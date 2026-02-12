@@ -1,0 +1,24 @@
+{
+    "name": "CalorieEntry",
+    "type": "object",
+    "properties": {
+        "meal_name": {
+            "type": "string",
+            "description": "Name of the meal"
+        },
+        "calories": {
+            "type": "number",
+            "description": "Calorie value of the meal"
+        },
+        "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of the meal"
+        }
+    },
+    "required": [
+        "meal_name",
+        "calories",
+        "date"
+    ]
+}
