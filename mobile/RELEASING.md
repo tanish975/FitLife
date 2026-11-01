@@ -54,23 +54,24 @@ Restore with `openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in FitLife-signi
 
 ## Local release build
 
-Install Java 17, Node 20, Android SDK platform 33 and build-tools 33.0.2. With the key in `.signing/`:
+Install Java 17, Node 20, Android SDK platform 35 and build-tools 36.0.0. The checked-in Gradle 9.3.1 wrapper verifies the distribution SHA-256. With the key in `.signing/`:
 
 ```sh
 cd mobile
 npm ci
 npm run test:native
 npm run build:standalone
+npm run test:cloud
 FITLIFE_VERSION_CODE=2 FITLIFE_VERSION_NAME=1.0.2 bash scripts/build-apk.sh
 npm run build
 ```
 
-`ANDROID_HOME` should point to the Android SDK. Alternatively set `ANDROID_BUILD_TOOLS_DIR` and `ANDROID_JAR` explicitly. Outputs are `../FitLife.apk` and `../FitLife-App.html`; they are generated and not committed. The build does not generate a replacement signing key automatically. Before distributing, choose a versionCode greater than every existing release.
+`ANDROID_HOME` should point to the Android SDK. Alternatively set `ANDROID_BUILD_TOOLS_DIR` explicitly. Firebase Android configuration is public; signing keys remain private. Outputs are `../FitLife.apk` and `../FitLife-App.html`; they are generated and not committed. The build does not generate a replacement signing key automatically. Before distributing, choose a versionCode greater than every existing release.
 
-The release workflow runs `npm run test:qa` against the production preview; it also runs `test:mobile` as part of that command. Locally, start `npx vite preview --host 127.0.0.1 --port 4173` in a separate terminal and run either command from `mobile/`. The mobile checks cover onboarding button hit targets, phone-sized layouts, simulated keyboard resizing, touch scrolling, search, logging, reduced motion, and resizing in Chromium. This is emulation, not a substitute for testing the signed APK and its keyboard on an actual phone.
+The release workflow runs `npm run test:qa` against the production preview; it also runs `test:mobile`, `test:features`, and `test:security` as part of that command. Locally, start `npx vite preview --host 127.0.0.1 --port 4173` in a separate terminal and run either command from `mobile/`. The mobile checks cover onboarding button hit targets, phone-sized layouts, simulated keyboard resizing, touch scrolling, search, logging, reduced motion, and resizing in Chromium. This is emulation, not a substitute for testing the signed APK and its keyboard on an actual phone.
 
 ## Privacy and scope
 
 The Android app checks GitHub Releases at launch at most once every six hours by default. The request shares ordinary network metadata (including IP address) with GitHub but **does not include fitness or profile data**. Users can disable automatic checks or manually check under Settings → App updates. The app remains usable offline. The standalone HTML and PWA do not perform Android APK update checks.
 
-This is a local-first demo. Firebase authentication and cloud synchronization are not configured. Fitness data is stored locally and may be lost if the app is uninstalled or device storage is cleared. Nutrition calculations are estimates and the app is not medical advice. The Android wrapper has been built and signature-verified locally, and CI is configured to repeat those checks. Physical-device installation has not yet been verified.
+This source includes local-first Android Google authentication and activity sync, but owner-reviewed Firestore rules must be deployed and tested on a real device before relying on cloud data. The browser remains local-only; phone SMS sign-in is not included. FitLife stores fitness data locally and it may be lost if the app is uninstalled or device storage is cleared. Android or browser backups may also include local app data depending on device settings. An optional, passphrase-encrypted manual backup is available in Settings; losing its passphrase makes that file unrecoverable. The native Android document picker and backup flow have not been tested on a physical phone or emulator. Nutrition calculations are estimates and the app is not medical advice. The Android wrapper has been built and signature-verified locally, and CI is configured to repeat those checks. Physical-device installation has not yet been verified.

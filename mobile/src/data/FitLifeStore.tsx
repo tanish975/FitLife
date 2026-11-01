@@ -33,6 +33,10 @@ import { triggerHaptic } from '../domain/Haptics';
 import { ParsedMealDraft } from '../domain/MealTextParser';
 import { applyThemeColorVariables } from '../domain/ThemeColorVariables';
 import { createThemeRevealController } from '../domain/ThemeReveal';
+import { BackupSnapshot, mergeBackupRows } from '../domain/EncryptedBackup';
+import { activatePartition, CLOUD_KINDS, CloudDeletions, CloudKind, CloudPartition, CloudPayload, emptyDeletions,
+  GoogleAccount, GUEST_OWNER, hasNativeCloud, isDemoId, mergeCloud, nativeCloudRequest, readActivePartition, readPartition,
+  RemoteSnapshot, rowFingerprint, savePartition, validCloudPayload } from '../domain/CloudSync';
 
 const STORAGE_KEYS = {
   PROFILE: 'fitlife_profile_v1',
@@ -84,6 +88,10 @@ interface FitLifeContextValue {
   setMotionStyle: (motion: MotionStyle) => void;
   setDensityStyle: (density: DensityStyle) => void;
   setDefaultRestSeconds: (sec: number) => void;
+  setAutoStartRest: (enabled: boolean) => void;
+  setWeeklyWorkoutGoal: (days: number) => void;
+  toggleFavoriteExercise: (id: string) => void;
+  setNavStyle: (style: 'glass' | 'solid') => void;
   setWaterGoalMl: (ml: number) => void;
   toggleDashboardWidget: (key: keyof DashboardWidgetsConfig) => void;
   addWaterMl: (deltaMl: number) => void;
@@ -96,8 +104,17 @@ interface FitLifeContextValue {
   logMood: (moodId: MoodId) => void;
   signIn: (email: string, name?: string) => void;
   signOut: () => void;
+  localOwnerId: string | null;
+  cloudAvailable: boolean;
+  cloudAccount: GoogleAccount | null;
+  cloudStatus: string;
+  signInGoogle: () => Promise<boolean>;
+  signOutGoogle: () => Promise<void>;
+  syncNow: () => Promise<void>;
   seedDemoHistory: () => void;
   clearAllHistory: () => void;
+  makeBackupSnapshot: () => BackupSnapshot;
+  restoreBackupSnapshot: (snapshot: BackupSnapshot, mode: 'merge' | 'replace') => Promise<void>;
 }
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -123,6 +140,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   motionStyle: 'spring',
   densityStyle: 'comfortable',
   defaultRestSeconds: 75,
+  autoStartRest: false,
+  weeklyWorkoutGoal: 3,
+  favoriteExerciseIds: [],
+  navStyle: 'glass',
   waterGoalMl: 2500,
   dashboardWidgets: {
     showMacros: true,
@@ -325,6 +346,28 @@ const FitLifeContext = createContext<FitLifeContextValue | null>(null);
 
 export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const initialSeed = useMemo(() => buildInitialDemoData(), []);
+  // Account slots are authoritative when a Google account has claimed this
+  // device's data. Never fall back to another account's legacy keys if a slot
+  // is missing or corrupt.
+  const initialCloud = useMemo(() => {
+    // The standalone preview may deliberately deny storage entirely.
+    try { return readActivePartition(localStorage); }
+    catch { return { uid: null, partition: null, damaged: false }; }
+  }, []);
+  const initialOwnerSnapshot = initialCloud.partition?.snapshot || null;
+  const ownerRef = useRef<string | null>(initialCloud.uid);
+  const [localOwnerId, setLocalOwnerId] = useState<string | null>(initialCloud.uid);
+  const storageBlockedRef = useRef(initialCloud.damaged);
+  const [cloudDeleted, setCloudDeleted] = useState<CloudDeletions>(() => initialCloud.partition?.deleted || emptyDeletions());
+  const cloudDeletedRef = useRef(cloudDeleted);
+  const [cloudAccount, setCloudAccount] = useState<GoogleAccount | null>(null);
+  const cloudAccountRef = useRef<GoogleAccount | null>(null);
+  const [cloudStatus, setCloudStatus] = useState(initialCloud.damaged
+    ? 'Account data needs recovery; cloud sync is paused and existing data was not overwritten.'
+    : 'Not connected.');
+  const cloudBusyRef = useRef(false);
+  const needsRecoveryRef = useRef(false);
+  const cloudAvailable = hasNativeCloud();
   const [todayKey, setTodayKey] = useState(() => getDateKeyDaysAgo(0));
 
   // Re-evaluate daily totals at local midnight and after the app resumes.
@@ -338,13 +381,16 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [todayKey]);
 
   const [profile, setProfile] = useState<UserProfile>(() =>
-    loadJson(STORAGE_KEYS.PROFILE, DEFAULT_PROFILE)
+    initialOwnerSnapshot?.profile || (initialCloud.damaged ? { ...DEFAULT_PROFILE, name: 'FitLife Athlete', email: '', onboarded: false } : loadJson(STORAGE_KEYS.PROFILE, DEFAULT_PROFILE))
   );
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const loaded = loadJson(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+    const loaded = initialOwnerSnapshot?.settings || (initialCloud.damaged ? DEFAULT_SETTINGS : loadJson(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS));
     return {
       ...DEFAULT_SETTINGS,
       ...loaded,
+      favoriteExerciseIds: Array.isArray(loaded.favoriteExerciseIds) ? loaded.favoriteExerciseIds.filter((id): id is string => typeof id === 'string') : [],
+      weeklyWorkoutGoal: Number.isFinite(loaded.weeklyWorkoutGoal) ? Math.max(1, Math.min(7, Math.round(loaded.weeklyWorkoutGoal))) : DEFAULT_SETTINGS.weeklyWorkoutGoal,
+      navStyle: loaded.navStyle === 'solid' ? 'solid' : 'glass',
       dashboardWidgets: {
         ...DEFAULT_SETTINGS.dashboardWidgets,
         ...(loaded.dashboardWidgets || {}),
@@ -360,18 +406,20 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => () => themeRevealRef.current?.cancel(), []);
 
   const [meals, setMeals] = useState<LoggedMeal[]>(() =>
-    loadArray(STORAGE_KEYS.MEALS, initialSeed.meals)
+    initialOwnerSnapshot?.meals || (initialCloud.damaged ? [] : loadArray(STORAGE_KEYS.MEALS, initialSeed.meals))
   );
   const [workouts, setWorkouts] = useState<LoggedWorkout[]>(() =>
-    loadArray(STORAGE_KEYS.WORKOUTS, initialSeed.workouts)
+    initialOwnerSnapshot?.workouts || (initialCloud.damaged ? [] : loadArray(STORAGE_KEYS.WORKOUTS, initialSeed.workouts))
   );
   const [weights, setWeights] = useState<WeightEntry[]>(() =>
-    loadArray(STORAGE_KEYS.WEIGHTS, initialSeed.weights)
+    initialOwnerSnapshot?.weights || (initialCloud.damaged ? [] : loadArray(STORAGE_KEYS.WEIGHTS, initialSeed.weights))
   );
   const [moods, setMoods] = useState<MoodEntry[]>(() =>
-    loadArray(STORAGE_KEYS.MOODS, initialSeed.moods)
+    initialOwnerSnapshot?.moods || (initialCloud.damaged ? [] : loadArray(STORAGE_KEYS.MOODS, initialSeed.moods))
   );
   const [waterRecord, setWaterRecord] = useState<{ dateKey: string; amountMl: number }>(() => {
+    if (initialOwnerSnapshot) return initialOwnerSnapshot.water;
+    if (initialCloud.damaged) return { dateKey: todayKey, amountMl: 0 };
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.WATER);
       if (!raw) return { dateKey: todayKey, amountMl: 0 };
@@ -384,6 +432,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
   const waterTodayMl = waterRecord.dateKey === todayKey ? waterRecord.amountMl : 0;
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (initialCloud.damaged) return false;
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.AUTH);
       return raw ? JSON.parse(raw) : false;
@@ -436,49 +485,49 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
     } catch {}
   }, [profile]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     } catch {}
   }, [settings]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.MEALS, JSON.stringify(meals));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.MEALS, JSON.stringify(meals));
     } catch {}
   }, [meals]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.WORKOUTS, JSON.stringify(workouts));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.WORKOUTS, JSON.stringify(workouts));
     } catch {}
   }, [workouts]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.WEIGHTS, JSON.stringify(weights));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.WEIGHTS, JSON.stringify(weights));
     } catch {}
   }, [weights]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.MOODS, JSON.stringify(moods));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.MOODS, JSON.stringify(moods));
     } catch {}
   }, [moods]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.WATER, JSON.stringify(waterRecord));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.WATER, JSON.stringify(waterRecord));
     } catch {}
   }, [waterRecord]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(isAuthenticated));
+      if (!storageBlockedRef.current) localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(isAuthenticated));
     } catch {}
   }, [isAuthenticated]);
 
@@ -567,7 +616,30 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return todayEntries[0]?.moodId ?? null;
   }, [moods, todayKey]);
 
-  const updateProfile = (next: Partial<UserProfile>) => {
+  // Deletions are content-specific and recorded before activity is removed.
+  // If another account becomes active while hashes are computed, do nothing.
+  const markCloudDeletes = async (groups: Partial<Record<CloudKind, { id: string }[]>>): Promise<boolean> => {
+    const owner = ownerRef.current;
+    if (!owner) return !storageBlockedRef.current;
+    if (storageBlockedRef.current) { showToast('Account data needs recovery before changes.'); return false; }
+    try {
+      const revision = backupRevisionRef.current;
+      const additions: Partial<Record<CloudKind, string[]>> = {};
+      for (const kind of CLOUD_KINDS) {
+        additions[kind] = await Promise.all((groups[kind] || []).filter(row => !isDemoId(row.id)).map(rowFingerprint));
+      }
+      if (ownerRef.current !== owner || backupRevisionRef.current !== revision) { showToast('Data changed; please try again.'); return false; }
+      setCloudDeleted(prev => {
+        const result = { ...prev };
+        for (const kind of CLOUD_KINDS) result[kind] = [...new Set([...prev[kind], ...(additions[kind] || [])])].sort();
+        return result;
+      });
+      return true;
+    } catch { showToast('Could not safely record the deletion. Nothing was removed.'); return false; }
+  };
+
+  const updateProfile = async (next: Partial<UserProfile>) => {
+    if (next.weightKg && next.weightKg > 0 && !(await markCloudDeletes({ weights: weights.filter(w => w.dateKey === todayKey) }))) return;
     triggerHaptic('medium', settings.hapticsEnabled);
     setProfile((prev) => ({ ...prev, ...next }));
     if (next.weightKg && next.weightKg > 0) {
@@ -656,6 +728,29 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast(`Default workout rest set to ${defaultRestSeconds}s`);
   };
 
+  const setAutoStartRest = (autoStartRest: boolean) => {
+    setSettings((prev) => ({ ...prev, autoStartRest }));
+    showToast(autoStartRest ? 'Rest timer will start after logging' : 'Automatic rest timer off');
+  };
+
+  const setWeeklyWorkoutGoal = (days: number) => {
+    const weeklyWorkoutGoal = Math.max(1, Math.min(7, Math.round(days)));
+    setSettings((prev) => ({ ...prev, weeklyWorkoutGoal }));
+    showToast(`Weekly goal: ${weeklyWorkoutGoal} workout days`);
+  };
+
+  const toggleFavoriteExercise = (id: string) => {
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((prev) => ({ ...prev, favoriteExerciseIds: prev.favoriteExerciseIds.includes(id)
+      ? prev.favoriteExerciseIds.filter((item) => item !== id)
+      : [...prev.favoriteExerciseIds, id] }));
+  };
+
+  const setNavStyle = (navStyle: 'glass' | 'solid') => {
+    setSettings((prev) => ({ ...prev, navStyle }));
+    showToast(navStyle === 'glass' ? 'Glass navigation selected' : 'Solid navigation selected');
+  };
+
   const setWaterGoalMl = (waterGoalMl: number) => {
     triggerHaptic('light', settings.hapticsEnabled);
     setSettings((prev) => ({ ...prev, waterGoalMl }));
@@ -724,7 +819,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast(`Quick-added ${created.length} item${created.length > 1 ? 's' : ''} (+${created.length * 10} XP)`);
   };
 
-  const removeMeal = (id: string) => {
+  const removeMeal = async (id: string) => {
+    if (!(await markCloudDeletes({ meals: meals.filter(row => row.id === id) }))) return;
     triggerHaptic('light', settings.hapticsEnabled);
     setMeals((prev) => prev.filter((m) => m.id !== id));
     showToast('Meal removed');
@@ -742,13 +838,15 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast(`Logged ${entry.exerciseName} (+20 XP)`);
   };
 
-  const removeWorkout = (id: string) => {
+  const removeWorkout = async (id: string) => {
+    if (!(await markCloudDeletes({ workouts: workouts.filter(row => row.id === id) }))) return;
     triggerHaptic('light', settings.hapticsEnabled);
     setWorkouts((prev) => prev.filter((w) => w.id !== id));
     showToast('Workout removed');
   };
 
-  const logWeight = (weightKg: number) => {
+  const logWeight = async (weightKg: number) => {
+    if (!(await markCloudDeletes({ weights: weights.filter(row => row.dateKey === todayKey) }))) return;
     triggerHaptic('medium', settings.hapticsEnabled);
     const rounded = Math.round(weightKg * 10) / 10;
     setWeights((prev) => [
@@ -764,7 +862,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast('Weight logged & BMI updated');
   };
 
-  const logMood = (moodId: MoodId) => {
+  const logMood = async (moodId: MoodId) => {
+    if (!(await markCloudDeletes({ moods: moods.filter(row => row.dateKey === todayKey) }))) return;
     triggerHaptic('light', settings.hapticsEnabled);
     setMoods((prev) => [
       ...prev.filter((m) => m.dateKey !== todayKey),
@@ -789,20 +888,25 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       'FitLife Athlete';
     setProfile((prev) => ({
       ...prev,
-      email: email.trim() || prev.email,
+      email: cloudAccountRef.current?.email || email.trim() || prev.email,
       name: displayName,
     }));
     setIsAuthenticated(true);
     showToast(`Welcome, ${displayName}!`);
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    if (cloudAccountRef.current) { await signOutGoogle(); return; }
+    ++authGenerationRef.current;
+    try { switchToLocalGuest(); }
+    catch { showToast('Could not safely separate local account data. Free device storage and try again.'); return; }
     triggerHaptic('medium', settings.hapticsEnabled);
     setIsAuthenticated(false);
-    showToast('Signed out of FitLife');
+    showToast('Profile closed on this device');
   };
 
-  const seedDemoHistory = () => {
+  const seedDemoHistory = async () => {
+    if (!(await markCloudDeletes({ meals, workouts, weights, moods }))) return;
     triggerHaptic('success', settings.hapticsEnabled);
     const fresh = buildInitialDemoData();
     setMeals(fresh.meals);
@@ -810,11 +914,13 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setWeights(fresh.weights);
     setMoods(fresh.moods);
     setWaterRecord({ dateKey: todayKey, amountMl: 1500 });
-    setProfile(DEFAULT_PROFILE);
+    const account = cloudAccountRef.current;
+    setProfile(account ? { ...DEFAULT_PROFILE, name: account.name || 'FitLife Athlete', email: account.email, uid: account.uid } : DEFAULT_PROFILE);
     showToast('Restored 14-day FitLife demo dataset');
   };
 
-  const clearAllHistory = () => {
+  const clearAllHistory = async () => {
+    if (!(await markCloudDeletes({ meals, workouts, weights, moods }))) return;
     triggerHaptic('medium', settings.hapticsEnabled);
     setMeals([]);
     setWorkouts([]);
@@ -829,6 +935,304 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMoods([]);
     setWaterRecord({ dateKey: todayKey, amountMl: 0 });
     showToast('Cleared logs — ready for a fresh start');
+  };
+
+  const backupRevisionRef = useRef(0);
+  const backupDataRef = useRef({ profile, settings, meals, workouts, weights, moods, water: waterRecord });
+  useLayoutEffect(() => {
+    backupDataRef.current = { profile, settings, meals, workouts, weights, moods, water: waterRecord };
+    cloudDeletedRef.current = cloudDeleted;
+    backupRevisionRef.current++;
+    if (ownerRef.current && !storageBlockedRef.current) {
+      try {
+        savePartition(localStorage, ownerRef.current, { version: 1, snapshot: { schema: 1, createdAt: 0, ...backupDataRef.current }, deleted: cloudDeleted });
+      } catch {
+        setCloudStatus('Device storage is full or unavailable. Changes may not persist; create an encrypted backup.');
+      }
+    }
+  }, [profile, settings, meals, workouts, weights, moods, waterRecord, cloudDeleted]);
+
+  const makeBackupSnapshot = (): BackupSnapshot => ({ schema: 1, createdAt: Date.now(), ...backupDataRef.current });
+
+  const syncAgainRef = useRef(false);
+  const syncNowRef = useRef<() => Promise<void>>(async () => {});
+  const authGenerationRef = useRef(0);
+
+  const parseAccount = (value: unknown): GoogleAccount | null => {
+    if (!value || typeof value !== 'object') return null;
+    const user = value as Partial<GoogleAccount>;
+    return user.signedIn === true && typeof user.uid === 'string' && user.uid !== GUEST_OWNER && /^[A-Za-z0-9_-]{1,128}$/.test(user.uid)
+      && typeof user.name === 'string' && user.name.length <= 200 && typeof user.email === 'string' && user.email.length <= 320
+      ? user as GoogleAccount : null;
+  };
+  const applyPartition = (part: CloudPartition) => {
+    const next = part.snapshot;
+    themeRevealRef.current?.cancel();
+    requestedThemeRef.current = next.settings.themeMode;
+    appliedThemeRef.current = next.settings.themeMode;
+    flushSync(() => {
+      setProfile(next.profile); setSettings(next.settings); setMeals(next.meals); setWorkouts(next.workouts);
+      setWeights(next.weights); setMoods(next.moods); setWaterRecord(next.water); setCloudDeleted(part.deleted);
+    });
+  };
+  const freshPartition = (account: GoogleAccount): CloudPartition => ({
+    version: 1,
+    snapshot: { schema: 1, createdAt: 0,
+      profile: { ...DEFAULT_PROFILE, name: account.name || 'FitLife Athlete', email: account.email, uid: account.uid, onboarded: false },
+      settings: DEFAULT_SETTINGS, meals: [], workouts: [], weights: [], moods: [], water: { dateKey: getDateKeyDaysAgo(0), amountMl: 0 } },
+    deleted: emptyDeletions(),
+  });
+  const switchToLocalGuest = () => {
+    const owner = ownerRef.current;
+    if (!owner || owner === GUEST_OWNER) return;
+    if (storageBlockedRef.current) throw new Error('Local data needs recovery.');
+    // Store the account first. The separate guest slot is activated only after
+    // it exists, so a crash cannot expose account A as the guest or account B.
+    const previous: CloudPartition = { version: 1, snapshot: makeBackupSnapshot(), deleted: cloudDeletedRef.current };
+    savePartition(localStorage, owner, previous);
+    const existing = readPartition(localStorage, GUEST_OWNER);
+    const guest = existing || freshPartition({ signedIn: true, uid: GUEST_OWNER, name: 'FitLife Athlete', email: '' });
+    activatePartition(localStorage, GUEST_OWNER, guest);
+    ownerRef.current = GUEST_OWNER; setLocalOwnerId(GUEST_OWNER);
+    needsRecoveryRef.current = false;
+    applyPartition(guest);
+  };
+  const isUntouchedDemo = (snapshot: BackupSnapshot) =>
+    [snapshot.meals, snapshot.workouts, snapshot.weights, snapshot.moods].every(rows => rows.every(row => isDemoId(row.id)))
+    && snapshot.water.amountMl === 0 && JSON.stringify(snapshot.profile) === JSON.stringify(DEFAULT_PROFILE);
+
+  const activateGoogleAccount = (account: GoogleAccount, openApp: boolean) => {
+    if (storageBlockedRef.current) throw new Error('The local account data needs recovery. Nothing was switched or uploaded.');
+    const previousOwner = ownerRef.current;
+    const previous: CloudPartition = { version: 1, snapshot: makeBackupSnapshot(), deleted: cloudDeletedRef.current };
+    let next: CloudPartition;
+    let recoverProfile = false;
+    if (previousOwner === account.uid) {
+      next = previous;
+      recoverProfile = !previous.snapshot.profile.onboarded && [previous.snapshot.meals, previous.snapshot.workouts, previous.snapshot.weights, previous.snapshot.moods].every(rows => rows.length === 0);
+    } else if (previousOwner) {
+      // Saving A is mandatory before B becomes active. An error aborts the switch.
+      savePartition(localStorage, previousOwner, previous);
+      const existing = readPartition(localStorage, account.uid);
+      next = existing || freshPartition(account);
+      recoverProfile = !existing;
+    } else {
+      // Only the first claimed account inherits the previously unclaimed data.
+      recoverProfile = isUntouchedDemo(previous.snapshot);
+      next = previous;
+    }
+    const identityProfile = { ...next.snapshot.profile,
+      name: next.snapshot.profile.name === DEFAULT_PROFILE.name && account.name ? account.name : next.snapshot.profile.name,
+      email: account.email || next.snapshot.profile.email, uid: account.uid };
+    next = { ...next, snapshot: { ...next.snapshot, profile: identityProfile } };
+    // A first claim also retains the existing local rest timer in that account.
+    // Later accounts never inherit another person's timer.
+    if (!previousOwner) {
+      const originalTimer = localStorage.getItem('fitlife_rest_timer_v1');
+      const accountTimerKey = `fitlife_rest_timer_v1:${account.uid}`;
+      if (originalTimer && !localStorage.getItem(accountTimerKey)) localStorage.setItem(accountTimerKey, originalTimer);
+    }
+    // A single slot is written first and the ownership marker second. If the
+    // app stops between writes, the old owner's slot remains authoritative.
+    activatePartition(localStorage, account.uid, next);
+    ownerRef.current = account.uid;
+    setLocalOwnerId(account.uid);
+    needsRecoveryRef.current = recoverProfile;
+    cloudAccountRef.current = account;
+    setCloudAccount(account);
+    applyPartition(next);
+    if (openApp) setIsAuthenticated(true);
+  };
+
+  const signInGoogle = async (): Promise<boolean> => {
+    if (!cloudAvailable) { setCloudStatus('Google sign-in is available in the Android app.'); return false; }
+    const generation = ++authGenerationRef.current;
+    setCloudStatus('Opening Google sign-in…');
+    let nativeSignedIn = false;
+    try {
+      const result = await nativeCloudRequest<unknown>('signIn');
+      nativeSignedIn = true;
+      const account = parseAccount(result);
+      if (!account || generation !== authGenerationRef.current) throw new Error('Google sign-in did not finish.');
+      activateGoogleAccount(account, true);
+      setCloudStatus('Google account connected. Checking cloud data…');
+      return true;
+    } catch (error) {
+      if (nativeSignedIn) { try { await nativeCloudRequest('signOut'); } catch {} }
+      cloudAccountRef.current = null; setCloudAccount(null);
+      setCloudStatus(error instanceof Error ? error.message : 'Google sign-in failed.');
+      return false;
+    }
+  };
+  const signOutGoogle = async () => {
+    ++authGenerationRef.current;
+    try {
+      await nativeCloudRequest('signOut');
+      cloudAccountRef.current = null; setCloudAccount(null);
+      switchToLocalGuest();
+      setIsAuthenticated(false);
+      setCloudStatus('Signed out. Account data remains on this device, separate from the local guest.');
+    } catch (error) { setCloudStatus(error instanceof Error ? error.message : 'Could not sign out.'); }
+  };
+
+  const syncNow = async () => {
+    const account = cloudAccountRef.current;
+    if (!account || !cloudAvailable) return;
+    if (storageBlockedRef.current || ownerRef.current !== account.uid) { setCloudStatus('Local account data needs recovery. Sync is paused.'); return; }
+    if (cloudBusyRef.current) { syncAgainRef.current = true; return; }
+    cloudBusyRef.current = true;
+    setCloudStatus('Checking cloud data…');
+    try {
+      const response = await nativeCloudRequest<{ uid: string; deviceId: string; snapshots: RemoteSnapshot[] }>('pull', undefined, account.uid);
+      if (cloudAccountRef.current?.uid !== account.uid || ownerRef.current !== account.uid || response.uid !== account.uid)
+        throw new Error('Account changed; sync was stopped.');
+      if (!/^[a-f0-9]{32}$/.test(response.deviceId) || !Array.isArray(response.snapshots) || response.snapshots.length > 10)
+        throw new Error('Cloud data could not be verified; nothing was overwritten.');
+      const remotes: CloudPayload[] = [];
+      let ownPayload: string | null = null;
+      for (const item of response.snapshots) {
+        if (!item || !/^[a-f0-9]{32}$/.test(item.deviceId) || typeof item.payload !== 'string') throw new Error('Cloud data is invalid; nothing was overwritten.');
+        let parsed: unknown; try { parsed = JSON.parse(item.payload); } catch { throw new Error('Cloud data is invalid; nothing was overwritten.'); }
+        if (!validCloudPayload(parsed)) throw new Error('Cloud data is invalid; nothing was overwritten.');
+        remotes.push(parsed); if (item.deviceId === response.deviceId) ownPayload = item.payload;
+      }
+      const revision = backupRevisionRef.current;
+      let snapshot = makeBackupSnapshot();
+      // A new device can recover one account's profile/preferences/water copy.
+      // Otherwise those values are device-local and are never silently merged.
+      if (needsRecoveryRef.current && remotes.length > 0) {
+        const recovered = remotes[0].snapshot;
+        snapshot = { ...snapshot, profile: { ...recovered.profile, email: account.email || recovered.profile.email, uid: account.uid },
+          settings: recovered.settings, water: recovered.water };
+      }
+      const merged = await mergeCloud({ schema: 1, snapshot, deleted: cloudDeletedRef.current }, remotes);
+      if (cloudAccountRef.current?.uid !== account.uid || ownerRef.current !== account.uid) throw new Error('Account changed; sync was stopped.');
+      if (revision !== backupRevisionRef.current) { syncAgainRef.current = true; setCloudStatus('Changes saved locally; retrying sync…'); return; }
+      const payload = JSON.stringify(merged);
+      if (new TextEncoder().encode(payload).byteLength > 500_000) throw new Error('This data is too large for cloud sync. Keep an encrypted local backup.');
+      const part: CloudPartition = { version: 1, snapshot: merged.snapshot, deleted: merged.deleted };
+      // Fail before modifying visible data if the local atomic slot cannot be saved.
+      savePartition(localStorage, account.uid, part);
+      const currentComparable = JSON.stringify({ ...makeBackupSnapshot(), createdAt: 0 });
+      const nextComparable = JSON.stringify(merged.snapshot);
+      if (currentComparable !== nextComparable || JSON.stringify(cloudDeletedRef.current) !== JSON.stringify(merged.deleted)) applyPartition(part);
+      needsRecoveryRef.current = false;
+      const mergedRevision = backupRevisionRef.current;
+      if (ownPayload !== payload) {
+        setCloudStatus('Saving merged activity to your Google account…');
+        const saved = await nativeCloudRequest<{ uid: string }>('push', payload, account.uid);
+        if (saved.uid !== account.uid || cloudAccountRef.current?.uid !== account.uid || ownerRef.current !== account.uid) throw new Error('Account changed; sync was stopped.');
+      }
+      if (mergedRevision !== backupRevisionRef.current) { syncAgainRef.current = true; setCloudStatus('Changes saved locally; syncing again…'); }
+      else setCloudStatus('Activity synced. Profile, settings and today’s water are device-specific.');
+    } catch (error) {
+      if (cloudAccountRef.current?.uid === account.uid) setCloudStatus(error instanceof Error ? error.message : 'Cloud sync is unavailable. Data stays on this device.');
+    } finally {
+      cloudBusyRef.current = false;
+      if (syncAgainRef.current) {
+        syncAgainRef.current = false;
+        window.setTimeout(() => { void syncNowRef.current(); }, 1600);
+      }
+    }
+  };
+  syncNowRef.current = syncNow;
+
+  // Restore only the native Firebase session; the WebView never receives tokens.
+  useEffect(() => {
+    if (!cloudAvailable) return;
+    const generation = authGenerationRef.current;
+    void nativeCloudRequest<unknown>('session').then(value => {
+      if (generation !== authGenerationRef.current) return;
+      const account = parseAccount(value);
+      if (!account) { if (!storageBlockedRef.current) setCloudStatus('Not connected.'); return; }
+      try { activateGoogleAccount(account, false); setCloudStatus('Google account connected. Checking cloud data…'); }
+      catch (error) { cloudAccountRef.current = null; setCloudAccount(null); setCloudStatus(error instanceof Error ? error.message : 'Account recovery is required.'); }
+    }).catch(() => setCloudStatus('Google session unavailable; local data is still available.'));
+  }, []);
+  // Debounced writes, periodic reads and foreground/online retry keep ordinary
+  // use within modest free-tier quotas. A network error never discards local edits.
+  useEffect(() => {
+    if (!cloudAccount) return;
+    const timer = window.setTimeout(() => { void syncNowRef.current(); }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [cloudAccount, profile, settings, meals, workouts, weights, moods, waterRecord, cloudDeleted]);
+  useEffect(() => {
+    if (!cloudAccount) return;
+    const timer = window.setInterval(() => { if (!document.hidden) void syncNowRef.current(); }, 120000);
+    const retry = () => { if (!document.hidden) void syncNowRef.current(); };
+    window.addEventListener('online', retry); document.addEventListener('visibilitychange', retry);
+    return () => { window.clearInterval(timer); window.removeEventListener('online', retry); document.removeEventListener('visibilitychange', retry); };
+  }, [cloudAccount]);
+
+  const restoreBackupSnapshot = async (snapshot: BackupSnapshot, mode: 'merge' | 'replace') => {
+    if (storageBlockedRef.current) throw new Error('Account data needs recovery before importing.');
+    // Read live state after decryption, not the render closure from when the user
+    // opened the file picker. Do not overwrite edits from another open tab.
+    const revision = backupRevisionRef.current;
+    const current = makeBackupSnapshot();
+    const keys: [string, unknown][] = [[STORAGE_KEYS.PROFILE, current.profile], [STORAGE_KEYS.SETTINGS, current.settings],
+      [STORAGE_KEYS.MEALS, current.meals], [STORAGE_KEYS.WORKOUTS, current.workouts], [STORAGE_KEYS.WEIGHTS, current.weights],
+      [STORAGE_KEYS.MOODS, current.moods], [STORAGE_KEYS.WATER, current.water]];
+    const originals = keys.map(([key]) => localStorage.getItem(key));
+    if (keys.some(([, value], i) => originals[i] !== JSON.stringify(value))) throw new Error('Device data changed in another tab. Reload FitLife before importing.');
+    // An intentional backup restore gets a fresh stable ID when its old copy
+    // was deleted in cloud sync. Otherwise an old tombstone would hide it.
+    const imported = { ...snapshot };
+    if (ownerRef.current) {
+      for (const kind of CLOUD_KINDS) {
+        const tombstones = new Set(cloudDeletedRef.current[kind]);
+        const rows = await Promise.all((snapshot[kind] as { id: string }[]).map(async row => {
+          const fingerprint = await rowFingerprint(row);
+          return tombstones.has(fingerprint) ? { ...row, id: `${row.id.slice(0, 250)}-restored-${fingerprint.slice(0, 24)}` } : row;
+        }));
+        (imported as any)[kind] = rows;
+      }
+    }
+    const next: BackupSnapshot = mode === 'merge' ? {
+      ...current,
+      meals: await mergeBackupRows(current.meals, imported.meals),
+      workouts: await mergeBackupRows(current.workouts, imported.workouts),
+      weights: await mergeBackupRows(current.weights, imported.weights),
+      moods: await mergeBackupRows(current.moods, imported.moods),
+    } : { ...imported, settings: {
+      ...DEFAULT_SETTINGS, ...snapshot.settings,
+      favoriteExerciseIds: snapshot.settings.favoriteExerciseIds || [],
+      weeklyWorkoutGoal: snapshot.settings.weeklyWorkoutGoal || DEFAULT_SETTINGS.weeklyWorkoutGoal,
+      navStyle: snapshot.settings.navStyle || DEFAULT_SETTINGS.navStyle,
+      dashboardWidgets: { ...DEFAULT_SETTINGS.dashboardWidgets, ...snapshot.settings.dashboardWidgets },
+    } };
+    const account = cloudAccountRef.current;
+    if (account && ownerRef.current === account.uid) next.profile = { ...next.profile, email: account.email || next.profile.email, uid: account.uid };
+    const nextDeleted: CloudDeletions = { ...cloudDeletedRef.current };
+    if (ownerRef.current && mode === 'replace') {
+      for (const kind of CLOUD_KINDS) {
+        const incoming = new Set(await Promise.all((next[kind] as { id: string }[]).map(rowFingerprint)));
+        const old = await Promise.all((current[kind] as { id: string }[]).filter(row => !isDemoId(row.id)).map(rowFingerprint));
+        nextDeleted[kind] = [...new Set([...nextDeleted[kind], ...old.filter(hash => !incoming.has(hash))])].sort();
+      }
+    }
+    if (backupRevisionRef.current !== revision || keys.some(([key], i) => localStorage.getItem(key) !== originals[i])) throw new Error('Your activity changed during import. Please try again.');
+    const changes: [string, unknown][] = [[STORAGE_KEYS.PROFILE, next.profile], [STORAGE_KEYS.SETTINGS, next.settings],
+      [STORAGE_KEYS.MEALS, next.meals], [STORAGE_KEYS.WORKOUTS, next.workouts], [STORAGE_KEYS.WEIGHTS, next.weights],
+      [STORAGE_KEYS.MOODS, next.moods], [STORAGE_KEYS.WATER, next.water]];
+    // Write all values before changing React state. On quota or storage failure,
+    // restore the earlier values when possible and report failure, never pretend.
+    let written = 0;
+    try {
+      for (const [key, value] of changes) { localStorage.setItem(key, JSON.stringify(value)); written++; }
+      if (ownerRef.current) savePartition(localStorage, ownerRef.current, { version: 1, snapshot: next, deleted: nextDeleted });
+    } catch {
+      // Free changed entries first: restoring them one-by-one can itself hit
+      // quota if an earlier replacement was larger than its original value.
+      for (let index = 0; index < written; index++) try { localStorage.removeItem(changes[index][0]); } catch { /* report failure below */ }
+      for (let index = 0; index < written; index++) {
+        try { const [key] = changes[index]; const old = originals[index]; if (old !== null) localStorage.setItem(key, old); } catch { /* report failure below */ }
+      }
+      throw new Error('Could not complete the restore. Check available device storage and try again.');
+    }
+    setProfile(next.profile); setSettings(next.settings); setMeals(next.meals); setWorkouts(next.workouts);
+    setWeights(next.weights); setMoods(next.moods); setWaterRecord(next.water); setCloudDeleted(nextDeleted);
+    showToast(mode === 'merge' ? 'Backup activity merged' : 'Backup restored');
   };
 
   const dismissCelebration = () => setCelebration(null);
@@ -879,6 +1283,10 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setMotionStyle,
         setDensityStyle,
         setDefaultRestSeconds,
+        setAutoStartRest,
+        setWeeklyWorkoutGoal,
+        toggleFavoriteExercise,
+        setNavStyle,
         setWaterGoalMl,
         toggleDashboardWidget,
         addWaterMl,
@@ -891,8 +1299,17 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         logMood,
         signIn,
         signOut,
+        localOwnerId,
+        cloudAvailable,
+        cloudAccount,
+        cloudStatus,
+        signInGoogle,
+        signOutGoogle,
+        syncNow,
         seedDemoHistory,
         clearAllHistory,
+        makeBackupSnapshot,
+        restoreBackupSnapshot,
       }}
     >
       {children}

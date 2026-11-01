@@ -3,6 +3,7 @@ import { ArrowRight, CalendarDays, ChevronRight, Droplets, Dumbbell, Leaf, Plus,
 import { AnimatedRing } from './AnimatedRing';
 import { MainTabId, NAV_ITEMS } from './GlassBottomNav';
 import { useFitLife } from '../data/FitLifeStore';
+import { FitLifeLogo } from './FitLifeLogo';
 
 interface SidebarProps {
   activeTab: MainTabId;
@@ -14,7 +15,7 @@ interface SidebarProps {
 
 export const FitLifeBrand: React.FC = () => (
   <span className="fitlife-brand" aria-label="FitLife">
-    <span className="fitlife-brand-mark"><Leaf size={17} strokeWidth={2.2} /></span>
+    <span className="fitlife-brand-mark"><FitLifeLogo /></span>
     <span>fitlife<span className="fitlife-brand-dot">.</span></span>
   </span>
 );

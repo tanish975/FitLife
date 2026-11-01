@@ -17,6 +17,7 @@ import { OnboardingScreen } from './screens/OnboardingScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { triggerHaptic } from './domain/Haptics';
 import { useMediaQuery } from './hooks/useMediaQuery';
+import { FitLifeLogo } from './components/FitLifeLogo';
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -67,7 +68,7 @@ const FitLifeShell: React.FC = () => {
 
   const renderScreen = () => {
     if (showSplash) return (
-      <div className="fitlife-splash"><div className="splash-mark"><FitLifeBrand /></div><span>MOVE WITH PURPOSE.</span></div>
+      <div className="fitlife-splash" role="status" aria-label="Opening FitLife"><div className="splash-logo"><FitLifeLogo /></div><div className="splash-wordmark">fitlife<span>.</span></div><span>MOVE WITH PURPOSE.</span><div className="splash-loader" aria-hidden="true"><i></i><i></i><i></i></div></div>
     );
     if (!isAuthenticated) return <div className="legacy-screen"><AuthScreen onCompleteAuth={(isNew) => { setActiveTab('dashboard'); setSubScreen(isNew || !profile.onboarded ? 'onboarding' : 'none'); scrollToTop(); }} /></div>;
     if (!profile.onboarded || subScreen === 'onboarding') return <div className="legacy-screen"><OnboardingScreen onFinish={closeSubScreen} onCancel={profile.onboarded ? closeSubScreen : undefined} /></div>;

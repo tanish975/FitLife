@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The server evaluates the verified Firebase UID, never a value supplied by
+    // JavaScript. No other document path is accessible to client SDKs / REST.
+    match /users/{uid}/devices/{deviceId} {
+      function owner() { return request.auth != null && request.auth.uid == uid; }
+      function validSnapshot() {
+        return deviceId.matches('^[a-f0-9]{32}$')
+          && request.resource.data.keys().hasOnly(['schema', 'payload'])
+          && request.resource.data.keys().hasAll(['schema', 'payload'])
+          && request.resource.data.schema == 1
+          && request.resource.data.payload is string
+          && request.resource.data.payload.size() <= 500000;
+      }
+      allow read: if owner();
+      allow create, update: if owner() && validSnapshot();
+      // The app uses tombstones for activity deletions; direct document deletes
+      // are disabled so another device's data cannot vanish accidentally.
+      allow delete: if false;
+    }
+  }
+}

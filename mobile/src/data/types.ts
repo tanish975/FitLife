@@ -157,6 +157,10 @@ export interface AppSettings {
   motionStyle: MotionStyle;
   densityStyle: DensityStyle;
   defaultRestSeconds: number;
+  autoStartRest: boolean;
+  weeklyWorkoutGoal: number;
+  favoriteExerciseIds: string[];
+  navStyle: 'glass' | 'solid';
   waterGoalMl: number;
   dashboardWidgets: DashboardWidgetsConfig;
 }

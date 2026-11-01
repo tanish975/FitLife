@@ -31,6 +31,8 @@ import {
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
 import { FITLIFE_RELEASES_URL, FITLIFE_LATEST_APK_URL, getNativeUpdateBridge } from '../domain/Updates';
+import { EncryptedBackupPanel } from '../components/EncryptedBackupPanel';
+import { CloudAccountPanel } from '../components/CloudAccountPanel';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -57,6 +59,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
     setMotionStyle,
     setDensityStyle,
     setDefaultRestSeconds,
+    setAutoStartRest,
+    setWeeklyWorkoutGoal,
+    setNavStyle,
     setWaterGoalMl,
     toggleDashboardWidget,
     seedDemoHistory,
@@ -125,70 +130,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
         />
       </div>
 
-      {/* 2. 5 REFRESHING NATURAL COLOR PALETTES (100% Solid, Zero Gradients) */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">
-            <Palette className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Natural Color Combinations
-            </h3>
-            <p className="text-xs text-[#84877F]">
-              5 organic, zero-gradient palettes tuned for both Daylight & Nightfall
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
+      {/* Compact, labelled, keyboard-accessible solid palette controls. */}
+      <section className="palette-picker" aria-labelledby="palette-heading">
+        <div className="palette-picker-heading"><div><h3 id="palette-heading">Color palette</h3><p>{NATURAL_PALETTES[settings.paletteId].name}</p></div><Palette size={19} aria-hidden="true" /></div>
+        <div className="palette-swatches" role="group" aria-label="Color palette">
           {(Object.keys(NATURAL_PALETTES) as PaletteId[]).map((pid) => {
-            const p = NATURAL_PALETTES[pid];
-            const isSelected = settings.paletteId === pid;
-            return (
-              <PressScale
-                key={pid}
-                onClick={() => setPaletteId(pid)}
-                ariaPressed={isSelected}
-                className={`flex items-center justify-between rounded-2xl border p-3 transition ${
-                  isSelected
-                    ? 'border-[#528B67] bg-[#213026]'
-                    : 'border-[#2F3A33] bg-[#141916]'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* 4 Solid Natural Color Swatches */}
-                  <div className="flex shrink-0 -space-x-1.5">
-                    {p.swatches.map((hex, i) => (
-                      <span
-                        key={i}
-                        className="h-6 w-6 rounded-full border-2 border-[#1E2520] shadow-sm"
-                        style={{ backgroundColor: hex }}
-                      />
-                    ))}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-heading text-xs font-bold text-[#F4F1EA]">
-                      {p.name}
-                    </div>
-                    <p className="truncate text-[11px] text-[#84877F]">{p.tagline}</p>
-                  </div>
-                </div>
-
-                <div
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                    isSelected
-                      ? 'border-[#528B67] bg-[#528B67] text-[#F4F1EA]'
-                      : 'border-[#84877F]'
-                  }`}
-                >
-                  {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-                </div>
-              </PressScale>
-            );
+            const palette = NATURAL_PALETTES[pid];
+            const selected = settings.paletteId === pid;
+            return <button key={pid} type="button" aria-label={palette.name} aria-pressed={selected} title={palette.name} onClick={() => setPaletteId(pid)} className={`palette-choice ${selected ? 'is-selected' : ''}`}>
+              <span className="palette-color" style={{ backgroundColor: palette.swatches[1] }}><span style={{ backgroundColor: palette.swatches[0] }} />{selected && <Check size={15} strokeWidth={3} />}</span>
+            </button>;
           })}
         </div>
-      </div>
+      </section>
 
       {/* 3. INTERFACE SHAPE, DENSITY & MOTION CUSTOMIZATION */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4">
@@ -236,6 +190,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
             selected={settings.densityStyle}
             onChange={setDensityStyle}
           />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">Bottom navigation</label>
+          <SegmentedSelector<'glass' | 'solid'> size="sm" options={[{ value: 'glass', label: 'Glass' }, { value: 'solid', label: 'Solid' }]} selected={settings.navStyle} onChange={setNavStyle} />
         </div>
 
         <div>
@@ -330,6 +289,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
           onChange={(v) => setWaterGoalMl(Number(v))}
         />
 
+        <div className="pt-2 border-t border-[#2F3A33]">
+          <div className="mb-2 flex items-center justify-between"><span className="font-heading text-xs font-semibold text-[#F4F1EA]">Weekly workout goal</span><span className="text-xs font-bold text-[#7BB38F]">{settings.weeklyWorkoutGoal} days</span></div>
+          <SegmentedSelector<string> size="sm" options={[1, 2, 3, 4, 5, 6, 7].map(day => ({ value: String(day), label: String(day) }))} selected={String(settings.weeklyWorkoutGoal)} onChange={(value) => setWeeklyWorkoutGoal(Number(value))} />
+        </div>
+
         <div className="pt-1 border-t border-[#2F3A33]">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -355,6 +319,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
             selected={String(settings.defaultRestSeconds)}
             onChange={(v) => setDefaultRestSeconds(Number(v))}
           />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-[#B8B5AD]">Start rest after logging a workout</span>
+            <button type="button" role="switch" aria-label="Auto-start rest timer" aria-checked={settings.autoStartRest} onClick={() => setAutoStartRest(!settings.autoStartRest)} className="relative inline-flex h-11 w-11 shrink-0 items-center">
+              <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${settings.autoStartRest ? 'bg-[#528B67]' : 'bg-[#2F3A33]'}`}><span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${settings.autoStartRest ? 'translate-x-6' : 'translate-x-1'}`} /></span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -486,7 +456,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
         )}
       </div>
 
-      {/* 8. DATA MANAGEMENT & CLOUD SYNC */}
+      <CloudAccountPanel />
+      <EncryptedBackupPanel />
+
+      {/* 8. LOCAL DATA MANAGEMENT */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -498,7 +471,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
           <span className="text-[11px] text-[#84877F]">{profile.email}</span>
         </div>
 
-        <p className="text-[11px] text-[#84877F]">Data is stored on this device; cloud sync is not configured.</p>
+        <p className="text-[11px] text-[#84877F]">FitLife keeps this profile on your device. Your device or browser may also include it in backups. Google sync, when connected above, only covers the activity described there.</p>
         <div className="grid grid-cols-2 gap-2">
           <PressScale
             onClick={() => setPendingDataAction('restore')}
@@ -538,7 +511,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
           }}
           className="flex w-full items-center justify-center rounded-xl border border-[#2F3A33] bg-[#141916] py-2.5 text-xs font-semibold text-[#B8B5AD] hover:text-[#F4F1EA]"
         >
-          Sign Out of FitLife
+          Exit local profile
         </PressScale>
       </div>
     </div>

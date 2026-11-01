@@ -2,8 +2,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APK="${1:-$ROOT/../FitLife.apk}"
-TOOLS="${ANDROID_BUILD_TOOLS_DIR:-${ANDROID_HOME:-}/build-tools/33.0.2}"
-CODE="${FITLIFE_VERSION_CODE:-2}"
+TOOLS="${ANDROID_BUILD_TOOLS_DIR:-${ANDROID_HOME:-}/build-tools/36.0.0}"
+CODE="${FITLIFE_VERSION_CODE:-5}"
 NAME="${FITLIFE_VERSION_NAME:-1.0.$CODE}"
 [[ -f "$APK" && -f "$ROOT/../FitLife-App.html" ]] || { echo 'Missing APK or standalone HTML.' >&2; exit 1; }
 badging="$("$TOOLS/aapt" dump badging "$APK")"

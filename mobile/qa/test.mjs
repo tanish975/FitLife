@@ -185,7 +185,7 @@ try {
   assert.ok((await firstRun.locator('body').innerText()).includes('Asha'));
   assert.equal(await firstRun.getByText('Demo data', { exact: true }).count(), 0, 'fresh profile starts without sample activity');
   await firstRun.getByRole('button', { name: 'Profile', exact: true }).click();
-  await firstRun.getByRole('button', { name: 'Sign Out', exact: true }).click();
+  await firstRun.getByRole('button', { name: 'Exit profile', exact: true }).click();
   await firstRun.getByRole('button', { name: 'Continue as Asha Tester', exact: true }).click();
   await firstRun.getByText("Today's overview").waitFor();
   assert.equal((await firstRun.evaluate(() => JSON.parse(localStorage.getItem('fitlife_profile_v1')))).name, 'Asha Tester', 'local profile survives sign out and return');

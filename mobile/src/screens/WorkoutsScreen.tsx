@@ -5,6 +5,7 @@ import {
   Clock,
   Dumbbell,
   Flame,
+  Heart,
   Plus,
   Search,
   Sparkles,
@@ -20,6 +21,8 @@ import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
 import { EmptyState } from '../components/EmptyState';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { RestTimer } from '../components/RestTimer';
+import { formatDateKey } from '../domain/ProgressAggregator';
 import partnerTraining from '../assets/partner-training.jpg';
 
 const MUSCLE_GROUPS: MuscleGroup[] = [
@@ -36,13 +39,15 @@ const MUSCLE_GROUPS: MuscleGroup[] = [
 const CATALOG_PAGE_SIZE = 10;
 
 export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initialGroup = 'All' }) => {
-  const { profile, settings, latestWeightKg, workouts, todayWorkouts, logWorkout, removeWorkout } =
+  const { localOwnerId, profile, settings, latestWeightKg, workouts, todayWorkouts, logWorkout, removeWorkout, toggleFavoriteExercise } =
     useFitLife();
   const unit = settings.weightUnit;
   const reducedMotion = useReducedMotion();
 
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>(initialGroup);
   const [searchQuery, setSearchQuery] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [restStart, setRestStart] = useState<{ seconds: number; id: number } | null>(null);
   const [visibleCount, setVisibleCount] = useState(CATALOG_PAGE_SIZE);
   const updateGroup = (value: MuscleGroup) => { setSelectedGroup(value); setVisibleCount(CATALOG_PAGE_SIZE); };
   const updateSearch = (value: string) => { setSearchQuery(value); setVisibleCount(CATALOG_PAGE_SIZE); };
@@ -124,6 +129,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
     setSelectedExercise(null);
     setIsSheetClosing(false);
     logWorkout(entry);
+    if (settings.autoStartRest) setRestStart({ seconds: restSeconds, id: Date.now() });
   };
 
   const filteredExercises = useMemo(() => {
@@ -136,14 +142,24 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         ex.muscleGroup.toLowerCase().includes(q) ||
         ex.secondaryMuscles.toLowerCase().includes(q) ||
         ex.equipment.toLowerCase().includes(q);
-      return matchesGroup && matchesQuery;
+      return matchesGroup && matchesQuery && (!favoritesOnly || settings.favoriteExerciseIds.includes(ex.id));
     });
-  }, [selectedGroup, searchQuery]);
+  }, [selectedGroup, searchQuery, favoritesOnly, settings.favoriteExerciseIds]);
 
   const totalBurnedToday = useMemo(
     () => todayWorkouts.reduce((s, w) => s + w.caloriesBurned, 0),
     [todayWorkouts]
   );
+
+  // A week starts on Monday in the device's local calendar. Multiple exercises
+  // on the same day count once; preloaded demo records never inflate the goal.
+  const weekStart = new Date();
+  weekStart.setHours(12, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weeklyDays = new Set(workouts.filter((workout) => !workout.id.startsWith('seed-') && !workout.id.startsWith('today-wk-') && workout.dateKey >= formatDateKey(weekStart) && workout.dateKey < formatDateKey(weekEnd)).map((workout) => workout.dateKey)).size;
+  const goalPercent = Math.min(100, Math.round(weeklyDays / settings.weeklyWorkoutGoal * 100));
 
   return (
     <div className="space-y-4 px-4 pb-28 pt-2 animate-screen-enter">
@@ -166,6 +182,12 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         <div className="workout-feature-copy"><span>YOUR NEXT SESSION</span><h2>Stronger,<br />every day.</h2><p>Find a workout that moves you.</p><button onClick={() => document.getElementById('exercise-search')?.focus()}>Find an exercise <span aria-hidden="true">→</span></button></div>
         <img src={partnerTraining} alt="A man and woman training together with dumbbells" />
       </section>
+
+      <section className="weekly-card" aria-label="Weekly workout goal">
+        <div className="weekly-copy"><span className="training-eyebrow">YOUR WEEK · MON—SUN</span><h2>Show up for yourself</h2><p>Workout days this week · goal in Settings</p><div className="weekly-progress" role="progressbar" aria-label="Weekly workout days" aria-valuemin={0} aria-valuemax={settings.weeklyWorkoutGoal} aria-valuenow={Math.min(weeklyDays, settings.weeklyWorkoutGoal)}><span style={{ width: `${goalPercent}%` }} /></div></div>
+        <div className="weekly-numbers">{weeklyDays}<small> / {settings.weeklyWorkoutGoal} days</small></div>
+      </section>
+      <RestTimer key={localOwnerId || "unclaimed"} defaultSeconds={settings.defaultRestSeconds} startRequest={restStart} />
 
       {/* 8 Muscle Group Filter Chips */}
       <SegmentedSelector<MuscleGroup>
@@ -200,6 +222,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         )}
       </div>
 
+      <button className="favorite-filter" type="button" aria-pressed={favoritesOnly} onClick={() => { setFavoritesOnly((value) => !value); setVisibleCount(CATALOG_PAGE_SIZE); }}><Heart size={15} fill={favoritesOnly ? 'currentColor' : 'none'} /> Favorites ({settings.favoriteExerciseIds.length})</button>
+
       {/* Exercise Catalog List */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
@@ -209,41 +233,18 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
           <span className="text-[11px] text-[#D8C39E]">Tap for Adaptive Sheet →</span>
         </div>
 
-        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle="Try a different search or muscle group." />}
+        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle={favoritesOnly ? 'Save exercises with the heart, or turn off Favorites.' : 'Try a different search or muscle group.'} />}
         <div className="space-y-2 pr-0.5" data-testid="exercise-catalog-list">
-          {filteredExercises.slice(0, visibleCount).map((ex) => (
-            <PressScale
-              key={ex.id}
-              onClick={() => openExerciseSheet(ex)}
-              className="flex items-center justify-between rounded-[22px] border border-[#2F3A33] bg-[#1E2520] p-3.5 hover:border-[#528B67]"
-            >
-              <div className="min-w-0 pr-3">
-                <div className="flex items-center gap-2">
-                  <h4 className="truncate font-heading text-xs font-semibold text-[#F4F1EA]">
-                    {ex.name}
-                  </h4>
-                  <span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[9px] font-semibold text-[#D8C39E]">
-                    {ex.muscleGroup}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-[11px] text-[#84877F]">
-                  {ex.equipment} · {ex.secondaryMuscles}
-                </p>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <div className="text-right">
-                  <div className="font-heading text-xs font-bold text-[#F4F1EA]">
-                    ~{ex.caloriesPerSet * 3} kcal
-                  </div>
-                  <div className="text-[10px] font-semibold text-[#7BB38F]">+20 XP</div>
-                </div>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#528B67] text-[#F4F1EA]">
-                  <Plus className="h-4 w-4 stroke-[2.5]" />
-                </div>
-              </div>
-            </PressScale>
-          ))}
+          {filteredExercises.slice(0, visibleCount).map((ex) => {
+            const favorite = settings.favoriteExerciseIds.includes(ex.id);
+            return <div key={ex.id} className="exercise-row">
+              <button type="button" className="exercise-open" onClick={() => openExerciseSheet(ex)}>
+                <div className="min-w-0 pr-3"><div className="flex items-center gap-2"><h4 className="truncate font-heading text-xs font-semibold text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[9px] font-semibold text-[#D8C39E]">{ex.muscleGroup}</span></div><p className="mt-0.5 text-[11px] text-[#84877F]">{ex.equipment} · {ex.secondaryMuscles}</p></div>
+                <div className="flex shrink-0 items-center gap-2"><div className="exercise-stats text-right"><div className="font-heading text-xs font-bold text-[#F4F1EA]">~{ex.caloriesPerSet * 3} kcal</div><div className="text-[10px] font-semibold text-[#7BB38F]">+20 XP</div></div><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#528B67] text-[#F4F1EA]"><Plus className="h-4 w-4 stroke-[2.5]" /></div></div>
+              </button>
+              <button type="button" className="exercise-favorite" aria-label={`${favorite ? 'Remove' : 'Add'} ${ex.name} ${favorite ? 'from' : 'to'} favorites`} aria-pressed={favorite} onClick={() => toggleFavoriteExercise(ex.id)}><Heart size={19} fill={favorite ? 'currentColor' : 'none'} /></button>
+            </div>;
+          })}
         </div>
         <p className="catalog-count" aria-live="polite">Showing {Math.min(visibleCount, filteredExercises.length)} of {filteredExercises.length} exercises</p>
         {visibleCount < filteredExercises.length && (

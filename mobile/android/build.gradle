@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application' version '9.1.1'
+    id 'com.google.gms.google-services' version '4.5.0'
+}
+
+android {
+    namespace 'com.tanish.fitlife'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.tanish.fitlife'
+        minSdk 26
+        targetSdk 33 // Keep the existing wrapper's insets/edge-to-edge behavior.
+        versionCode = Integer.parseInt((project.findProperty('fitlifeVersionCode') ?: '5').toString())
+        versionName = (project.findProperty('fitlifeVersionName') ?: '1.0.5').toString()
+    }
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ["$buildDir/generated-fitlife-assets"]
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildTypes { release { minifyEnabled false } }
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:35.1.0')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'androidx.credentials:credentials:1.3.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
+}

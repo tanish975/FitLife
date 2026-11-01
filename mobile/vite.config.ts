@@ -35,8 +35,17 @@ function apkDownload(): Plugin {
   };
 }
 
+// React Fast Refresh needs an inline dev-only bootstrap and a websocket.
+// Production and the signed standalone app keep the strict script policy.
+function developmentCsp(): Plugin {
+  return { name: 'fitlife-development-csp', apply: 'serve', transformIndexHtml(html) {
+    return html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+      .replace("connect-src 'self'", "connect-src 'self' ws: wss:");
+  } };
+}
+
 export default defineConfig({
-  plugins: [react(), apkDownload()],
+  plugins: [react(), apkDownload(), developmentCsp()],
   base: './',
   build: {
     // Keep the fitness photography inside the JS bundle for the standalone HTML and Android WebView.

@@ -279,7 +279,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           className="flex items-center justify-center gap-2 rounded-2xl border border-[#6E4433] bg-[#33241E] py-3 text-xs font-semibold text-[#DE9473]"
         >
           <LogOut className="h-4 w-4" />
-          <span>Sign Out</span>
+          <span>Exit profile</span>
         </PressScale>
       </div>
     </div>

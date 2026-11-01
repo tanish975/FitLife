@@ -43,7 +43,7 @@ jobs:
       - name: Set up Android tools
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
-          packages: 'platforms;android-33 build-tools;33.0.2'
+          packages: 'platforms;android-35 build-tools;36.0.0'
       - name: Calculate a monotonic Android version
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,6 +70,22 @@ jobs:
         run: npm ci
       - name: Test native release validation
         run: npm run test:native
+      - name: Test Firestore rules with a local emulator
+        run: |
+          set -euo pipefail
+          jar="$RUNNER_TEMP/fitlife-firestore-emulator.jar"
+          curl -fsSL 'https://storage.googleapis.com/firebase-preview-drop/emulator/cloud-firestore-emulator-v1.19.8.jar' -o "$jar"
+          echo '9d43599ed6151199e8d604dc87fac51218e49e5f3a48519b1ae560bbe5e3382d  '"$jar" | sha256sum --check --status
+          java -Xmx256m -jar "$jar" --host 127.0.0.1 --port 8188 --rules "$GITHUB_WORKSPACE/mobile/firestore.rules" --project_id demo-fitlife --single_project_mode true > "$RUNNER_TEMP/fitlife-firestore.log" 2>&1 &
+          emulator=$!
+          trap 'kill "$emulator" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -s --max-time 2 http://127.0.0.1:8188/ > /dev/null; then break; fi
+            if ! kill -0 "$emulator" 2>/dev/null; then cat "$RUNNER_TEMP/fitlife-firestore.log"; exit 1; fi
+            sleep 1
+          done
+          curl -s --max-time 2 http://127.0.0.1:8188/ > /dev/null
+          npm run test:rules
       - name: Build self-contained web app
         run: npm run build:standalone
       - name: Build and verify signed Android APK
@@ -89,13 +105,14 @@ jobs:
           printf '%s' "$CERT_B64" | base64 --decode > "$keydir/cert.pem"
           chmod 600 "$keydir"/*
           FITLIFE_SIGNING_KEY="$keydir/key.pk8" FITLIFE_SIGNING_CERT="$keydir/cert.pem" \
-            ANDROID_BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/33.0.2" \
-            ANDROID_JAR="$ANDROID_HOME/platforms/android-33/android.jar" \
+            ANDROID_BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/36.0.0" \
             bash scripts/build-apk.sh
       - name: Verify package, version, signature and embedded app
         run: bash scripts/verify-apk.sh
       - name: Install Chromium for end-to-end tests
         run: npx playwright install --with-deps chromium
+      - name: Test account isolation and sync (simulated native bridge)
+        run: npm run test:cloud
       - name: Test release build, animations, updates, standalone and offline use
         run: |
           set -euo pipefail

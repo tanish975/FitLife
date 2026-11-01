@@ -25,6 +25,7 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
@@ -40,9 +41,15 @@ public final class MainActivity extends Activity {
     private static final String PREFS = "fitlife_release_updates";
     private static final long AUTO_CHECK_INTERVAL = 6L * 60L * 60L * 1000L;
     private static final int MAX_RESPONSE_BYTES = 256 * 1024;
+    private static final int MAX_BACKUP_BYTES = BackupTransfer.MAX_BYTES;
+    private static final int BACKUP_CREATE = 19101;
+    private static final int BACKUP_OPEN = 19102;
 
     private WebView webView;
+    private CloudBridge cloudBridge;
     private boolean checking;
+    private String pendingBackup;
+    private final BackupBridge backupBridge = new BackupBridge();
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -80,6 +87,9 @@ public final class MainActivity extends Activity {
         });
         webView.addJavascriptInterface(new HapticBridge(this), "AndroidHaptics");
         webView.addJavascriptInterface(new UpdateBridge(), "FitLifeAndroid");
+        webView.addJavascriptInterface(backupBridge, "FitLifeBackup");
+        cloudBridge = new CloudBridge(this, webView);
+        webView.addJavascriptInterface(cloudBridge, "FitLifeCloud");
         setContentView(webView);
         webView.loadUrl(APP_ASSET); // same origin as the previous FitLife APK
         mainHandler.postDelayed(() -> checkForUpdates(false), 2500);
@@ -170,6 +180,94 @@ public final class MainActivity extends Activity {
         } finally { connection.disconnect(); }
     }
 
+    // Only an encrypted envelope crosses this bridge. Android's document picker
+    // grants access to exactly the user-selected file, without filesystem permissions.
+    private void backupEvent(String type, String value) {
+        if (webView == null || isFinishing() || isDestroyed()) return;
+        String js = "window.dispatchEvent(new CustomEvent('fitlife-backup-part',{detail:{type:"
+                + JSONObject.quote(type) + ",value:" + JSONObject.quote(value == null ? "" : value) + "}}));";
+        webView.evaluateJavascript(js, null);
+    }
+
+    private static boolean validEncryptedEnvelope(JSONObject json) {
+        if (json.length() != 8 || !"fitlife-encrypted-backup".equals(json.optString("format")) || json.optInt("version") != 1 ||
+                !"AES-256-GCM".equals(json.optString("cipher")) || !"PBKDF2-SHA256".equals(json.optString("kdf")) ||
+                json.optInt("iterations") != 600000) return false;
+        String salt = json.optString("salt"), iv = json.optString("iv"), data = json.optString("data");
+        return salt.matches("[A-Za-z0-9+/]{22}==") && iv.matches("[A-Za-z0-9+/]{16}") &&
+                data.length() >= 24 && data.length() <= MAX_BACKUP_BYTES && data.matches("[A-Za-z0-9+/]*={0,2}");
+    }
+
+    public final class BackupBridge {
+        private final BackupTransfer transfer = new BackupTransfer();
+        @JavascriptInterface public boolean beginExport(int length) { return transfer.begin(length); }
+        @JavascriptInterface public void abortExport() { transfer.abort(); }
+        @JavascriptInterface public boolean appendExport(String part) { return transfer.append(part); }
+        @JavascriptInterface public boolean finishExport() {
+            String value = transfer.finish();
+            if (value == null) return false;
+            try {
+                JSONObject json = new JSONObject(value);
+                if (!validEncryptedEnvelope(json)) return false;
+            } catch (Exception e) { return false; }
+            runOnUiThread(() -> {
+                pendingBackup = value;
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("application/octet-stream").putExtra(Intent.EXTRA_TITLE, "FitLife-backup.fitlife");
+                try { startActivityForResult(intent, BACKUP_CREATE); }
+                catch (ActivityNotFoundException e) { pendingBackup = null; backupEvent("error", "No file picker is available on this device."); }
+            });
+            return true;
+        }
+        @JavascriptInterface public void chooseImport() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
+                try { startActivityForResult(intent, BACKUP_OPEN); }
+                catch (ActivityNotFoundException e) { backupEvent("error", "No file picker is available on this device."); }
+            });
+        }
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != BACKUP_CREATE && requestCode != BACKUP_OPEN) return;
+        final String export = pendingBackup; pendingBackup = null;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) { backupEvent("cancel", ""); return; }
+        final Uri uri = data.getData();
+        if (!"content".equalsIgnoreCase(uri.getScheme())) { backupEvent("error", "Unsupported file location."); return; }
+        updateExecutor.execute(() -> {
+            try {
+                if (requestCode == BACKUP_CREATE) {
+                    if (export == null) throw new IllegalStateException("Export expired. Please try again.");
+                    try (OutputStream output = getContentResolver().openOutputStream(uri, "w")) {
+                        if (output == null) throw new IllegalStateException("Cannot write the selected file.");
+                        output.write(export.getBytes(StandardCharsets.UTF_8)); output.flush();
+                    }
+                    mainHandler.post(() -> backupEvent("saved", "Encrypted backup saved."));
+                } else {
+                    ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    try (InputStream input = getContentResolver().openInputStream(uri)) {
+                        if (input == null) throw new IllegalStateException("Cannot read the selected file.");
+                        byte[] buffer = new byte[8192]; int count;
+                        while ((count = input.read(buffer)) != -1) {
+                            if (output.size() + count > MAX_BACKUP_BYTES) throw new IllegalStateException("The selected backup is too large.");
+                            output.write(buffer, 0, count);
+                        }
+                    }
+                    final String encrypted = new String(output.toByteArray(), StandardCharsets.UTF_8);
+                    for (int i = 0; i < encrypted.length(); i++) if (encrypted.charAt(i) > 127) throw new IllegalStateException("Invalid backup.");
+                    if (!validEncryptedEnvelope(new JSONObject(encrypted))) throw new IllegalStateException("Invalid backup.");
+                    mainHandler.post(() -> {
+                        backupEvent("start", "");
+                        for (int offset = 0; offset < encrypted.length(); offset += 32000)
+                            backupEvent("chunk", encrypted.substring(offset, Math.min(offset + 32000, encrypted.length())));
+                        backupEvent("done", "");
+                    });
+                }
+            } catch (Exception e) { mainHandler.post(() -> backupEvent("error", "Could not access the selected backup file.")); }
+        });
+    }
+
     public final class UpdateBridge {
         @JavascriptInterface public String versionName() { return installedName(); }
         @JavascriptInterface public boolean automaticUpdateChecksEnabled() { return automaticChecksEnabled(); }
@@ -198,10 +296,13 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (cloudBridge != null) cloudBridge.destroy();
         mainHandler.removeCallbacksAndMessages(null);
         updateExecutor.shutdownNow();
         if (webView != null) {
             webView.removeJavascriptInterface("FitLifeAndroid");
+            webView.removeJavascriptInterface("FitLifeBackup");
+            webView.removeJavascriptInterface("FitLifeCloud");
             webView.removeJavascriptInterface("AndroidHaptics");
             webView.destroy();
         }

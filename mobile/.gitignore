@@ -11,3 +11,7 @@ public/FitLife.apk
 *.keystore
 *.pk8
 *.pem
+
+# Android Gradle caches and generated assets; the checked-in wrapper is source.
+android/.gradle/
+android/build/

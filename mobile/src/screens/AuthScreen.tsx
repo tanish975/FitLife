@@ -4,17 +4,19 @@ import { useFitLife } from '../data/FitLifeStore';
 import { PressScale } from '../components/PressScale';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { EntryActionBar } from '../components/EntryActionBar';
+import { FitLifeLogo } from '../components/FitLifeLogo';
 
 interface AuthScreenProps {
   onCompleteAuth: (isNewSignup: boolean) => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
-  const { signIn, profile, meals, workouts, weights, moods, waterTodayMl, clearAllHistory } = useFitLife();
+  const { signIn, signInGoogle, cloudAvailable, cloudStatus, profile, meals, workouts, weights, moods, waterTodayMl, clearAllHistory } = useFitLife();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState(profile.name || 'Tanish Patel');
   const [email, setEmail] = useState(profile.email || 'tanish@fitlife.app');
   const [error, setError] = useState<string | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const history = [...meals, ...workouts, ...weights, ...moods];
   const isSample = (id: string) => id.startsWith('seed-') || id.startsWith('today-meal-') || id.startsWith('today-wk-') || id.startsWith('today-mood-');
   const hasSample = history.some(item => isSample(item.id));
@@ -42,16 +44,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
       {/* Brand Header */}
       <div className="text-center pt-3">
         <div className="mx-auto mb-4 relative flex h-20 w-20 items-center justify-center rounded-[24px] bg-[#213026] border border-[#3E634B] shadow-xl overflow-hidden">
-          <svg viewBox="0 0 108 108" className="h-14 w-14 relative z-10">
-            <path
-              d="M26,54 L40,54 L47,36 L54,74 L61,54 L82,54"
-              fill="none"
-              stroke="#7BB38F"
-              strokeWidth="7.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <FitLifeLogo className="entry-logo" />
         </div>
 
         <h1 className="font-heading text-2xl font-bold tracking-tight text-[#F4F1EA]">
@@ -64,9 +57,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
 
       {/* Auth Card */}
       <div className="my-5 rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-5 shadow-xl">
+        {cloudAvailable && <>
+          <button type="button" disabled={googleBusy} onClick={async () => {
+            setError(null); setGoogleBusy(true);
+            try { if (await signInGoogle()) onCompleteAuth(false); }
+            finally { setGoogleBusy(false); }
+          }} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#83B491] bg-[#F4F1EA] px-3 py-3 text-xs font-bold text-[#213026] disabled:opacity-50">
+            <ShieldCheck className="h-4 w-4" /> {googleBusy ? 'Opening Google…' : 'Sign in with Google'}
+          </button>
+          <p className="mb-3 text-[11px] leading-relaxed text-[#B8B5AD]">The first Google account merges this device’s activity. Cloud data is not end-to-end encrypted.</p>
+          {cloudStatus !== 'Not connected.' && <p className="mb-3 text-[11px] leading-relaxed text-[#B8B5AD]" role="status">{cloudStatus}</p>}
+        </>}
         <SegmentedSelector
           options={[
-            { value: 'signin', label: 'Sign In' },
+            { value: 'signin', label: 'Local access' },
             { value: 'signup', label: 'Create Profile' },
           ]}
           selected={mode}
@@ -141,7 +145,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
       <div className="flex items-center justify-center gap-2 rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2 text-[11px] text-[#84877F]">
         <ShieldCheck className="h-4 w-4 text-[#7BB38F] shrink-0" />
         <span>
-          Demo sign-in only. Credentials are not verified and data stays on this device.
+          Local access does not verify an email. Google sign-in and activity sync are available in the Android app; device backups may include local data.
         </span>
       </div>
     </div>

@@ -97,7 +97,7 @@ async function assertSwipeFromCardScrolls(page, context, testId) {
     const x = Math.max(25, Math.min(innerWidth - 25, r.left + r.width / 2));
     const y = Math.max(70, Math.min(innerHeight - 105, r.top + r.height / 2));
     const hit = document.elementFromPoint(x, y);
-    return { x, y, hitsCard: !!hit && (hit === el || el.contains(hit)) };
+    return { x, y, hitsCard: !!hit && (hit === el || el.contains(hit)), hit: hit ? `${hit.tagName}.${hit.className}` : null, card: { top:r.top, bottom:r.bottom }, viewport:innerHeight };
   });
   assert(point.hitsCard, `Swipe did not begin over a visible ${testId} card: ${JSON.stringify(point)}`);
   const before = await page.evaluate(() => scrollY);
@@ -186,14 +186,14 @@ try {
   await page.waitForTimeout(250);
   await assertNoHorizontalOverflow(page, 'workouts');
   const exerciseList = page.getByTestId('exercise-catalog-list');
-  assert.equal(await exerciseList.getByRole('button').count(), 10);
+  assert.equal(await exerciseList.locator('.exercise-open').count(), 10);
   await assertSwipeFromCardScrolls(page, context, 'exercise-catalog-list');
   await page.getByRole('button', { name: /Show more exercises/ }).click();
-  assert.equal(await exerciseList.getByRole('button').count(), 20);
+  assert.equal(await exerciseList.locator('.exercise-open').count(), 20);
   await page.getByPlaceholder(/Search .*exercise/i).fill('a name that cannot match');
   await page.getByText('No exercises found').waitFor();
   await page.getByPlaceholder(/Search .*exercise/i).fill('');
-  assert.equal(await exerciseList.getByRole('button').count(), 10, 'Search did not reset progressive disclosure');
+  assert.equal(await exerciseList.locator('.exercise-open').count(), 10, 'Search did not reset progressive disclosure');
   const previousWorkoutCount = await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_workouts_v1') || '[]').length);
   await exerciseList.getByRole('button').first().click();
   const dialog = page.getByRole('dialog');
