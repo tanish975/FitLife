@@ -1,0 +1,402 @@
+@font-face { font-family: 'Inter'; src: url('./assets/fonts/Inter.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('./assets/fonts/Poppins-500.woff2') format('woff2'); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('./assets/fonts/Poppins-600.woff2') format('woff2'); font-style: normal; font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('./assets/fonts/Poppins-700.woff2') format('woff2'); font-style: normal; font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('./assets/fonts/Poppins-800.woff2') format('woff2'); font-style: normal; font-weight: 800; font-display: swap; }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-outer: #E6E2D8;
+  --bg-base: #F5F2EB;
+  --bg-card: #FFFFFF;
+  --bg-hero: #E3EFE7;
+  --bg-recessed: #ECE8DF;
+  --border-subtle: #DDD8CE;
+  --border-strong: #88B399;
+  --text-primary: #1C2621;
+  --text-secondary: #4A5750;
+  --text-muted: #5C6962;
+  --text-on-accent: #FFFFFF;
+  --accent-primary: #3B7A57;
+  --accent-primary-hover: #316849;
+  --accent-primary-text: #2D6345;
+  --accent-primary-soft: #DFEFE5;
+  --accent-secondary: #C86D51;
+  --accent-secondary-text: #A04F37;
+  --accent-secondary-soft: #F7E6E0;
+  --accent-warm: #C5953A;
+  --accent-warm-text: #88641D;
+  --accent-warm-soft: #F6EFE0;
+  --accent-cool: #4E8279;
+  --accent-cool-text: #35665E;
+  --accent-cool-soft: #E2F0ED;
+  --radius-card: 24px;
+  --radius-btn: 14px;
+  --motion-duration: 320ms;
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    transition: background-color 220ms ease, color 220ms ease;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-heading {
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Dynamic Theme Token Overrides so all screens adapt to Daylight / Nightfall & all 5 Natural Palettes */
+.bg-\[\#0E120F\] {
+  background-color: var(--bg-outer) !important;
+}
+.bg-\[\#151A17\],
+.bg-\[\#151A17\]\/90 {
+  background-color: var(--bg-base) !important;
+}
+.bg-\[\#1E2520\],
+.bg-\[\#181E1A\],
+.bg-\[\#1A211C\]\/95 {
+  background-color: var(--bg-card) !important;
+}
+.bg-\[\#213026\],
+.bg-\[\#25382B\] {
+  background-color: var(--accent-primary-soft) !important;
+}
+.bg-\[\#141916\],
+.bg-\[\#151F19\],
+.bg-\[\#121714\] {
+  background-color: var(--bg-recessed) !important;
+}
+.bg-\[\#242E27\],
+.bg-\[\#2A332D\],
+.bg-\[\#252E28\] {
+  background-color: var(--bg-recessed) !important;
+}
+.bg-\[\#33241E\] {
+  background-color: var(--accent-secondary-soft) !important;
+}
+.bg-\[\#2E2418\],
+.bg-\[\#2B271F\],
+.bg-\[\#29251D\] {
+  background-color: var(--accent-warm-soft) !important;
+}
+.bg-\[\#528B67\],
+.bg-\[\#6BA37E\] {
+  background-color: var(--accent-primary) !important;
+}
+.hover\:bg-\[\#5E9A74\]:hover {
+  background-color: var(--accent-primary-hover) !important;
+}
+
+/* Text Tokens */
+.text-\[\#F4F1EA\] {
+  color: var(--text-primary) !important;
+}
+.bg-\[\#528B67\] .text-\[\#F4F1EA\],
+.bg-\[\#528B67\].text-\[\#F4F1EA\] {
+  color: var(--text-on-accent) !important;
+}
+.text-\[\#B8B5AD\] {
+  color: var(--text-secondary) !important;
+}
+.text-\[\#84877F\],
+.placeholder\:text-\[\#636961\]::placeholder {
+  color: var(--text-muted) !important;
+}
+.text-\[\#7BB38F\] {
+  color: var(--accent-primary-text) !important;
+}
+.fill-\[\#7BB38F\] {
+  fill: var(--accent-primary-text) !important;
+}
+.text-\[\#DE9473\] {
+  color: var(--accent-secondary-text) !important;
+}
+.text-\[\#D8C39E\],
+.text-\[\#E0B467\] {
+  color: var(--accent-warm-text) !important;
+}
+.text-\[\#87B5AD\] {
+  color: var(--accent-cool-text) !important;
+}
+
+/* Border Tokens */
+.border-\[\#2F3A33\],
+.border-\[\#26302A\],
+.border-\[\#344A3C\],
+.border-\[\#2F4536\],
+.border-\[\#355440\],
+.border-\[\#242E27\] {
+  border-color: var(--border-subtle) !important;
+}
+.border-\[\#3E634B\],
+.border-\[\#497A5B\],
+.border-\[\#528B67\],
+.border-\[\#6BA37E\] {
+  border-color: var(--border-strong) !important;
+}
+.border-\[\#6E532B\],
+.border-\[\#4A4333\],
+.border-\[\#4A4232\] {
+  border-color: var(--accent-warm) !important;
+}
+.border-\[\#6E4433\] {
+  border-color: var(--accent-secondary) !important;
+}
+
+/* Dynamic Corner Radius Customization */
+.rounded-\[26px\],
+.rounded-\[28px\],
+.rounded-\[22px\] {
+  border-radius: var(--radius-card) !important;
+}
+.rounded-2xl,
+.rounded-xl {
+  border-radius: var(--radius-btn) !important;
+}
+
+/* Hide scrollbars on horizontal chip bars while keeping scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom thin scrollbar for lists */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 9999px;
+}
+
+/* Keyframe Animations */
+@keyframes screenEnterRight {
+  0% {
+    opacity: 0;
+    transform: translateX(18px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes screenEnterLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-18px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes screenEnterFade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes staggerUp {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideUpSheet {
+  0% {
+    transform: translateY(100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes popSpring {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(12px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes shimmerPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes pulseLineDraw {
+  0%,
+  100% {
+    stroke-dasharray: 120;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  50% {
+    stroke-dasharray: 120;
+    stroke-dashoffset: 35;
+    opacity: 0.65;
+  }
+}
+
+.animate-screen-enter {
+  animation: screenEnterFade var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.animate-tab-right {
+  animation: screenEnterRight var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.animate-tab-left {
+  animation: screenEnterLeft var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.animate-stagger-1 {
+  animation: staggerUp var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) 20ms backwards;
+}
+.animate-stagger-2 {
+  animation: staggerUp var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) 70ms backwards;
+}
+.animate-stagger-3 {
+  animation: staggerUp var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) 130ms backwards;
+}
+.animate-stagger-4 {
+  animation: staggerUp var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) 190ms backwards;
+}
+.animate-stagger-5 {
+  animation: staggerUp var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) 250ms backwards;
+}
+
+.animate-slide-up {
+  animation: slideUpSheet var(--motion-duration) cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 200ms ease-out backwards;
+}
+
+.animate-pop-spring {
+  animation: popSpring 420ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.shimmer-pulse {
+  animation: shimmerPulse 1.4s ease-in-out infinite;
+}
+
+.animate-pulse-line {
+  animation: pulseLineDraw 2.8s ease-in-out infinite;
+}
+
+/* Existing detail cards follow the selected card-shape preference too. */
+.legacy-screen .rounded-\[26px\], .legacy-screen .rounded-\[22px\] { border-radius: var(--radius-card) !important; }
+
+/* The new theme is revealed outwards from the activated control. These rules
+   are scoped to theme changes; other screen transitions keep their own motion. */
+html[data-fitlife-theme-reveal],
+html[data-fitlife-theme-reveal] *,
+html[data-fitlife-theme-reveal] body {
+  transition: none !important;
+}
+html[data-fitlife-theme-reveal]::view-transition-group(root) {
+  animation-duration: var(--fitlife-theme-reveal-duration, 620ms);
+}
+html[data-fitlife-theme-reveal]::view-transition-old(root),
+html[data-fitlife-theme-reveal]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-fitlife-theme-reveal]::view-transition-old(root) { z-index: 1; }
+html[data-fitlife-theme-reveal]::view-transition-new(root) {
+  z-index: 2;
+  clip-path: var(--fitlife-theme-reveal-start, circle(0% at 50% 50%));
+}
+
+/* A fallback snapshot must not replay the app's entrance/stagger animations;
+   otherwise its contents shift or blur as the circle passes over them. */
+[data-fitlife-theme-fallback],
+[data-fitlife-theme-fallback] *,
+[data-fitlife-theme-fallback] *::before,
+[data-fitlife-theme-fallback] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Both icons exist in the snapshot so even the older-WebView reveal shows the
+   icon for the incoming mode instead of changing it after the wipe finishes. */
+.theme-visible-dark { display: none; }
+:root[data-theme-mode="dark"] .theme-visible-light { display: none; }
+:root[data-theme-mode="dark"] .theme-visible-dark { display: block; }
+[data-fitlife-theme-fallback][data-fitlife-target-mode="light"] .theme-visible-light,
+[data-fitlife-theme-fallback][data-fitlife-target-mode="dark"] .theme-visible-dark { display: block; }
+[data-fitlife-theme-fallback][data-fitlife-target-mode="light"] .theme-visible-dark,
+[data-fitlife-theme-fallback][data-fitlife-target-mode="dark"] .theme-visible-light { display: none; }
+
+/* Match the incoming Daylight/Nightfall segment in that inert snapshot. */
+[data-fitlife-theme-fallback][data-fitlife-target-mode="light"] [data-fitlife-theme-choice="dark"],
+[data-fitlife-theme-fallback][data-fitlife-target-mode="dark"] [data-fitlife-theme-choice="light"] {
+  background-color: transparent !important;
+  color: var(--text-muted) !important;
+  font-weight: 500;
+  box-shadow: none;
+  transform: none;
+}
+[data-fitlife-theme-fallback][data-fitlife-target-mode="light"] [data-fitlife-theme-choice="light"],
+[data-fitlife-theme-fallback][data-fitlife-target-mode="dark"] [data-fitlife-theme-choice="dark"] {
+  background-color: var(--accent-primary-text) !important;
+  color: var(--bg-base) !important;
+  font-weight: 600;
+  transform: scale(1.02);
+}

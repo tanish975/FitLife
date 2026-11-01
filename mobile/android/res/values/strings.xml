@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">FitLife</string>
+    <color name="fitlife_launch_bg">#F5F2EB</color>
+    <style name="Theme.FitLife" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/fitlife_launch_bg</item>
+        <item name="android:statusBarColor">@color/fitlife_launch_bg</item>
+        <item name="android:navigationBarColor">@color/fitlife_launch_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

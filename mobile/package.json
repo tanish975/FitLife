@@ -1,0 +1,37 @@
+{
+  "name": "fitlife-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "typecheck": "tsc --noEmit",
+    "build:standalone": "npm run build && node scripts/build-standalone.mjs",
+    "test:qa": "node qa/test.mjs",
+    "test:offline": "node qa/offline.mjs",
+    "test:theme": "node qa/theme-reveal.mjs",
+    "test:standalone": "node qa/standalone.mjs",
+    "test:updates": "node qa/updates.mjs",
+    "test:native": "bash android/tests/run.sh"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "playwright": "^1.64.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3"
+  }
+}

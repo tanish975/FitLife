@@ -22,3 +22,17 @@ package-lock.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# FitLife mobile releases and private signing material
+!/mobile/package-lock.json
+/FitLife.apk
+/FitLife-App.html
+/SHA256SUMS.txt
+/mobile/public/FitLife.apk
+/mobile/.signing/
+*.pk8
+*.jks
+*.keystore
+*.p12
+*.pfx
+FitLife-signing-backup.enc
