@@ -72,12 +72,12 @@ export const WellnessSidebar: React.FC<Pick<SidebarProps, 'onOpenDaily' | 'onSel
       </div>
       <section className="aside-card">
         <div className="aside-card-title"><div><p className="eyebrow">TODAY</p><h2>Today’s summary</h2></div><span className="tiny-leaf"><Leaf size={15} /></span></div>
-        <div className="aside-ring-row">
+        {profile.onboarded ? <div className="aside-ring-row">
           <AnimatedRing size={110} strokeWidth={8} progress={macroTargets.calories > 0 ? consumed / macroTargets.calories : 0}>
             <strong className="aside-ring-number">{remaining.toLocaleString()}</strong><span className="aside-ring-label">kcal left</span>
           </AnimatedRing>
           <div className="aside-ring-copy"><strong>Daily calorie<br />target.</strong><span>{consumed.toLocaleString()} of {macroTargets.calories.toLocaleString()} kcal</span><small>Logged today</small></div>
-        </div>
+        </div> : <div className="aside-ring-copy"><strong>{consumed.toLocaleString()} kcal logged</strong><span>Add profile details for an estimated target.</span><button className="aside-profile-link" onClick={() => onSelectTab('profile')}>Open profile</button></div>}
         <div className="aside-stat-grid">
           <div><span>STREAK</span><strong>{gamification.currentStreak} <small>days</small></strong></div>
           <div><span>EXERCISE LOGS</span><strong>{todayWorkouts.length} <small>today</small></strong></div>

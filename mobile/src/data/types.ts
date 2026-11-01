@@ -14,6 +14,14 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'ath
 
 export type WeightUnit = 'kg' | 'lb';
 
+/** Monotonic first-visit flags. IDs are stable across devices and app versions. */
+export const GUIDE_IDS = ['dashboard', 'meals', 'workouts', 'progress', 'profile', 'settings', 'daily', 'onboarding'] as const;
+export type GuideId = typeof GUIDE_IDS[number];
+export function normalizeGuides(value: unknown): GuideId[] {
+  if (!Array.isArray(value)) return [];
+  return GUIDE_IDS.filter(id => value.includes(id));
+}
+
 export type MealCategory = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 
 export type MuscleGroup =
@@ -96,6 +104,10 @@ export interface LoggedMeal {
   carbsG: number;
   fatG: number;
   fiberG: number;
+  /** Optional user-supplied values; absent means unknown, not zero. */
+  sugarG?: number;
+  sodiumMg?: number;
+  nutritionNote?: string;
 }
 
 export interface ExerciseItem {
@@ -122,6 +134,8 @@ export interface LoggedWorkout {
   reps: number;
   weightKg: number; // Stored in kg internally
   caloriesBurned: number;
+  /** False when the inputs needed for an estimate have not been provided. */
+  energyEstimateAvailable?: boolean;
   restSeconds: number;
 }
 
@@ -163,6 +177,8 @@ export interface AppSettings {
   navStyle: 'glass' | 'solid';
   waterGoalMl: number;
   dashboardWidgets: DashboardWidgetsConfig;
+  /** Optional for backward-compatible backups made before guides existed. */
+  guidesSeen?: GuideId[];
 }
 
 export interface BadgeStatus {

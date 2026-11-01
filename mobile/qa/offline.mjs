@@ -1,65 +1,48 @@
 // Start the production preview on port 4173 before running this test.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const standalone = pathToFileURL(resolve(root, '../FitLife-App.html')).href;
-const prod = process.env.FITLIFE_PROD_URL || 'http://127.0.0.1:4173/';
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-
+const prod=process.env.FITLIFE_PROD_URL || 'http://127.0.0.1:4173/';
+const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 try {
-  const fileContext = await browser.newContext({ viewport: { width: 320, height: 700 }, reducedMotion: 'reduce' });
-  await fileContext.addInitScript(() => {
-    Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new Error('Storage blocked for QA'); } });
-  });
-  await fileContext.route('http**://**', route => route.abort());
-  const filePage = await fileContext.newPage();
-  const fileErrors = [];
-  filePage.on('pageerror', e => fileErrors.push(e.message));
-  await filePage.goto(standalone);
-  await filePage.getByRole('button', { name: 'Quick launch (demo data)' }).click();
-  await filePage.getByText("Today's overview").waitFor();
-  assert.equal(await filePage.locator('.home-training-feature img, .home-focus img').count(), 3);
-  assert.equal(await filePage.locator('.home-training-feature img').evaluate(img => img.complete && img.naturalWidth > 0), true);
-  await filePage.getByRole('button', { name: 'Add 250 milliliters of water' }).click();
-  assert.equal(await filePage.getByRole('progressbar', { name: 'Water towards daily goal' }).getAttribute('aria-valuenow'), '250');
-  await filePage.getByRole('button', { name: 'Open settings' }).click();
-  await filePage.getByRole('button', { name: 'QR & Install Guide' }).click();
-  await filePage.getByText('A QR link is available when FitLife is hosted', { exact: false }).waitFor();
-  assert.deepEqual(fileErrors, []);
-  await fileContext.close();
+  // A storage-blocked standalone must fail closed and explain the real limit.
+  const blocked=await browser.newContext({viewport:{width:320,height:700},reducedMotion:'reduce'});
+  await blocked.addInitScript(()=>Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new Error('Storage blocked for QA');}}));
+  await blocked.route('http**://**',route=>route.abort());
+  const blockedPage=await blocked.newPage(); const errors=[]; blockedPage.on('pageerror',e=>errors.push(e.message));
+  await blockedPage.goto(nativeApp);
+  await blockedPage.getByRole('button',{name:'Sign in with Google'}).waitFor();
+  assert(await blockedPage.getByRole('button',{name:'Sign in with Google'}).isDisabled());
+  assert.equal(await blockedPage.getByText('Available in the Android app').count(),1);
+  assert.deepEqual(errors,[]); await blocked.close();
 
-  const pwaContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'allow' });
-  const page = await pwaContext.newPage();
-  const errors = [];
-  page.on('pageerror', e => errors.push(e.message));
-  await page.goto(prod, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Quick launch (demo data)' }).click();
-  await page.getByText("Today's overview").waitFor();
-  await page.waitForFunction(() => navigator.serviceWorker?.controller, { timeout: 15000 });
-  const assets = await page.evaluate(async () => {
-    const names = await caches.keys();
-    const cacheName = names.find(name => name.startsWith('fitlife-fitness-'));
-    if (!cacheName) return [];
-    return (await (await caches.open(cacheName)).keys()).map(r => r.url);
-  });
-  assert.ok(assets.some(url => url.includes('/assets/index-') && url.endsWith('.js')));
-  assert.ok(assets.some(url => url.includes('/assets/index-') && url.endsWith('.css')));
-  await page.waitForTimeout(500);
-  await pwaContext.setOffline(true);
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.getByText("Today's overview").waitFor({ timeout: 10000 });
-  assert.equal(await page.locator('.home-training-feature img').evaluate(img => img.complete && img.naturalWidth > 0), true);
-  await page.getByRole('button', { name: 'Add 250 milliliters of water' }).click();
-  assert.equal(await page.getByRole('progressbar', { name: 'Water towards daily goal' }).getAttribute('aria-valuenow'), '250');
-  assert.deepEqual(errors, []);
-  await pwaContext.close();
-  console.log('PASS: standalone works with network/storage blocked and reduced motion; PWA loads immediately offline after first install.');
-} catch (error) {
-  console.error('FAILED:', error.stack || error.message);
-  process.exitCode = 1;
-} finally {
-  await browser.close();
-}
+  // A previously authenticated native session is restored locally and saved
+  // activity remains usable while the simulated cloud is unavailable.
+  const native=await browser.newContext({viewport:{width:320,height:700},reducedMotion:'reduce'});
+  const filePage=await native.newPage(); await installNativeFixture(filePage,{signedIn:true});
+  const fileErrors=[]; filePage.on('pageerror',e=>fileErrors.push(e.message));
+  await filePage.goto(nativeApp); await filePage.getByText("Today's overview").waitFor();
+  await filePage.evaluate(()=>localStorage.setItem('__fixture_offline','1'));
+  await filePage.getByRole('button',{name:'Add 250 milliliters of water'}).click();
+  await filePage.reload(); await filePage.getByText("Today's overview").waitFor();
+  assert.equal(await filePage.getByRole('progressbar',{name:'Water towards daily goal'}).getAttribute('aria-valuenow'),'250');
+  assert.equal(await filePage.locator('.home-training-feature img').evaluate(img=>img.complete && img.naturalWidth>0),true);
+  assert.deepEqual(fileErrors,[]); await native.close();
+
+  // The hosted web/PWA shell caches and opens offline, but it cannot perform
+  // the Android-only authentication and must not claim otherwise.
+  const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'allow'});
+  const page=await pwa.newPage(); const webErrors=[]; page.on('pageerror',e=>webErrors.push(e.message));
+  await page.goto(prod,{waitUntil:'networkidle'}); await page.getByRole('button',{name:'Sign in with Google'}).waitFor();
+  await page.waitForFunction(()=>navigator.serviceWorker?.controller,{timeout:15000});
+  const assets=await page.evaluate(async()=>{const names=await caches.keys();const name=names.find(x=>x.startsWith('fitlife-fitness-'));return name?(await(await caches.open(name)).keys()).map(r=>r.url):[];});
+  assert(assets.some(url=>url.includes('/assets/index-')&&url.endsWith('.js')));
+  assert(assets.some(url=>url.includes('/assets/index-')&&url.endsWith('.css')));
+  await pwa.setOffline(true); await page.reload({waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'Sign in with Google'}).waitFor({timeout:10000});
+  assert(await page.getByRole('button',{name:'Sign in with Google'}).isDisabled());
+  assert.equal(await page.getByText('Available in the Android app').count(),1);
+  assert.deepEqual(webErrors,[]); await pwa.close();
+  console.log('PASS: blocked storage fails closed; simulated native session restores offline; PWA caches the honest Android-only entry offline.');
+} finally {await browser.close();}

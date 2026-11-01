@@ -48,6 +48,8 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private CloudBridge cloudBridge;
     private boolean checking;
+    private boolean backPending;
+    private int backRequestId;
     private String pendingBackup;
     private final BackupBridge backupBridge = new BackupBridge();
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
@@ -292,7 +294,25 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+        if (webView == null) { super.onBackPressed(); return; }
+        if (backPending) return; // Avoid double-exits while WebView answers asynchronously.
+        backPending = true;
+        final int request = ++backRequestId;
+        final Runnable timeout = () -> {
+            if (backPending && request == backRequestId) {
+                backPending = false;
+                backRequestId++;
+                if (!isFinishing() && !isDestroyed()) Toast.makeText(this, "Please try Back again.", Toast.LENGTH_SHORT).show();
+            }
+        };
+        mainHandler.postDelayed(timeout, 1500);
+        // Keep the file:///android_asset origin; SPA tab changes are not WebView history.
+        webView.evaluateJavascript("(function(){try{return typeof window.__fitlifeHandleBack==='function'?window.__fitlifeHandleBack():false}catch(e){return true}})()", result -> {
+            if (request != backRequestId) return;
+            mainHandler.removeCallbacks(timeout);
+            backPending = false;
+            if ("false".equals(result) && !isFinishing() && !isDestroyed()) MainActivity.super.onBackPressed();
+        });
     }
 
     @Override protected void onDestroy() {

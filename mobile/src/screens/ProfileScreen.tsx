@@ -83,7 +83,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </div>
 
       {/* Profile summary: all numbers come from local fitness history. */}
-      <section className="fitness-profile-card" aria-label="Your fitness profile">
+      <section className="fitness-profile-card" data-guide-target="profile-card" aria-label="Your fitness profile">
         <div className="fitness-profile-top">
           <div className="fitness-profile-ring"><span>{initials(profile.name)}</span></div>
           <div className="fitness-profile-stats">
@@ -94,7 +94,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
         <div className="fitness-profile-bio">
           <h2>{profile.name}</h2>
-          <p>Level {gamification.level} athlete · {GOAL_CONFIG[profile.goal]?.label}</p>
+          <p>Level {gamification.level} athlete{profile.onboarded ? ` · ${GOAL_CONFIG[profile.goal]?.label}` : ' · Set a goal when you’re ready'}</p>
           <span>A little stronger, every day.</span>
         </div>
         <div className="fitness-profile-actions">
@@ -108,8 +108,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
       </section>
 
-      {/* CURRENT STATS & TARGETS CARD */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
+      {/* Never present placeholder demographics as a person's information. */}
+      {profile.onboarded ? <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
             Biometrics & Daily Targets
@@ -181,10 +181,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <span>Activity: {ACTIVITY_MULTIPLIERS[profile.activityLevel]?.label}</span>
           <span>BMR {macroTargets.bmr} · TDEE {macroTargets.tdee} kcal</span>
         </div>
-      </div>
+      </div> : <section className="profile-needed profile-needed-card" aria-label="Optional profile details"><div><strong>Profile details are optional</strong><p>Add your own measurements to see estimated targets and BMI. Nothing is filled in for you.</p></div><button type="button" onClick={onEditOnboarding}>Add profile details</button></section>}
 
       {/* 9-BADGE GAMIFICATION GRID */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4">
+      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="profile-badges" aria-label="Achievement badges">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
@@ -265,7 +265,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </div>
 
       {/* Quick Footer Actions */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5" data-guide-target="profile-settings" aria-label="Profile account controls">
         <PressScale
           onClick={onOpenSettings}
           className="flex items-center justify-center gap-2 rounded-2xl border border-[#2F3A33] bg-[#1E2520] py-3 text-xs font-semibold text-[#F4F1EA]"
@@ -279,7 +279,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           className="flex items-center justify-center gap-2 rounded-2xl border border-[#6E4433] bg-[#33241E] py-3 text-xs font-semibold text-[#DE9473]"
         >
           <LogOut className="h-4 w-4" />
-          <span>Exit profile</span>
+          <span>Sign out</span>
         </PressScale>
       </div>
     </div>

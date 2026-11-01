@@ -1,4 +1,4 @@
-import { AppSettings, LoggedMeal, LoggedWorkout, MoodEntry, UserProfile, WeightEntry } from '../data/types';
+import { AppSettings, GUIDE_IDS, LoggedMeal, LoggedWorkout, MoodEntry, UserProfile, WeightEntry } from '../data/types';
 
 /** A local encrypted export. This is not cloud sync or an account. */
 export interface BackupSnapshot {
@@ -53,11 +53,12 @@ export function validSnapshot(value: unknown): value is BackupSnapshot {
   if (s.weeklyWorkoutGoal !== undefined && (!finite(s.weeklyWorkoutGoal) || s.weeklyWorkoutGoal < 1 || s.weeklyWorkoutGoal > 7)) return false;
   if (s.navStyle !== undefined && !oneOf(s.navStyle, ['glass','solid'])) return false;
   if (s.favoriteExerciseIds !== undefined && (!Array.isArray(s.favoriteExerciseIds) || s.favoriteExerciseIds.length > 500 || !s.favoriteExerciseIds.every((id: unknown) => str(id, 200)))) return false;
+  if (s.guidesSeen !== undefined && (!Array.isArray(s.guidesSeen) || s.guidesSeen.length > GUIDE_IDS.length || !s.guidesSeen.every((id: unknown) => oneOf(id, [...GUIDE_IDS])) || new Set(s.guidesSeen).size !== s.guidesSeen.length)) return false;
   if (!dateKey(w.dateKey) || !finite(w.amountMl) || w.amountMl < 0 || w.amountMl > 8000) return false;
   const arrays = [value.meals, value.workouts, value.weights, value.moods];
   if (!arrays.every(a => Array.isArray(a) && a.length <= MAX_ROWS && a.every(record))) return false;
-  return value.meals.every((x: any) => str(x.name, 500) && str(x.servingLabel, 300) && oneOf(x.category, ['Breakfast','Lunch','Dinner','Snack']) && ['calories','proteinG','carbsG','fatG','fiberG'].every(k => finite(x[k]))) &&
-    value.workouts.every((x: any) => str(x.exerciseId, 300) && str(x.exerciseName, 500) && oneOf(x.muscleGroup, ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio','Full Body']) && ['sets','reps','weightKg','caloriesBurned','restSeconds'].every(k => finite(x[k]))) &&
+  return value.meals.every((x: any) => str(x.name, 500) && str(x.servingLabel, 300) && oneOf(x.category, ['Breakfast','Lunch','Dinner','Snack']) && ['calories','proteinG','carbsG','fatG','fiberG'].every(k => finite(x[k])) && (x.sugarG === undefined || (finite(x.sugarG) && x.sugarG >= 0 && x.sugarG <= 2000)) && (x.sodiumMg === undefined || (finite(x.sodiumMg) && x.sodiumMg >= 0 && x.sodiumMg <= 100000)) && (x.nutritionNote === undefined || str(x.nutritionNote, 300))) &&
+    value.workouts.every((x: any) => str(x.exerciseId, 300) && str(x.exerciseName, 500) && oneOf(x.muscleGroup, ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio','Full Body']) && ['sets','reps','weightKg','caloriesBurned','restSeconds'].every(k => finite(x[k])) && (x.energyEstimateAvailable === undefined || typeof x.energyEstimateAvailable === 'boolean')) &&
     value.weights.every((x: any) => finite(x.weightKg)) && value.moods.every((x: any) => oneOf(x.moodId, ['energized','focused','happy','calm','motivated','neutral','tired','stressed','sore','anxious','exhausted']));
 }
 export async function encryptBackup(snapshot: BackupSnapshot, passphrase: string): Promise<string> {

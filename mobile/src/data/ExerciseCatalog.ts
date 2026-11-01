@@ -1,8 +1,8 @@
 import { ExerciseItem } from './types';
 
 /**
- * Complete 42-Exercise Catalog across 8 Muscle Groups:
- * Chest (6), Back (6), Legs (6), Shoulders (5), Arms (5), Core (5), Cardio (5), Full Body (4) = 42 exercises.
+ * 90 exercises across eight groups, including 30 additional no-equipment home movements.
+ * Energy figures are rough placeholders, not measured calorie expenditure.
  */
 export const EXERCISE_CATALOG: ExerciseItem[] = [
   // CHEST (6)
@@ -32,7 +32,7 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
   },
   {
     id: 'ex-pushups',
-    name: 'Strict Deficit Push-Ups',
+    name: 'Strict Push-Ups',
     muscleGroup: 'Chest',
     secondaryMuscles: 'Core, Triceps, Serratus',
     equipment: 'Bodyweight',
@@ -428,15 +428,15 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
   },
   {
     id: 'ex-incline-walk',
-    name: 'Zone-2 Incline Treadmill Walk',
+    name: 'Comfortable Incline Treadmill Walk',
     muscleGroup: 'Cardio',
     secondaryMuscles: 'Glutes, Calves, Aerobic Base',
-    equipment: 'Treadmill (10% Incline)',
+    equipment: 'Treadmill',
     difficulty: 'Beginner',
     isBodyweight: true,
     defaultWeightKg: 0,
     caloriesPerSet: 38,
-    tip: 'Avoid holding the handrails so your posture and calorie burn stay elevated.',
+    tip: 'Choose a comfortable speed and incline. Hold the rails if needed for balance.',
   },
   {
     id: 'ex-rowing-erg',
@@ -464,7 +464,7 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
   },
   {
     id: 'ex-assault-bike',
-    name: 'Air Bike Tabata Intervals',
+    name: 'Air Bike Intervals',
     muscleGroup: 'Cardio',
     secondaryMuscles: 'Quads, Shoulders, Anaerobic Engine',
     equipment: 'Air Bike',
@@ -472,7 +472,7 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
     isBodyweight: true,
     defaultWeightKg: 0,
     caloriesPerSet: 48,
-    tip: '20 seconds all-out effort followed by 40 seconds smooth cadence recovery.',
+    tip: 'Alternate a manageable faster pace with easier recovery; adjust duration to your ability.',
   },
 
   // FULL BODY (4)
@@ -524,4 +524,56 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
     caloriesPerSet: 24,
     tip: 'Snap feet wide outside your hands on the jump-in to protect your lower back.',
   },
+
+  // Additional practical home, gym, and low-impact choices.
+  { id: "ex-incline-pushup", name: "Incline Push-Up", muscleGroup: "Chest", secondaryMuscles: "Chest, Triceps, Core", equipment: "Sturdy Bench", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Use a stable support; keep your body in one line and lower with control." },
+  { id: "ex-db-floor-press", name: "Dumbbell Floor Press", muscleGroup: "Chest", secondaryMuscles: "Chest, Triceps, Front Delts", equipment: "Dumbbells", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 11, tip: "Keep wrists stacked and gently touch upper arms to the floor before pressing." },
+  { id: "ex-band-pull-apart", name: "Resistance Band Pull-Apart", muscleGroup: "Back", secondaryMuscles: "Upper Back, Rear Delts", equipment: "Resistance Band", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 7, tip: "Keep ribs relaxed and pull the band apart without shrugging your shoulders." },
+  { id: "ex-inverted-row", name: "Inverted Row", muscleGroup: "Back", secondaryMuscles: "Lats, Mid-Back, Biceps", equipment: "Secure Bar", difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 11, tip: "Use a secure bar, brace your body and pull your chest toward the bar." },
+  { id: "ex-glute-bridge", name: "Bodyweight Glute Bridge", muscleGroup: "Legs", secondaryMuscles: "Glutes, Hamstrings, Core", equipment: "Bodyweight", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Press through your feet and lift hips without arching your lower back." },
+  { id: "ex-goblet-squat", name: "Goblet Squat", muscleGroup: "Legs", secondaryMuscles: "Quads, Glutes, Core", equipment: "Dumbbell", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 12, tip: "Hold the weight close to your chest and squat only as low as comfortable." },
+  { id: "ex-step-up", name: "Low Step-Up", muscleGroup: "Legs", secondaryMuscles: "Quads, Glutes, Balance", equipment: "Sturdy Step", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Use a stable low step and support for balance when needed; alternate legs." },
+  { id: "ex-reverse-lunge", name: "Reverse Lunge", muscleGroup: "Legs", secondaryMuscles: "Glutes, Quads, Balance", equipment: "Bodyweight", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 11, tip: "Step back gently and keep your front knee tracking over your foot." },
+  { id: "ex-wall-slide", name: "Wall Slide", muscleGroup: "Shoulders", secondaryMuscles: "Shoulders, Upper Back", equipment: "Wall", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 5, tip: "Move slowly within a comfortable range without forcing your shoulders." },
+  { id: "ex-band-external-rotation", name: "Band External Rotation", muscleGroup: "Shoulders", secondaryMuscles: "Rotator Cuff, Rear Delts", equipment: "Resistance Band", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 5, tip: "Keep the elbow close to your side and use a light, controlled resistance." },
+  { id: "ex-rope-triceps-pressdown", name: "Rope Triceps Pressdown", muscleGroup: "Arms", secondaryMuscles: "Triceps", equipment: "Cable Machine", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Keep elbows near your sides and extend without swinging your torso." },
+  { id: "ex-band-biceps-curl", name: "Resistance Band Biceps Curl", muscleGroup: "Arms", secondaryMuscles: "Biceps, Forearms", equipment: "Resistance Band", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Stand securely on the band and curl smoothly without rocking your body." },
+  { id: "ex-dead-bug", name: "Dead Bug", muscleGroup: "Core", secondaryMuscles: "Deep Core, Hip Flexors", equipment: "Bodyweight", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 7, tip: "Keep your lower back comfortable and move opposite arm and leg slowly." },
+  { id: "ex-bird-dog", name: "Bird Dog", muscleGroup: "Core", secondaryMuscles: "Core, Glutes, Back Stabilizers", equipment: "Bodyweight", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 7, tip: "Reach opposite arm and leg long; keep hips level and move with control." },
+  { id: "ex-brisk-walking", name: "Brisk Walking", muscleGroup: "Cardio", secondaryMuscles: "Heart, Legs, Aerobic Fitness", equipment: "Bodyweight", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 20, tip: "Choose a pace at which you can still speak; adjust to your comfort." },
+  { id: "ex-elliptical", name: "Elliptical Trainer", muscleGroup: "Cardio", secondaryMuscles: "Legs, Heart, Low-Impact Conditioning", equipment: "Elliptical Machine", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 24, tip: "Use a comfortable resistance and hold handles if helpful for balance." },
+  { id: "ex-squat-to-calf-raise", name: "Squat to Calf Raise", muscleGroup: "Full Body", secondaryMuscles: "Legs, Glutes, Calves, Core", equipment: "Bodyweight", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Rise smoothly from a comfortable squat and lift heels; use support if needed." },
+  { id: "ex-db-deadlift", name: "Dumbbell Deadlift", muscleGroup: "Full Body", secondaryMuscles: "Glutes, Hamstrings, Back, Grip", equipment: "Dumbbells", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 13, tip: "Hinge at the hips with a neutral back and keep weights close to your legs." },
+
+  // 30 additional home movements: no weights, machines, bands, bench, or wall required.
+  { id: "ex-home-kneeling-pushup", name: "Kneeling Push-Up", muscleGroup: "Chest", secondaryMuscles: "Chest, Triceps, Core", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Place hands just wider than shoulders, keep hips in line with your torso and lower comfortably." },
+  { id: "ex-home-wide-pushup", name: "Wide-Hand Push-Up", muscleGroup: "Chest", secondaryMuscles: "Chest, Front Shoulders, Triceps", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Set hands slightly wider than shoulders and lower only through a comfortable range." },
+  { id: "ex-home-prone-w-raise", name: "Prone W Raise", muscleGroup: "Back", secondaryMuscles: "Upper Back, Rear Shoulders", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 5, tip: "Lie face down and gently lift bent arms into a W; keep your neck relaxed." },
+  { id: "ex-home-prone-swimmers", name: "Prone Swimmers", muscleGroup: "Back", secondaryMuscles: "Upper Back, Rear Shoulders", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 7, tip: "Lying face down, slowly sweep your arms without forcing your shoulders or arching your back." },
+  { id: "ex-home-scapular-squeeze", name: "Standing Shoulder-Blade Squeeze", muscleGroup: "Back", secondaryMuscles: "Upper Back, Posture Muscles", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 4, tip: "Stand tall and gently draw shoulder blades together, then release without shrugging." },
+  { id: "ex-home-air-squat", name: "Bodyweight Squat", muscleGroup: "Legs", secondaryMuscles: "Quads, Glutes, Core", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Keep feet planted and squat only as low as is comfortable; stand up smoothly." },
+  { id: "ex-home-lateral-lunge", name: "Side Lunge", muscleGroup: "Legs", secondaryMuscles: "Glutes, Quads, Inner Thighs", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Step to the side and bend that knee while keeping both feet comfortably planted." },
+  { id: "ex-home-split-squat", name: "Stationary Split Squat", muscleGroup: "Legs", secondaryMuscles: "Quads, Glutes, Balance", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Start with feet staggered, lower comfortably and press through the front foot." },
+  { id: "ex-home-calf-raise", name: "Standing Calf Raise", muscleGroup: "Legs", secondaryMuscles: "Calves, Balance", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 6, tip: "Rise onto your toes slowly and lower with control; hold a support only if needed for balance." },
+  { id: "ex-home-side-lying-leg-raise", name: "Side-Lying Leg Raise", muscleGroup: "Legs", secondaryMuscles: "Side Glutes, Hips", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 6, tip: "Lie on your side and lift your upper leg without rolling your hips backward." },
+  { id: "ex-home-donkey-kick", name: "Quadruped Glute Kickback", muscleGroup: "Legs", secondaryMuscles: "Glutes, Hamstrings, Core", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 7, tip: "On hands and knees, lift one bent leg gently without arching your lower back." },
+  { id: "ex-home-single-leg-bridge", name: "Single-Leg Glute Bridge", muscleGroup: "Legs", secondaryMuscles: "Glutes, Hamstrings, Core", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 9, tip: "Lift one foot and raise your hips without twisting; use both feet if needed." },
+  { id: "ex-home-good-morning", name: "Bodyweight Hip Hinge", muscleGroup: "Legs", secondaryMuscles: "Hamstrings, Glutes, Back", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 6, tip: "Soften your knees and move hips back while keeping your spine in a comfortable neutral position." },
+  { id: "ex-home-arm-circles", name: "Standing Arm Circles", muscleGroup: "Shoulders", secondaryMuscles: "Shoulders, Upper Back", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 4, tip: "Make small, controlled circles and reverse direction; stop short of discomfort." },
+  { id: "ex-home-scapular-pushup", name: "Scapular Push-Up", muscleGroup: "Shoulders", secondaryMuscles: "Shoulder Blades, Serratus, Core", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 7, tip: "From hands and knees or a plank, gently move your shoulder blades without bending elbows." },
+  { id: "ex-home-pike-pushup", name: "Pike Push-Up", muscleGroup: "Shoulders", secondaryMuscles: "Shoulders, Triceps, Core", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 9, tip: "With hips raised, bend elbows gradually and keep your head clear of the floor." },
+  { id: "ex-home-close-grip-pushup", name: "Kneeling Close-Grip Push-Up", muscleGroup: "Arms", secondaryMuscles: "Triceps, Chest, Shoulders", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Keep hands a comfortable distance apart and elbows near your sides; move under control." },
+  { id: "ex-home-self-resisted-curl", name: "Self-Resisted Biceps Curl", muscleGroup: "Arms", secondaryMuscles: "Biceps, Forearms", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 5, tip: "Curl one arm while the other hand supplies gentle resistance; avoid straining or holding your breath." },
+  { id: "ex-home-kneeling-side-plank-lift", name: "Kneeling Side-Plank Hip Lift", muscleGroup: "Core", secondaryMuscles: "Obliques, Side Glutes, Shoulders", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 7, tip: "With your lower knee down, raise and lower hips gently; keep your shoulder comfortable." },
+  { id: "ex-home-heel-taps", name: "Alternating Heel Reaches", muscleGroup: "Core", secondaryMuscles: "Abdominals, Deep Core", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 6, tip: "Lie on your back with knees bent and reach each hand toward its same-side heel; do not pull your neck." },
+  { id: "ex-home-standing-cross-crunch", name: "Standing Cross-Body Knee Crunch", muscleGroup: "Core", secondaryMuscles: "Obliques, Hip Flexors, Balance", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 6, tip: "Bring opposite elbow and knee toward each other gently; stay balanced and move slowly." },
+  { id: "ex-home-bear-knee-hover", name: "Alternating Bear Knee Hover", muscleGroup: "Core", secondaryMuscles: "Core, Shoulders, Quads", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "On hands and knees, hover one knee briefly at a time while keeping your back comfortable." },
+  { id: "ex-home-reverse-crunch", name: "Reverse Crunch", muscleGroup: "Core", secondaryMuscles: "Lower Abdominals, Hip Flexors", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Bring bent knees toward your chest using a small controlled movement; avoid swinging." },
+  { id: "ex-home-heel-slides", name: "Supine Heel Slides", muscleGroup: "Core", secondaryMuscles: "Deep Core, Hip Flexors", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 5, tip: "Lie on your back and slide one heel away at a time without forcing your lower back flat." },
+  { id: "ex-home-march-in-place", name: "March in Place", muscleGroup: "Cardio", secondaryMuscles: "Heart, Legs, Coordination", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 18, tip: "March comfortably in a clear space; slow down whenever needed." },
+  { id: "ex-home-side-step-reach", name: "Side Step and Reach", muscleGroup: "Cardio", secondaryMuscles: "Heart, Legs, Shoulders", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 17, tip: "Step gently side to side while reaching within a comfortable shoulder range." },
+  { id: "ex-home-standing-knee-lifts", name: "Alternating Standing Knee Lifts", muscleGroup: "Cardio", secondaryMuscles: "Heart, Hip Flexors, Balance", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 18, tip: "Lift one knee at a comfortable height, alternate sides and keep your pace manageable." },
+  { id: "ex-home-step-out-jacks", name: "Step-Out Jacks", muscleGroup: "Cardio", secondaryMuscles: "Heart, Legs, Shoulders", equipment: 'Bodyweight', difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 20, tip: "Step one foot out at a time as arms rise; no jumping is required." },
+  { id: "ex-home-walkout", name: "Walkout to High Plank", muscleGroup: "Full Body", secondaryMuscles: "Shoulders, Core, Hamstrings", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Fold comfortably, walk hands out toward a plank, then walk them back; bend knees as needed." },
+  { id: "ex-home-plank-shoulder-taps", name: "Plank Shoulder Taps", muscleGroup: "Full Body", secondaryMuscles: "Core, Shoulders, Glutes", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "From a plank or hands and knees, tap one shoulder at a time while keeping hips steady." },
 ];

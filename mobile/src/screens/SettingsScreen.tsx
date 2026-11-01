@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { GuideId, GUIDE_IDS } from '../data/types';
+import { GUIDES } from '../components/ContextualGuide';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -10,8 +12,6 @@ import {
   Palette,
   RefreshCw,
   Scale,
-  Sliders,
-  Smartphone,
   Sparkles,
   Sun,
   Timer,
@@ -21,22 +21,19 @@ import {
 import { useFitLife } from '../data/FitLifeStore';
 import { DashboardWidgetsConfig, WeightUnit } from '../data/types';
 import {
-  CornerStyle,
-  DensityStyle,
-  MotionStyle,
   NATURAL_PALETTES,
   PaletteId,
   ThemeMode,
 } from '../domain/ThemePalettes';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
-import { FITLIFE_RELEASES_URL, FITLIFE_LATEST_APK_URL, getNativeUpdateBridge } from '../domain/Updates';
+import { FITLIFE_RELEASES_URL, getNativeUpdateBridge } from '../domain/Updates';
 import { EncryptedBackupPanel } from '../components/EncryptedBackupPanel';
 import { CloudAccountPanel } from '../components/CloudAccountPanel';
 
 interface SettingsScreenProps {
   onBack: () => void;
-  onOpenInstall: () => void;
+  onReviewGuide: (id: GuideId) => void;
 }
 
 const WIDGET_ITEMS: { key: keyof DashboardWidgetsConfig; label: string; desc: string }[] = [
@@ -47,7 +44,7 @@ const WIDGET_ITEMS: { key: keyof DashboardWidgetsConfig; label: string; desc: st
   { key: 'showActivityFeed', label: 'Today’s Activity Feed', desc: 'Chronological stream of logged meals & sets' },
 ];
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenInstall }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReviewGuide }) => {
   const {
     profile,
     settings,
@@ -55,25 +52,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
     setHapticsEnabled,
     setThemeMode,
     setPaletteId,
-    setCornerStyle,
-    setMotionStyle,
-    setDensityStyle,
     setDefaultRestSeconds,
     setAutoStartRest,
     setWeeklyWorkoutGoal,
-    setNavStyle,
     setWaterGoalMl,
     toggleDashboardWidget,
     seedDemoHistory,
     clearAllHistory,
     signOut,
   } = useFitLife();
-  const isNativeAsset = typeof window !== 'undefined' && window.location.protocol === 'file:' && window.location.pathname.startsWith('/android_asset/');
   const updateBridge = getNativeUpdateBridge();
   const [automaticUpdateChecks, setAutomaticUpdateChecks] = useState(() => {
     try { return updateBridge?.automaticUpdateChecksEnabled() ?? true; } catch { return true; }
   });
   const [pendingDataAction, setPendingDataAction] = useState<'clear' | 'restore' | null>(null);
+  const [showGuideChoices, setShowGuideChoices] = useState(false);
+  useEffect(() => {
+    if (!pendingDataAction) return;
+    const onBack = (event: Event) => { if (event.defaultPrevented) return; event.preventDefault(); setPendingDataAction(null); };
+    window.addEventListener('fitlife-back', onBack);
+    return () => window.removeEventListener('fitlife-back', onBack);
+  }, [pendingDataAction]);
   let installedVersion = '';
   try { installedVersion = updateBridge?.versionName() || ''; } catch { /* Version is optional on older wrappers. */ }
 
@@ -94,14 +93,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
               Studio & Customization
             </h1>
             <p className="text-xs text-[#84877F]">
-              Natural palettes, Daylight/Nightfall theme, layout & units
+              Natural palettes, Daylight/Nightfall theme & units
             </p>
           </div>
         </div>
       </div>
 
       {/* 1. THEME MODE TOGGLE (Daylight Light vs Nightfall Dark) */}
-      <div className="rounded-[26px] border border-[#3E634B] bg-[#213026] p-4 space-y-3">
+      <div className="rounded-[26px] border border-[#3E634B] bg-[#213026] p-4 space-y-3" data-guide-target="settings-appearance" aria-label="Appearance settings">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#528B67] text-[#F4F1EA]">
@@ -143,76 +142,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
           })}
         </div>
       </section>
-
-      {/* 3. INTERFACE SHAPE, DENSITY & MOTION CUSTOMIZATION */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#2B271F] border border-[#4A4232] text-[#D8C39E]">
-            <Sliders className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Shape, Density & Motion Feel
-            </h3>
-            <p className="text-xs text-[#84877F]">
-              Tailor card roundness, text scale, and spring transition speed
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">
-            Card Corner Radius
-          </label>
-          <SegmentedSelector<CornerStyle>
-            size="sm"
-            options={[
-              { value: 'sharp', label: 'Crisp (14px)' },
-              { value: 'organic', label: 'Organic (24px)' },
-              { value: 'pebble', label: 'Pebble (30px)' },
-            ]}
-            selected={settings.cornerStyle}
-            onChange={setCornerStyle}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">
-            Display Density & Scale
-          </label>
-          <SegmentedSelector<DensityStyle>
-            size="sm"
-            options={[
-              { value: 'compact', label: 'Compact' },
-              { value: 'comfortable', label: 'Comfortable' },
-              { value: 'spacious', label: 'Spacious' },
-            ]}
-            selected={settings.densityStyle}
-            onChange={setDensityStyle}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">Bottom navigation</label>
-          <SegmentedSelector<'glass' | 'solid'> size="sm" options={[{ value: 'glass', label: 'Glass' }, { value: 'solid', label: 'Solid' }]} selected={settings.navStyle} onChange={setNavStyle} />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">
-            UI Animation Intensity
-          </label>
-          <SegmentedSelector<MotionStyle>
-            size="sm"
-            options={[
-              { value: 'spring', label: 'Full Spring' },
-              { value: 'gentle', label: 'Gentle' },
-              { value: 'reduced', label: 'Minimal' },
-            ]}
-            selected={settings.motionStyle}
-            onChange={setMotionStyle}
-          />
-        </div>
-      </div>
 
       {/* 4. DASHBOARD WIDGET CUSTOMIZER */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
@@ -383,44 +312,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
         </div>
       </div>
 
-      {/* 7. INSTALL ON PHONE CARD */}
-      <div className="rounded-[26px] border border-[#3E634B] bg-[#213026] p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#528B67] text-[#F4F1EA]">
-            <Smartphone className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-bold text-[#F4F1EA]">
-              Install FitLife on Your Phone
-            </h3>
-            <p className="text-xs text-[#B8B5AD]">
-              Open the install guide or get the latest signed Android <code className="text-[#7BB38F]">FitLife.apk</code> from GitHub.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <PressScale
-            onClick={onOpenInstall}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#528B67] hover:bg-[#5E9A74] py-2.5 text-xs font-bold text-[#F4F1EA]"
-          >
-            <Smartphone className="h-4 w-4" />
-            <span>QR & Install Guide</span>
-          </PressScale>
-
-          {!isNativeAsset && <a
-            href={FITLIFE_LATEST_APK_URL}
-            target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3E634B] bg-[#151F19] py-2.5 text-xs font-semibold text-[#7BB38F]"
-          >
-            <Download className="h-4 w-4" />
-            <span>Get FitLife.apk</span>
-          </a>}
-        </div>
-      </div>
+      <section className="guide-replay" aria-label="App tips">
+        <div><strong>Need a refresher?</strong><p>Review a short guide whenever you choose.</p></div>
+        <button type="button" aria-expanded={showGuideChoices} aria-controls="guide-choices" onClick={() => setShowGuideChoices(value => !value)}>{showGuideChoices ? 'Hide tips' : 'Review app tips'}</button>
+        {showGuideChoices && <div id="guide-choices" className="guide-choice-grid">{GUIDE_IDS.map(id => <button key={id} type="button" onClick={() => onReviewGuide(id)}>{GUIDES[id].area} guide</button>)}</div>}
+      </section>
 
       {/* Release updates: GitHub is checked without sending fitness data. */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
+      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3" data-guide-target="settings-updates" aria-label="App updates">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">
             <RefreshCw className="h-5 w-5" />
@@ -456,8 +355,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
         )}
       </div>
 
-      <CloudAccountPanel />
-      <EncryptedBackupPanel />
+      <div data-guide-target="settings-data" aria-label="Account and encrypted backups"><CloudAccountPanel />
+      <EncryptedBackupPanel /></div>
 
       {/* 8. LOCAL DATA MANAGEMENT */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
@@ -511,7 +410,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenIn
           }}
           className="flex w-full items-center justify-center rounded-xl border border-[#2F3A33] bg-[#141916] py-2.5 text-xs font-semibold text-[#B8B5AD] hover:text-[#F4F1EA]"
         >
-          Exit local profile
+          Sign out
         </PressScale>
       </div>
     </div>

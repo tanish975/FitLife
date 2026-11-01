@@ -1,160 +1,54 @@
 import React, { useState } from 'react';
-import { ArrowRight, CheckCircle2, Mail, ShieldCheck, User } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Smartphone } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
-import { PressScale } from '../components/PressScale';
-import { SegmentedSelector } from '../components/SegmentedSelector';
 import { EntryActionBar } from '../components/EntryActionBar';
 import { FitLifeLogo } from '../components/FitLifeLogo';
 
-interface AuthScreenProps {
-  onCompleteAuth: (isNewSignup: boolean) => void;
-}
+interface AuthScreenProps { onCompleteAuth: () => void }
 
+/** Google authentication is performed by Android Credential Manager and Firebase,
+ * not by an embedded web login or a pretend local account. */
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
-  const { signIn, signInGoogle, cloudAvailable, cloudStatus, profile, meals, workouts, weights, moods, waterTodayMl, clearAllHistory } = useFitLife();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [name, setName] = useState(profile.name || 'Tanish Patel');
-  const [email, setEmail] = useState(profile.email || 'tanish@fitlife.app');
-  const [error, setError] = useState<string | null>(null);
-  const [googleBusy, setGoogleBusy] = useState(false);
-  const history = [...meals, ...workouts, ...weights, ...moods];
-  const isSample = (id: string) => id.startsWith('seed-') || id.startsWith('today-meal-') || id.startsWith('today-wk-') || id.startsWith('today-mood-');
-  const hasSample = history.some(item => isSample(item.id));
+  const { signInGoogle, cloudAvailable, cloudStatus } = useFitLife();
+  const [busy, setBusy] = useState(false);
+  const status = cloudStatus === 'Not connected.' ? '' : cloudStatus;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-    setError(null);
-    if (mode === 'signup') {
-      // A fresh install starts with sample history. Remove only untouched sample
-      // data; never erase existing user-created logs just because someone signs in.
-      const sampleOnly = history.length > 0 && history.every(item => isSample(item.id));
-      if (sampleOnly && waterTodayMl === 0) clearAllHistory();
-    }
-    signIn(email, mode === 'signup' ? name : profile.name);
-    onCompleteAuth(mode === 'signup');
+  const handleGoogle = async () => {
+    if (busy || !cloudAvailable) return;
+    setBusy(true);
+    try { if (await signInGoogle()) onCompleteAuth(); }
+    finally { setBusy(false); }
   };
 
-  return (
-    <>
-    <div className="auth-entry-content flex min-h-full flex-col justify-between px-5 py-7">
-      {/* Brand Header */}
-      <div className="text-center pt-3">
-        <div className="mx-auto mb-4 relative flex h-20 w-20 items-center justify-center rounded-[24px] bg-[#213026] border border-[#3E634B] shadow-xl overflow-hidden">
-          <FitLifeLogo className="entry-logo" />
+  return <>
+    <div className="auth-entry-content auth-google-entry">
+      <div className="auth-brand">
+        <span className="auth-brand-mark"><FitLifeLogo className="entry-logo" /></span>
+        <p className="auth-eyebrow">MOVE WELL. LIVE WELL.</p>
+        <h1>Welcome to <span>FitLife</span></h1>
+        <p>Workouts, meals and progress, together in one place.</p>
+      </div>
+      <section className="auth-intro" aria-labelledby="auth-intro-heading">
+        <span className="auth-intro-icon"><ShieldCheck size={21} aria-hidden="true" /></span>
+        <div>
+          <h2 id="auth-intro-heading">Your fitness, your account</h2>
+          <p>Sign in with Google to get started. Your first sign-in needs an internet connection; your saved session can return when offline.</p>
+          <p>Existing activity on this device is kept and merged with the first Google account. Cloud data is not end-to-end encrypted.</p>
         </div>
-
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-[#F4F1EA]">
-          Welcome to <span className="text-[#7BB38F]">FitLife</span>
-        </h1>
-        <p className="mt-1 text-xs text-[#84877F]">
-          Adaptive workouts, nutrition tracking & daily guidance
-        </p>
-      </div>
-
-      {/* Auth Card */}
-      <div className="my-5 rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-5 shadow-xl">
-        {cloudAvailable && <>
-          <button type="button" disabled={googleBusy} onClick={async () => {
-            setError(null); setGoogleBusy(true);
-            try { if (await signInGoogle()) onCompleteAuth(false); }
-            finally { setGoogleBusy(false); }
-          }} className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#83B491] bg-[#F4F1EA] px-3 py-3 text-xs font-bold text-[#213026] disabled:opacity-50">
-            <ShieldCheck className="h-4 w-4" /> {googleBusy ? 'Opening Google…' : 'Sign in with Google'}
-          </button>
-          <p className="mb-3 text-[11px] leading-relaxed text-[#B8B5AD]">The first Google account merges this device’s activity. Cloud data is not end-to-end encrypted.</p>
-          {cloudStatus !== 'Not connected.' && <p className="mb-3 text-[11px] leading-relaxed text-[#B8B5AD]" role="status">{cloudStatus}</p>}
-        </>}
-        <SegmentedSelector
-          options={[
-            { value: 'signin', label: 'Local access' },
-            { value: 'signup', label: 'Create Profile' },
-          ]}
-          selected={mode}
-          onChange={(m) => {
-            setMode(m);
-            setError(null);
-          }}
-        />
-
-        <form id="fitlife-auth-form" onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-          {mode === 'signup' && (
-            <div>
-              <label htmlFor="auth-name" className="mb-1 block text-xs font-medium text-[#B8B5AD]">Full Name</label>
-              <div className="flex items-center gap-2.5 rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5 focus-within:border-[#6BA37E]">
-                <User className="h-4 w-4 text-[#84877F]" />
-                <input
-                  id="auth-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Tanish Patel"
-                  className="w-full bg-transparent text-sm text-[#F4F1EA] outline-none placeholder:text-[#636961]"
-                />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="auth-email" className="mb-1 block text-xs font-medium text-[#B8B5AD]">Email Address</label>
-            <div className="flex items-center gap-2.5 rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5 focus-within:border-[#6BA37E]">
-              <Mail className="h-4 w-4 text-[#84877F]" />
-              <input
-                id="auth-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@fitlife.app"
-                className="w-full bg-transparent text-sm text-[#F4F1EA] outline-none placeholder:text-[#636961]"
-              />
-            </div>
-          </div>
-
-          <p className="rounded-xl bg-[#213026] p-3 text-xs leading-relaxed text-[#B8B5AD]">Local demo only: email is not verified and no password is needed. There is one profile per device; no cloud account is created.</p>
-
-          {error && (
-            <p className="rounded-xl bg-[#33241E] border border-[#C47451]/40 px-3 py-2 text-xs text-[#DE9473]">
-              {error}
-            </p>
-          )}
-
-        </form>
-
-        <div className="my-3.5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#2F3A33]" />
-          <span className="text-[11px] uppercase tracking-wider text-[#84877F]">or instant access</span>
-          <div className="h-px flex-1 bg-[#2F3A33]" />
+      </section>
+      {!cloudAvailable && <section className="auth-platform-note" aria-label="Android app required">
+        <Smartphone size={20} aria-hidden="true" />
+        <div><strong>Available in the Android app</strong><p>Google sign-in is not supported in this web or standalone build. Install FitLife for Android to sign in.</p>
+          <a href="https://github.com/tanish975/FitLife/releases/latest/download/FitLife.apk" target="_blank" rel="noreferrer">Download Android app <ArrowRight size={14} aria-hidden="true" /></a>
         </div>
-
-        <PressScale
-          onClick={() => {
-            signIn(profile.email, profile.name);
-            onCompleteAuth(false);
-          }}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#3E634B] bg-[#213026] py-2.5 text-xs font-semibold text-[#7BB38F] hover:bg-[#27392D]"
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          <span>{hasSample ? 'Quick launch (demo data)' : `Continue as ${profile.name}`}</span>
-        </PressScale>
-      </div>
-
-      {/* Firebase Project Status Footer */}
-      <div className="flex items-center justify-center gap-2 rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2 text-[11px] text-[#84877F]">
-        <ShieldCheck className="h-4 w-4 text-[#7BB38F] shrink-0" />
-        <span>
-          Local access does not verify an email. Google sign-in and activity sync are available in the Android app; device backups may include local data.
-        </span>
-      </div>
+      </section>}
+      {status && <p className="auth-status" role="status">{status}</p>}
     </div>
     <EntryActionBar>
-      <button type="submit" form="fitlife-auth-form" className="entry-action-button">
-        <span>{mode === 'signin' ? 'Continue to FitLife' : 'Continue to Onboarding'}</span>
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      <button type="button" className="entry-action-button" disabled={busy || !cloudAvailable} onClick={handleGoogle} aria-describedby={!cloudAvailable ? 'android-signin-note' : undefined}>
+        <ShieldCheck size={19} aria-hidden="true" /> {busy ? 'Opening Google…' : 'Sign in with Google'}
       </button>
+      {!cloudAvailable && <span id="android-signin-note" className="sr-only">Install the Android app to sign in.</span>}
     </EntryActionBar>
-    </>
-  );
+  </>;
 };

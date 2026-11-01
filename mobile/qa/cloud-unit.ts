@@ -36,6 +36,24 @@ assert.deepEqual(noResurrection.snapshot.meals.map(x => x.name), ['Rice'], 'stal
 assert.equal((await rowFingerprint(a)).length, 64);
 await assert.rejects(() => mergeCloud(payload(), [{ ...payload(), snapshot: { ...snap(), water: { dateKey: 'bad', amountMl: 1 } } }]), /invalid/);
 
+
+// Guide completion is the only preference merged monotonically across devices.
+const one: any = payload([], 'A'); one.snapshot.settings = { ...settings, guidesSeen: ['dashboard','meals'] };
+const two: any = payload([], 'B'); two.snapshot.settings = { ...settings, guidesSeen: ['workouts','dashboard'] };
+const guideMerge = await mergeCloud(one, [two]);
+assert.deepEqual(guideMerge.snapshot.settings.guidesSeen, ['dashboard','meals','workouts']);
+const guideAgain = await mergeCloud(guideMerge, [two]);
+assert.deepEqual(guideAgain.snapshot.settings.guidesSeen, guideMerge.snapshot.settings.guidesSeen, 'guide union is idempotent');
+assert.equal(validCloudPayload({ ...one, snapshot: { ...one.snapshot, settings: { ...one.snapshot.settings, guidesSeen:['not-a-guide'] } } }), false, 'unknown guide ID rejected');
+assert.equal(validCloudPayload({ ...one, snapshot: { ...one.snapshot, settings: { ...one.snapshot.settings, guidesSeen:['dashboard','dashboard'] } } }), false, 'duplicate guide ID rejected');
+const migrated = await mergeCloud(one, [payload()]);
+assert.equal(migrated.snapshot.settings.guidesSeen?.length, 8, 'existing pre-guide profiles are not forced into a first-run tour');
+const unprofiledLegacy: any = payload(); unprofiledLegacy.snapshot.profile = { ...profile, onboarded:false };
+assert.deepEqual((await mergeCloud(one, [unprofiledLegacy])).snapshot.settings.guidesSeen, ['dashboard','meals'], 'an incomplete legacy snapshot is not treated as an existing completed profile');
+const unavailableWorkout: any = { id:'w-1', dateKey:'2026-11-01', timestamp:1760000000000, exerciseId:'ex', exerciseName:'Movement', muscleGroup:'Cardio', sets:1, reps:1, weightKg:0, caloriesBurned:0, energyEstimateAvailable:false, restSeconds:45 };
+assert(validCloudPayload({ ...one, snapshot: { ...one.snapshot, workouts:[unavailableWorkout] } }), 'unavailable estimate survives sync/backup');
+assert(!validCloudPayload({ ...one, snapshot: { ...one.snapshot, workouts:[{...unavailableWorkout,energyEstimateAvailable:'false'}] } }), 'bad estimate flags rejected');
+
 class MemoryStorage implements Storage {
   data = new Map<string,string>(); failKey: string | null = null;
   get length() { return this.data.size; }

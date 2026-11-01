@@ -8,7 +8,7 @@ import { LineChart, LineChartDatum } from '../components/LineChart';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { PressScale } from '../components/PressScale';
 
-export const ProgressScreen: React.FC = () => {
+export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEditProfile }) => {
   const {
     profile,
     settings,
@@ -22,13 +22,14 @@ export const ProgressScreen: React.FC = () => {
 
   const unit = settings.weightUnit;
 
+  const hasWeight = weights.length > 0 || profile.onboarded;
   const [weightInput, setWeightInput] = useState<string>(() =>
-    String(displayWeight(latestWeightKg, unit, 1))
+    hasWeight ? String(displayWeight(latestWeightKg, unit, 1)) : ''
   );
 
   useEffect(() => {
-    setWeightInput(String(displayWeight(latestWeightKg, unit, 1)));
-  }, [latestWeightKg, unit]);
+    setWeightInput(hasWeight ? String(displayWeight(latestWeightKg, unit, 1)) : '');
+  }, [latestWeightKg, unit, hasWeight]);
 
   const bmiResult = useMemo(
     () => calculateBmi(latestWeightKg, profile.heightCm),
@@ -66,7 +67,7 @@ export const ProgressScreen: React.FC = () => {
     }
   };
 
-  const bmiMarkerPct = Math.max(4, Math.min(96, ((bmiResult.bmi - 15) / 20) * 100));
+  const bmiMarkerPct = Math.max(0, Math.min(100, ((bmiResult.bmi - 15) / 20) * 100));
 
   return (
     <div className="space-y-4 px-4 pb-28 pt-2 animate-screen-enter">
@@ -84,13 +85,13 @@ export const ProgressScreen: React.FC = () => {
       </div>
 
       {/* WEIGHT HERO CARD (Solid Deep Sage Surface) */}
-      <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-xl">
+      <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-xl" data-guide-target="progress-weight" aria-label="Weight check-in">
         <div className="relative z-10 flex items-start justify-between gap-3">
           <div>
             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
               <Sparkles className="h-3 w-3" /> Latest Logged Weight
             </span>
-            <div className="mt-1 flex items-baseline gap-1.5">
+            {hasWeight ? <><div className="mt-1 flex items-baseline gap-1.5">
               <AnimatedCounter
                 value={displayWeight(latestWeightKg, unit, 1)}
                 decimals={1}
@@ -117,7 +118,7 @@ export const ProgressScreen: React.FC = () => {
               <span className="text-[#B8B5AD] text-[11px]">
                 Start: {formatWeight(startingWeightKg, unit)}
               </span>
-            </div>
+            </div></> : <p className="mt-2 text-sm text-[#B8B5AD]">No weight logged yet.</p>}
           </div>
 
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#151F19] border border-[#355440] text-[#7BB38F]">
@@ -152,8 +153,8 @@ export const ProgressScreen: React.FC = () => {
         </form>
       </div>
 
-      {/* CURRENT BMI & HEALTH SPECTRUM CARD */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4">
+      {/* BMI needs real height and age; do not use the sample profile. */}
+      {profile.onboarded ? <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="progress-bmi" aria-label="Body mass index">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Body Mass Index (BMI)</h2>
@@ -179,28 +180,26 @@ export const ProgressScreen: React.FC = () => {
         {/* Natural Earthy Spectrum Bar */}
         {profile.age >= 18 && <div className="mt-3 relative">
           <div className="h-2.5 w-full rounded-full overflow-hidden flex">
-            <div className="w-[18%] bg-[#5F8D85]" />
-            <div className="w-[32%] bg-[#6BA37E]" />
+            <div className="w-[17.5%] bg-[#5F8D85]" />
+            <div className="w-[32.5%] bg-[#6BA37E]" />
             <div className="w-[25%] bg-[#C89643]" />
             <div className="w-[25%] bg-[#C47451]" />
           </div>
           <div
-            className="absolute -top-1 h-4 w-2 -translate-x-1/2 rounded-full bg-[#F4F1EA] shadow-md ring-2 ring-[#151A17] transition-all duration-500"
+            data-testid="bmi-marker"
+            className="absolute -top-1 h-4 w-2 -translate-x-1/2 rounded-full bg-[#F4F1EA] shadow-md ring-2 ring-[#151A17]"
             style={{ left: `${bmiMarkerPct}%` }}
           />
-          <div className="mt-1.5 flex justify-between text-[9px] text-[#84877F] font-medium">
-            <span>15</span>
-            <span>18.5 (Normal)</span>
-            <span>25 (Over)</span>
-            <span>30+</span>
+          <div className="bmi-scale-labels" aria-label="BMI scale from 15 to 35">
+            <span>15</span><span>18.5</span><span>25</span><span>30</span><span>35</span>
           </div>
         </div>}
 
         <p className="mt-2.5 text-xs leading-relaxed text-[#B8B5AD]">{profile.age >= 18 ? bmiResult.summary : 'BMI is a screening measure, not an assessment of individual health. Ask a qualified health professional for age-appropriate advice.'}</p>
-      </div>
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="progress-bmi" aria-label="Body mass index"><div><strong>BMI is not available yet</strong><p>Add your own profile details if you want a BMI estimate. It is a screening measure, not a diagnosis.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></section>}
 
       {/* WEIGHT TREND CHART (Last 14 Entries on Canvas) */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4">
+      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="progress-chart" aria-label="Weight trend chart">
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
@@ -229,23 +228,23 @@ export const ProgressScreen: React.FC = () => {
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              14-Day Calorie Trend vs. Target
+              {profile.onboarded ? '14-Day Calorie Trend vs. Target' : '14-Day Calorie Trend'}
             </h2>
             <p className="text-[11px] text-[#84877F]">
-              Dashed ochre line shows your {macroTargets.calories} kcal daily target
+              {profile.onboarded ? `Dashed ochre line shows your ${macroTargets.calories} kcal daily target` : 'Logged food energy; add profile details to calculate a target.'}
             </p>
           </div>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D8C39E]">
+          {profile.onboarded && <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D8C39E]">
             <Flame className="h-3.5 w-3.5" /> {macroTargets.calories} kcal
-          </span>
+          </span>}
         </div>
 
         <LineChart
           data={calorieChartData}
           height={185}
           lineColor="#C2A878"
-          targetValue={macroTargets.calories}
-          targetLabel={`Target ${macroTargets.calories}`}
+          targetValue={profile.onboarded ? macroTargets.calories : undefined}
+          targetLabel={profile.onboarded ? `Target ${macroTargets.calories}` : undefined}
           unitSuffix=" kcal"
           yDecimals={0}
         />

@@ -1,20 +1,23 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
-const base = process.env.FITLIFE_URL || 'http://127.0.0.1:4173/';
+const base = nativeApp;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const errors = [];
 
-async function freshPage(width, height, extra = {}, initSettings = null) {
+async function freshPage(width, height, extra = {}, initSettings = null, signedIn = true) {
   const context = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, isMobile: width < 1000, hasTouch: width < 1000,
     ...extra,
   });
   const page = await context.newPage();
+  await installNativeFixture(page, { signedIn });
   if (initSettings) await page.addInitScript(settings => localStorage.setItem('fitlife_settings_v2', JSON.stringify(settings)), initSettings);
   page.on('pageerror', error => errors.push(`${width}x${height}: ${error.message}`));
   await page.goto(base, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Create Profile', exact: true }).waitFor();
+  if (signedIn) await page.getByText("Today's overview").waitFor();
+  else await page.getByRole('button', { name:'Sign in with Google', exact:true }).waitFor();
   return { context, page };
 }
 
@@ -63,11 +66,10 @@ async function assertNoHorizontalOverflow(page, label) {
 }
 
 async function tapSignup(page, name = null) {
-  await page.getByRole('button', { name: 'Create Profile', exact: true }).click();
-  await assertActionInViewport(page, 'Continue to Onboarding');
-  if (name) await page.getByLabel('Full Name').fill(name);
-  await page.getByRole('button', { name: 'Continue to Onboarding', exact: true }).click();
+  await page.getByRole('button', { name: 'Profile', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Edit profile', exact: true }).click();
   await page.getByRole('heading', { name: 'Complete your profile' }).waitFor();
+  if (name) await page.getByLabel('Athlete Name').fill(name);
   await assertActionInViewport(page, 'Complete profile & continue');
 }
 
@@ -90,7 +92,9 @@ async function assertSwipeFromCardScrolls(page, context, testId) {
   const list = page.getByTestId(testId);
   assert.equal(await list.evaluate(el => getComputedStyle(el).overflowY), 'visible', `${testId} has a nested vertical scroller`);
   const card = list.getByRole('button').first();
-  await card.scrollIntoViewIfNeeded();
+  // Center the actual card, rather than accepting the browser's definition of
+  // "visible" when its bottom is covered by the persistent navigation bar.
+  await card.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'nearest' }));
   await page.waitForTimeout(250);
   const point = await card.evaluate(el => {
     const r = el.getBoundingClientRect();
@@ -112,7 +116,6 @@ try {
   // automated scroll, then ensure the final activity choice is not under the bar.
   for (const [width, height] of [[320, 480], [360, 640], [390, 844], [640, 360], [768, 1024]]) {
     const { context, page } = await freshPage(width, height);
-    await assertActionInViewport(page, 'Continue to FitLife');
     await tapSignup(page);
     await assertNoHorizontalOverflow(page, `onboarding ${width}x${height}`);
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -169,7 +172,7 @@ try {
   await weight.fill('68.2');
   await assertActionInViewport(page, 'Complete profile & continue');
   await page.getByRole('button', { name: 'Complete profile & continue' }).click();
-  await page.getByText("Today's overview").waitFor();
+  await page.getByRole('heading', { name:'Athlete Profile' }).waitFor();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_profile_v1') || '{}').age === 32);
   const profile = await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_profile_v1')));
   assert.equal(profile.name, 'Mira Tester');
@@ -233,7 +236,7 @@ try {
   await assertSwipeFromCardScrolls(page, context, 'food-catalog-list');
   await page.getByRole('button', { name: /Show more foods/ }).click();
   assert.equal(await foodList.getByRole('button').count(), 20);
-  await page.getByPlaceholder(/Search 32\+ foods/).fill('paneer');
+  await page.getByPlaceholder(/Search \d+ foods/).fill('paneer');
   assert.equal(await foodList.getByRole('button').count(), 3);
   assert.equal(await page.locator('.shimmer-pulse').count(), 0, 'Search still inserts an artificial loading state');
   const previousMealCount = await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_meals_v1') || '[]').length);
@@ -260,7 +263,6 @@ try {
   console.log('✓ Celebration permits scrolling and has an accessible close action');
 
   const reduced = await freshPage(360, 640, { reducedMotion: 'reduce' });
-  await reduced.page.getByRole('button', { name: 'Quick launch (demo data)', exact: true }).click();
   await reduced.page.getByRole('button', { name: 'Workouts', exact: true }).click();
   await reduced.page.getByTestId('exercise-catalog-list').getByRole('button').first().click();
   await reduced.page.getByRole('button', { name: 'Close workout details' }).click();
@@ -274,9 +276,9 @@ try {
 
   for (const mode of ['light', 'dark']) {
     for (const palette of ['matcha_oat', 'coastal_eucalyptus', 'terracotta_olive', 'nordic_fjord', 'kyoto_cedar']) {
-      const colors = await freshPage(320, 480, {}, { themeMode: mode, paletteId: palette });
-      await assertActionInViewport(colors.page, 'Continue to FitLife');
-      await assertActionContrast(colors.page, 'Continue to FitLife');
+      const colors = await freshPage(320, 480, {}, { themeMode: mode, paletteId: palette }, false);
+      await assertActionInViewport(colors.page, 'Sign in with Google');
+      await assertActionContrast(colors.page, 'Sign in with Google');
       await colors.context.close();
     }
   }
@@ -286,22 +288,22 @@ try {
   // user would. Profile completion must remain legible and save kilograms.
   const nightContext = await browser.newContext({ viewport: { width: 320, height: 480 }, isMobile: true, hasTouch: true });
   const nightPage = await nightContext.newPage();
+  await installNativeFixture(nightPage);
   nightPage.on('pageerror', error => errors.push(`nightfall: ${error.message}`));
   await nightPage.addInitScript(() => localStorage.setItem('fitlife_settings_v2', JSON.stringify({ themeMode: 'dark', weightUnit: 'lb' })));
   await nightPage.goto(base, { waitUntil: 'networkidle' });
-  await nightPage.getByRole('button', { name: 'Create Profile', exact: true }).waitFor();
+  await nightPage.getByText("Today's overview").waitFor();
   assert.equal(await nightPage.evaluate(() => document.documentElement.dataset.themeMode), 'dark');
   await tapSignup(nightPage);
   await nightPage.getByLabel('Weight (lb)').fill('150');
   await assertActionInViewport(nightPage, 'Complete profile & continue');
   await nightPage.getByRole('button', { name: 'Complete profile & continue' }).click();
-  await nightPage.getByText("Today's overview").waitFor();
+  await nightPage.getByRole('heading', { name:'Athlete Profile' }).waitFor();
   await nightPage.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_profile_v1') || '{}').weightKg === 68.04);
   await nightContext.close();
   console.log('✓ Nightfall entry and pound-to-kilogram profile saving');
 
   const desktop = await freshPage(1280, 800, { isMobile: false, hasTouch: false });
-  await desktop.page.getByRole('button', { name: 'Quick launch (demo data)', exact: true }).click();
   await desktop.page.getByText("Today's overview").waitFor();
   assert.equal(await desktop.page.locator('.desktop-navigation').count(), 1);
   assert.equal(await desktop.page.locator('.wellness-aside').count(), 1);

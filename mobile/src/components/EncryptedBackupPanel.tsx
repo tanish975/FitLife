@@ -38,6 +38,12 @@ export const EncryptedBackupPanel: React.FC = () => {
     return () => window.removeEventListener('fitlife-backup-part', listener);
   }, []);
   const close = () => { setAction(null); setPass(''); setConfirm(''); setEncryptedFile(''); setFileName(''); setRestoreMode('merge'); setConfirmedReplace(false); setStatus(''); setBusy(false); };
+  useEffect(() => {
+    if (!action) return;
+    const onBack = (event: Event) => { if (event.defaultPrevented) return; event.preventDefault(); if (!busy) close(); };
+    window.addEventListener('fitlife-back', onBack);
+    return () => window.removeEventListener('fitlife-back', onBack);
+  }, [action, busy]);
   const open = (next: 'export' | 'import') => { close(); setAction(next); };
   const save = async () => {
     if (pass !== confirm) { setStatus('The passphrases do not match.'); return; }

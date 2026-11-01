@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, Search, Sparkles, Trash2, Utensils, X } from 'lucide-react';
+import { Pencil, Plus, Search, Sparkles, Trash2, Utensils, X } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
 import { FOOD_CATALOG } from '../data/FoodCatalog';
-import { MealCategory } from '../data/types';
-import { parseMealFreeText } from '../domain/MealTextParser';
+import { LoggedMeal, MealCategory } from '../data/types';
+import { parseMealFreeText, ParsedMealDraft } from '../domain/MealTextParser';
+import { MealEditor } from '../components/MealEditor';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
 import { EmptyState } from '../components/EmptyState';
@@ -11,26 +12,30 @@ import { AnimatedCounter } from '../components/AnimatedCounter';
 
 const CATEGORIES: MealCategory[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const CATALOG_PAGE_SIZE = 10;
+type EditingMeal = { kind: 'new'; initial?: ParsedMealDraft } | { kind: 'quick'; index: number; initial: ParsedMealDraft } | { kind: 'logged'; id: string; initial: LoggedMeal };
 
 export const MealsScreen: React.FC = () => {
-  const { todayMeals, macroTargets, logFoodItem, logQuickAddMeals, removeMeal } = useFitLife();
+  const { profile, todayMeals, macroTargets, logFoodItem, logQuickAddMeals, editMeal, removeMeal } = useFitLife();
   const [selectedCategory, setSelectedCategory] = useState<MealCategory>('Breakfast');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(CATALOG_PAGE_SIZE);
   const [quickAddText, setQuickAddText] = useState('');
+  const [draftOverrides, setDraftOverrides] = useState<Record<number, ParsedMealDraft>>({});
+  const [editing, setEditing] = useState<EditingMeal | null>(null);
+  const updateQuickText = (text: string) => { setQuickAddText(text); setDraftOverrides({}); };
   const updateSearch = (value: string) => { setSearchQuery(value); setVisibleCount(CATALOG_PAGE_SIZE); };
-  const updateCategory = (value: MealCategory) => { setSelectedCategory(value); setVisibleCount(CATALOG_PAGE_SIZE); };
+  const updateCategory = (value: MealCategory) => { setSelectedCategory(value); setVisibleCount(CATALOG_PAGE_SIZE); setDraftOverrides(prev => Object.fromEntries(Object.entries(prev).map(([key, draft]) => [key, { ...draft, category: value }]))); };
 
   const parsedQuickDrafts = useMemo(
-    () => parseMealFreeText(quickAddText, selectedCategory),
-    [quickAddText, selectedCategory]
+    () => parseMealFreeText(quickAddText, selectedCategory).map((draft, index) => draftOverrides[index] || draft),
+    [quickAddText, selectedCategory, draftOverrides]
   );
 
   const handleQuickAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (parsedQuickDrafts.length === 0) return;
+    if (parsedQuickDrafts.length === 0 || parsedQuickDrafts.some((draft) => draft.requiresReview)) return;
     logQuickAddMeals(parsedQuickDrafts);
-    setQuickAddText('');
+    updateQuickText('');
   };
 
   const filteredCatalog = useMemo(() => {
@@ -75,18 +80,19 @@ export const MealsScreen: React.FC = () => {
         <div>
           <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Meals & Nutrition</h1>
           <p className="text-xs text-[#84877F]">
-            Tap any food to log (+10 XP) or quick-parse natural text
+            Track calories, protein, carbs, fat & fiber
           </p>
         </div>
         <div className="rounded-2xl border border-[#3E634B] bg-[#213026] px-3 py-1.5 text-right">
           <div className="text-[10px] font-medium text-[#7BB38F]">Today’s Intake</div>
           <div className="font-heading text-xs font-bold text-[#F4F1EA]">
-            <AnimatedCounter value={todayCalories} /> / {macroTargets.calories} kcal
+            <AnimatedCounter value={todayCalories} /> {profile.onboarded ? `/ ${macroTargets.calories} kcal` : 'kcal logged'}
           </div>
         </div>
       </div>
 
       {/* Category Selector */}
+      <div data-guide-target="meals-category" aria-label="Meal category">
       <SegmentedSelector<MealCategory>
         scrollable
         options={CATEGORIES.map((c) => ({
@@ -97,12 +103,13 @@ export const MealsScreen: React.FC = () => {
         selected={selectedCategory}
         onChange={updateCategory}
       />
+      </div>
 
       {/* Quick-Add Natural Text Parser Card */}
-      <div className="rounded-[26px] border border-[#3E634B] bg-[#1E2520] p-4">
+      <div className="rounded-[26px] border border-[#3E634B] bg-[#1E2520] p-4" data-guide-target="meals-quick" aria-label="Quick add a meal">
         <div className="flex items-center justify-between mb-2">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#7BB38F]">
-            <Sparkles className="h-3.5 w-3.5" /> Quick Add Free-Text Parser
+            <Sparkles className="h-3.5 w-3.5" /> Quick add a meal
           </span>
           <span className="text-[10px] text-[#84877F]">Logging to {selectedCategory}</span>
         </div>
@@ -111,14 +118,14 @@ export const MealsScreen: React.FC = () => {
           <input
             type="text"
             value={quickAddText}
-            onChange={(e) => setQuickAddText(e.target.value)}
+            onChange={(e) => updateQuickText(e.target.value)}
             placeholder='Try "2 eggs and a banana" or "150g chicken & rice"'
             className="min-w-0 flex-1 rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5 text-xs text-[#F4F1EA] outline-none placeholder:text-[#636961] focus:border-[#6BA37E]"
           />
           <PressScale scaleDown={0.94}>
             <button
               type="submit"
-              disabled={parsedQuickDrafts.length === 0}
+              disabled={parsedQuickDrafts.length === 0 || parsedQuickDrafts.some((draft) => draft.requiresReview)}
               className="rounded-2xl bg-[#528B67] hover:bg-[#5E9A74] px-4 py-2.5 text-xs font-bold text-[#F4F1EA] disabled:opacity-40"
             >
               Add {parsedQuickDrafts.length > 0 ? `(${parsedQuickDrafts.length})` : ''}
@@ -126,22 +133,15 @@ export const MealsScreen: React.FC = () => {
           </PressScale>
         </form>
 
-        <p className="mt-2 text-[11px] leading-relaxed text-[#B8B5AD]">Nutrition values are estimates. Unrecognized foods use a generic placeholder; review before adding.</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-[#B8B5AD]">Catalog values are estimates, not a complete database. Check the food and portion; unknown or ambiguous items need your nutrition details.</p>
 
-        {/* Live Parsed Chips Preview */}
-        {parsedQuickDrafts.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5 pt-2 border-t border-[#2F3A33]">
-            {parsedQuickDrafts.map((d, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#213026] border border-[#3E634B] px-2.5 py-1 text-[11px] font-medium text-[#7BB38F]"
-              >
-                <span>{d.name}</span>
-                <strong className="text-[#F4F1EA]">{d.calories} kcal</strong>
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Review every amount and nutrient before adding; unknown foods never get invented values. */}
+        {parsedQuickDrafts.length > 0 && <div className="meal-draft-list" aria-label="Meal preview">
+          {parsedQuickDrafts.map((draft, index) => <div key={index} className="meal-draft">
+            <div><strong>{draft.name}</strong><small>{draft.servingLabel}</small><small>{draft.requiresReview ? 'Nutrition details needed' : `${draft.calories} kcal · P ${draft.proteinG}g · C ${draft.carbsG}g · F ${draft.fatG}g · Fiber ${draft.fiberG}g`}</small></div>
+            <button type="button" aria-label={`Review nutrition for ${draft.name}`} onClick={() => setEditing({ kind: 'quick', index, initial: draft })}>{draft.requiresReview ? 'Add details' : 'Review'}</button>
+          </div>)}
+        </div>}
 
         {/* Preset 1-Tap Quick Phrases */}
         {!quickAddText && (
@@ -155,7 +155,7 @@ export const MealsScreen: React.FC = () => {
               <button
                 key={sample}
                 type="button"
-                onClick={() => setQuickAddText(sample)}
+                onClick={() => updateQuickText(sample)}
                 className="shrink-0 rounded-full border border-[#2F3A33] bg-[#141916] px-2.5 py-1 text-[10px] text-[#B8B5AD] hover:border-[#528B67] hover:text-[#7BB38F]"
               >
                 “{sample}”
@@ -165,14 +165,17 @@ export const MealsScreen: React.FC = () => {
         )}
       </div>
 
+      <div className="meal-add-row"><div><strong>Something else?</strong><span>Add any food using its label or recipe.</span></div><button type="button" onClick={() => setEditing({ kind: 'new' })}><Plus size={16} /> Custom meal</button></div>
+      <p className="meal-scope-note">FitLife tracks energy, protein, carbohydrates, fat and fiber. You can optionally record sugar, sodium and a source. Vitamins, most minerals and allergens are not tracked.</p>
+
       {/* Search Bar */}
-      <div className="relative">
+      <div className="relative" data-guide-target="meals-search" aria-label="Search foods">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#84877F]" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => updateSearch(e.target.value)}
-          placeholder="Search 32+ foods (oats, paneer, chicken, idli, salmon...)"
+          placeholder={`Search ${FOOD_CATALOG.length} foods (oats, paneer, chicken...)`}
           className="w-full rounded-2xl border border-[#2F3A33] bg-[#1E2520] py-2.5 pl-10 pr-9 text-xs text-[#F4F1EA] outline-none placeholder:text-[#636961] focus:border-[#6BA37E]"
         />
         {searchQuery && (
@@ -197,13 +200,9 @@ export const MealsScreen: React.FC = () => {
         {filteredCatalog.length === 0 ? (
           <EmptyState
             title="No Matching Foods Found"
-            subtitle={`Use the Quick Add box above to log "${searchQuery}" with a clearly labelled generic nutrition estimate.`}
-            actionLabel={`Quick Add "${searchQuery}"`}
-            onAction={() => {
-              const drafts = parseMealFreeText(searchQuery, selectedCategory);
-              logQuickAddMeals(drafts);
-              updateSearch('');
-            }}
+            subtitle="Add your own food and enter values from a package or reliable source."
+            actionLabel="Add custom meal"
+            onAction={() => setEditing({ kind: 'new', initial: { name: searchQuery, servingLabel: '', category: selectedCategory, calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, requiresReview: true, source: 'unknown' } })}
           />
         ) : (
           <div>
@@ -227,7 +226,8 @@ export const MealsScreen: React.FC = () => {
                     {item.servingLabel} ·{' '}
                     <span className="text-[#7BB38F]">P:{item.proteinG}g</span>{' '}
                     <span className="text-[#D8C39E]">C:{item.carbsG}g</span>{' '}
-                    <span className="text-[#E0B467]">F:{item.fatG}g</span>
+                    <span className="text-[#E0B467]">F:{item.fatG}g</span>{' '}
+                    <span>Fiber:{item.fiberG}g</span>
                   </p>
                 </div>
 
@@ -290,23 +290,28 @@ export const MealsScreen: React.FC = () => {
                       </span>
                     </div>
                     <p className="truncate text-[11px] text-[#84877F]">
-                      {m.calories} kcal · P:{Math.round(m.proteinG)}g · C:{Math.round(m.carbsG)}g · F:{Math.round(m.fatG)}g
+                      {m.servingLabel} · {m.calories} kcal · P:{m.proteinG}g · C:{m.carbsG}g · F:{m.fatG}g · Fiber:{m.fiberG}g{m.sugarG !== undefined ? ` · Sugar:${m.sugarG}g` : ''}{m.sodiumMg !== undefined ? ` · Sodium:${m.sodiumMg}mg` : ''}
                     </p>
                   </div>
                 </div>
 
-                <PressScale
-                  onClick={() => removeMeal(m.id)}
-                  ariaLabel={`Remove ${m.name}`}
-                  className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#33241E] text-[#DE9473] hover:bg-[#422D25]"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </PressScale>
+                <div className="meal-row-actions">
+                  <button type="button" aria-label={`Edit ${m.name}`} onClick={() => setEditing({ kind: 'logged', id: m.id, initial: m })}><Pencil size={15} /></button>
+                  <button type="button" aria-label={`Remove ${m.name}`} onClick={() => removeMeal(m.id)}><Trash2 size={16} /></button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      {editing && <MealEditor key={editing.kind === 'quick' ? `quick-${editing.index}` : editing.kind === 'logged' ? editing.id : 'new'}
+        title={editing.kind === 'new' ? 'Add a custom meal' : 'Review meal details'} initial={editing.initial} category={selectedCategory}
+        onClose={() => setEditing(null)} onSave={async (draft) => {
+          if (editing.kind === 'quick') setDraftOverrides((previous) => ({ ...previous, [editing.index]: draft }));
+          else if (editing.kind === 'logged') { if (!(await editMeal(editing.id, draft))) throw new Error('edit failed'); }
+          else logQuickAddMeals([draft]);
+          setEditing(null);
+        }} />}
     </div>
   );
 };

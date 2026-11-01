@@ -9,17 +9,20 @@
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "typecheck": "tsc --noEmit",
     "build:standalone": "npm run build && node scripts/build-standalone.mjs",
-    "test:qa": "node qa/test.mjs && npm run test:mobile && npm run test:features && npm run test:security",
+    "test:qa": "node qa/test.mjs && npm run test:mobile && npm run test:features && npm run test:security && npm run test:guides",
     "test:offline": "node qa/offline.mjs",
     "test:theme": "node qa/theme-reveal.mjs",
     "test:standalone": "node qa/standalone.mjs",
     "test:updates": "node qa/updates.mjs",
     "test:native": "bash android/tests/run.sh",
     "test:mobile": "node qa/mobile.mjs",
-    "test:features": "node qa/features.mjs && node qa/native-backup.mjs && node qa/feature-layouts.mjs",
+    "test:features": "node qa/features.mjs && node qa/native-backup.mjs && node qa/feature-layouts.mjs && npm run test:loader && npm run test:nutrition",
+    "test:loader": "node qa/loader.mjs",
     "test:security": "node qa/security.mjs",
     "test:cloud": "node qa/cloud-unit.mjs && node qa/cloud-browser.mjs",
-    "test:rules": "python3 qa/firestore-rules.py"
+    "test:rules": "python3 qa/firestore-rules.py",
+    "test:nutrition": "node qa/nutrition-unit.mjs && node qa/iteration.mjs",
+    "test:guides": "node qa/guides.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

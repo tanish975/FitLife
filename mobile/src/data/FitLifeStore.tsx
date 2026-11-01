@@ -6,6 +6,9 @@ import {
   DashboardWidgetsConfig,
   FoodItem,
   GamificationSummary,
+  GUIDE_IDS,
+  GuideId,
+  normalizeGuides,
   LoggedMeal,
   LoggedWorkout,
   MacroTargets,
@@ -47,6 +50,7 @@ const STORAGE_KEYS = {
   MOODS: 'fitlife_moods_v1',
   WATER: 'fitlife_water_v1',
   AUTH: 'fitlife_auth_v1',
+  UNCLAIMED_FRESH: 'fitlife_unclaimed_fresh_v1',
 };
 
 export interface CelebrationPayload {
@@ -66,6 +70,9 @@ interface FitLifeContextValue {
   moods: MoodEntry[];
   waterTodayMl: number;
   isAuthenticated: boolean;
+  authRestoring: boolean;
+  guidesReady: boolean;
+  markGuideSeen: (id: GuideId) => void;
   todayKey: string;
   todayMeals: LoggedMeal[];
   todayWorkouts: LoggedWorkout[];
@@ -78,7 +85,7 @@ interface FitLifeContextValue {
   toastMessage: string | null;
   dismissCelebration: () => void;
   triggerManualCelebration: (badge?: BadgeStatus) => void;
-  updateProfile: (next: Partial<UserProfile>) => void;
+  updateProfile: (next: Partial<UserProfile>) => Promise<boolean>;
   setWeightUnit: (unit: WeightUnit) => void;
   setHapticsEnabled: (enabled: boolean) => void;
   setThemeMode: (mode: ThemeMode, origin?: HTMLElement | null) => void;
@@ -97,12 +104,12 @@ interface FitLifeContextValue {
   addWaterMl: (deltaMl: number) => void;
   logFoodItem: (item: FoodItem, category: MealCategory) => void;
   logQuickAddMeals: (drafts: ParsedMealDraft[]) => void;
+  editMeal: (id: string, draft: ParsedMealDraft) => Promise<boolean>;
   removeMeal: (id: string) => void;
   logWorkout: (entry: Omit<LoggedWorkout, 'id' | 'dateKey' | 'timestamp'>) => void;
   removeWorkout: (id: string) => void;
   logWeight: (weightKg: number) => void;
   logMood: (moodId: MoodId) => void;
-  signIn: (email: string, name?: string) => void;
   signOut: () => void;
   localOwnerId: string | null;
   cloudAvailable: boolean;
@@ -145,6 +152,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   favoriteExerciseIds: [],
   navStyle: 'glass',
   waterGoalMl: 2500,
+  guidesSeen: [],
   dashboardWidgets: {
     showMacros: true,
     showHydration: true,
@@ -355,6 +363,20 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     catch { return { uid: null, partition: null, damaged: false }; }
   }, []);
   const initialOwnerSnapshot = initialCloud.partition?.snapshot || null;
+  // Distinguish a genuinely fresh install from an existing unclaimed profile
+  // *before* the default demo is persisted. Keep the marker across a restart
+  // at the sign-in screen. If any legacy fitness data already exists, treat
+  // it as the user's data even if its IDs resemble sample IDs.
+  const freshUnclaimed = useMemo(() => {
+    try {
+      if (localStorage.getItem(STORAGE_KEYS.UNCLAIMED_FRESH) === '1') return true;
+      const existingKeys = [STORAGE_KEYS.PROFILE, STORAGE_KEYS.MEALS, STORAGE_KEYS.WORKOUTS,
+        STORAGE_KEYS.WEIGHTS, STORAGE_KEYS.MOODS, STORAGE_KEYS.WATER, 'fitlife_cloud_owner_v1'];
+      if (existingKeys.some(key => localStorage.getItem(key) !== null)) return false;
+      localStorage.setItem(STORAGE_KEYS.UNCLAIMED_FRESH, '1');
+      return true;
+    } catch { return false; } // fail safe: never discard data if storage is unavailable
+  }, []);
   const ownerRef = useRef<string | null>(initialCloud.uid);
   const [localOwnerId, setLocalOwnerId] = useState<string | null>(initialCloud.uid);
   const storageBlockedRef = useRef(initialCloud.damaged);
@@ -368,6 +390,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const cloudBusyRef = useRef(false);
   const needsRecoveryRef = useRef(false);
   const cloudAvailable = hasNativeCloud();
+  const [authRestoring, setAuthRestoring] = useState(cloudAvailable);
+  const [guidesReady, setGuidesReady] = useState(false);
   const [todayKey, setTodayKey] = useState(() => getDateKeyDaysAgo(0));
 
   // Re-evaluate daily totals at local midnight and after the app resumes.
@@ -385,12 +409,20 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
   const [settings, setSettings] = useState<AppSettings>(() => {
     const loaded = initialOwnerSnapshot?.settings || (initialCloud.damaged ? DEFAULT_SETTINGS : loadJson(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS));
+    let original: Partial<AppSettings> | null = initialOwnerSnapshot?.settings || null;
+    if (!original && !initialCloud.damaged) {
+      try { const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS); original = raw ? JSON.parse(raw) : null; } catch { /* storage unavailable */ }
+    }
+    let hadPriorProfile = false;
+    try { hadPriorProfile = !!localStorage.getItem(STORAGE_KEYS.PROFILE) || !!initialOwnerSnapshot; } catch { /* storage unavailable */ }
+    const legacyGuideState = profile.onboarded && hadPriorProfile && (!original || original.guidesSeen === undefined);
     return {
       ...DEFAULT_SETTINGS,
       ...loaded,
       favoriteExerciseIds: Array.isArray(loaded.favoriteExerciseIds) ? loaded.favoriteExerciseIds.filter((id): id is string => typeof id === 'string') : [],
       weeklyWorkoutGoal: Number.isFinite(loaded.weeklyWorkoutGoal) ? Math.max(1, Math.min(7, Math.round(loaded.weeklyWorkoutGoal))) : DEFAULT_SETTINGS.weeklyWorkoutGoal,
       navStyle: loaded.navStyle === 'solid' ? 'solid' : 'glass',
+      guidesSeen: legacyGuideState ? [...GUIDE_IDS] : normalizeGuides(loaded.guidesSeen),
       dashboardWidgets: {
         ...DEFAULT_SETTINGS.dashboardWidgets,
         ...(loaded.dashboardWidgets || {}),
@@ -431,15 +463,9 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return { dateKey: todayKey, amountMl: 0 };
   });
   const waterTodayMl = waterRecord.dateKey === todayKey ? waterRecord.amountMl : 0;
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (initialCloud.damaged) return false;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.AUTH);
-      return raw ? JSON.parse(raw) : false;
-    } catch {
-      return false;
-    }
-  });
+  // A stored UI flag from an older local profile is not a Google session.
+  // Native Firebase restores a verified session locally, including when offline.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [celebration, setCelebration] = useState<CelebrationPayload | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -557,8 +583,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const gamification = useMemo(
-    () => computeGamification(meals, workouts, moods, weights, macroTargets.calories),
-    [meals, workouts, moods, weights, macroTargets.calories]
+    () => computeGamification(meals, workouts, moods, weights, profile.onboarded ? macroTargets.calories : 0),
+    [meals, workouts, moods, weights, macroTargets.calories, profile.onboarded]
   );
 
   const prevUnlockedRef = useRef<Set<string> | null>(null);
@@ -639,7 +665,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateProfile = async (next: Partial<UserProfile>) => {
-    if (next.weightKg && next.weightKg > 0 && !(await markCloudDeletes({ weights: weights.filter(w => w.dateKey === todayKey) }))) return;
+    if (next.weightKg && next.weightKg > 0 && !(await markCloudDeletes({ weights: weights.filter(w => w.dateKey === todayKey) }))) return false;
     triggerHaptic('medium', settings.hapticsEnabled);
     setProfile((prev) => ({ ...prev, ...next }));
     if (next.weightKg && next.weightKg > 0) {
@@ -654,6 +680,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ]);
     }
     showToast('Profile & targets updated');
+    return true;
   };
 
   const setWeightUnit = (unit: WeightUnit) => {
@@ -800,10 +827,11 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const logQuickAddMeals = (drafts: ParsedMealDraft[]) => {
     if (drafts.length === 0) return;
+    if (drafts.some((draft) => draft.requiresReview)) { showToast('Review each unknown food before logging.'); return; }
     triggerHaptic('success', settings.hapticsEnabled);
     const now = Date.now();
     const created: LoggedMeal[] = drafts.map((d, idx) => ({
-      id: `meal-qa-${now}-${idx}`,
+      id: `meal-qa-${now}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey: todayKey,
       timestamp: now + idx,
       name: d.name,
@@ -814,9 +842,27 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       carbsG: d.carbsG,
       fatG: d.fatG,
       fiberG: d.fiberG,
+      ...(d.sugarG !== undefined ? { sugarG: d.sugarG } : {}),
+      ...(d.sodiumMg !== undefined ? { sodiumMg: d.sodiumMg } : {}),
+      ...(d.nutritionNote ? { nutritionNote: d.nutritionNote } : {}),
     }));
     setMeals((prev) => [...created, ...prev]);
     showToast(`Quick-added ${created.length} item${created.length > 1 ? 's' : ''} (+${created.length * 10} XP)`);
+  };
+
+  const editMeal = async (id: string, draft: ParsedMealDraft): Promise<boolean> => {
+    const original = meals.find((meal) => meal.id === id);
+    if (!original || draft.requiresReview) return false;
+    const updated: LoggedMeal = { ...original, name: draft.name, servingLabel: draft.servingLabel, category: draft.category,
+      calories: draft.calories, proteinG: draft.proteinG, carbsG: draft.carbsG, fatG: draft.fatG, fiberG: draft.fiberG,
+      sugarG: draft.sugarG, sodiumMg: draft.sodiumMg, nutritionNote: draft.nutritionNote };
+    if (JSON.stringify(updated) === JSON.stringify(original)) return true; // Never tombstone an unchanged row.
+    if (!(await markCloudDeletes({ meals: [original] }))) return false;
+    // Sample entries are never uploaded; an edited sample becomes a real row.
+    if (isDemoId(original.id)) updated.id = `meal-edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setMeals((previous) => previous.map((meal) => meal.id === id ? updated : meal));
+    showToast('Meal details updated.');
+    return true;
   };
 
   const removeMeal = async (id: string) => {
@@ -859,7 +905,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       },
     ]);
     setProfile((prev) => ({ ...prev, weightKg: rounded }));
-    showToast('Weight logged & BMI updated');
+    showToast(profile.onboarded ? 'Weight logged & BMI updated' : 'Weight logged');
   };
 
   const logMood = async (moodId: MoodId) => {
@@ -875,24 +921,6 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       },
     ]);
     showToast('Mood checked in (+5 XP)');
-  };
-
-  const signIn = (email: string, name?: string) => {
-    triggerHaptic('success', settings.hapticsEnabled);
-    const displayName =
-      name?.trim() ||
-      email
-        .split('@')[0]
-        .replace(/[._-]/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase()) ||
-      'FitLife Athlete';
-    setProfile((prev) => ({
-      ...prev,
-      email: cloudAccountRef.current?.email || email.trim() || prev.email,
-      name: displayName,
-    }));
-    setIsAuthenticated(true);
-    showToast(`Welcome, ${displayName}!`);
   };
 
   const signOut = async () => {
@@ -924,14 +952,14 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     triggerHaptic('medium', settings.hapticsEnabled);
     setMeals([]);
     setWorkouts([]);
-    setWeights([
+    setWeights(profile.onboarded ? [
       {
         id: `wt-init-${Date.now()}`,
         dateKey: todayKey,
         timestamp: Date.now(),
         weightKg: profile.weightKg,
       },
-    ]);
+    ] : []);
     setMoods([]);
     setWaterRecord({ dateKey: todayKey, amountMl: 0 });
     showToast('Cleared logs — ready for a fresh start');
@@ -971,7 +999,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     requestedThemeRef.current = next.settings.themeMode;
     appliedThemeRef.current = next.settings.themeMode;
     flushSync(() => {
-      setProfile(next.profile); setSettings(next.settings); setMeals(next.meals); setWorkouts(next.workouts);
+      setProfile(next.profile); setSettings({ ...DEFAULT_SETTINGS, ...next.settings, guidesSeen: next.settings.guidesSeen === undefined && next.profile.onboarded ? [...GUIDE_IDS] : normalizeGuides(next.settings.guidesSeen) }); setMeals(next.meals); setWorkouts(next.workouts);
       setWeights(next.weights); setMoods(next.moods); setWaterRecord(next.water); setCloudDeleted(part.deleted);
     });
   };
@@ -1018,11 +1046,23 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       recoverProfile = !existing;
     } else {
       // Only the first claimed account inherits the previously unclaimed data.
-      recoverProfile = isUntouchedDemo(previous.snapshot);
-      next = previous;
+      // Replace demo defaults only when this install was provably fresh before
+      // its first load. Persisted legacy rows are never inferred to be disposable
+      // just from their IDs. Retain any customized preferences either way.
+      recoverProfile = freshUnclaimed && isUntouchedDemo(previous.snapshot);
+      if (recoverProfile) {
+        const fresh = freshPartition(account);
+        next = { ...fresh, snapshot: { ...fresh.snapshot, settings: previous.snapshot.settings } };
+      } else next = previous;
+    }
+    // Existing pre-guide local profiles should not be forced through new-user tips.
+    // A new partition explicitly contains an empty guidesSeen list.
+    if (next.snapshot.settings.guidesSeen === undefined && next.snapshot.profile.onboarded) {
+      next = { ...next, snapshot: { ...next.snapshot, settings: { ...next.snapshot.settings, guidesSeen: [...GUIDE_IDS] } } };
     }
     const identityProfile = { ...next.snapshot.profile,
-      name: next.snapshot.profile.name === DEFAULT_PROFILE.name && account.name ? account.name : next.snapshot.profile.name,
+      // A new partition already uses the Google name; do not overwrite the
+      // display name a legacy user may have deliberately chosen.
       email: account.email || next.snapshot.profile.email, uid: account.uid };
     next = { ...next, snapshot: { ...next.snapshot, profile: identityProfile } };
     // A first claim also retains the existing local rest timer in that account.
@@ -1035,10 +1075,14 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // A single slot is written first and the ownership marker second. If the
     // app stops between writes, the old owner's slot remains authoritative.
     activatePartition(localStorage, account.uid, next);
+    if (!previousOwner) {
+      try { localStorage.removeItem(STORAGE_KEYS.UNCLAIMED_FRESH); } catch { /* partition is already saved */ }
+    }
     ownerRef.current = account.uid;
     setLocalOwnerId(account.uid);
     needsRecoveryRef.current = recoverProfile;
     cloudAccountRef.current = account;
+    setGuidesReady(false);
     setCloudAccount(account);
     applyPartition(next);
     if (openApp) setIsAuthenticated(true);
@@ -1068,11 +1112,15 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ++authGenerationRef.current;
     try {
       await nativeCloudRequest('signOut');
-      cloudAccountRef.current = null; setCloudAccount(null);
+    } catch (error) { setCloudStatus(error instanceof Error ? error.message : 'Could not sign out.'); return; }
+    cloudAccountRef.current = null; setCloudAccount(null);
+    setIsAuthenticated(false); setGuidesReady(false);
+    try {
       switchToLocalGuest();
-      setIsAuthenticated(false);
-      setCloudStatus('Signed out. Account data remains on this device, separate from the local guest.');
-    } catch (error) { setCloudStatus(error instanceof Error ? error.message : 'Could not sign out.'); }
+      setCloudStatus('Signed out. Your account data remains on this device.');
+    } catch {
+      setCloudStatus('Signed out. Your saved account data was not deleted; free storage before signing in again.');
+    }
   };
 
   const syncNow = async () => {
@@ -1110,11 +1158,18 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (revision !== backupRevisionRef.current) { syncAgainRef.current = true; setCloudStatus('Changes saved locally; retrying sync…'); return; }
       const payload = JSON.stringify(merged);
       if (new TextEncoder().encode(payload).byteLength > 500_000) throw new Error('This data is too large for cloud sync. Keep an encrypted local backup.');
-      const part: CloudPartition = { version: 1, snapshot: merged.snapshot, deleted: merged.deleted };
+      // Demo records are intentionally excluded from cloud payloads, but that
+      // must not silently delete an existing user's local sample history.
+      const localSnapshot = { ...merged.snapshot };
+      for (const kind of CLOUD_KINDS) {
+        const localSamples = snapshot[kind].filter(row => isDemoId(row.id));
+        (localSnapshot as any)[kind] = [...localSamples, ...merged.snapshot[kind]];
+      }
+      const part: CloudPartition = { version: 1, snapshot: localSnapshot, deleted: merged.deleted };
       // Fail before modifying visible data if the local atomic slot cannot be saved.
       savePartition(localStorage, account.uid, part);
       const currentComparable = JSON.stringify({ ...makeBackupSnapshot(), createdAt: 0 });
-      const nextComparable = JSON.stringify(merged.snapshot);
+      const nextComparable = JSON.stringify(localSnapshot);
       if (currentComparable !== nextComparable || JSON.stringify(cloudDeletedRef.current) !== JSON.stringify(merged.deleted)) applyPartition(part);
       needsRecoveryRef.current = false;
       const mergedRevision = backupRevisionRef.current;
@@ -1128,6 +1183,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (error) {
       if (cloudAccountRef.current?.uid === account.uid) setCloudStatus(error instanceof Error ? error.message : 'Cloud sync is unavailable. Data stays on this device.');
     } finally {
+      if (cloudAccountRef.current?.uid === account.uid) setGuidesReady(true);
       cloudBusyRef.current = false;
       if (syncAgainRef.current) {
         syncAgainRef.current = false;
@@ -1139,16 +1195,27 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Restore only the native Firebase session; the WebView never receives tokens.
   useEffect(() => {
-    if (!cloudAvailable) return;
+    if (!cloudAvailable) { setAuthRestoring(false); return; }
     const generation = authGenerationRef.current;
     void nativeCloudRequest<unknown>('session').then(value => {
       if (generation !== authGenerationRef.current) return;
       const account = parseAccount(value);
       if (!account) { if (!storageBlockedRef.current) setCloudStatus('Not connected.'); return; }
-      try { activateGoogleAccount(account, false); setCloudStatus('Google account connected. Checking cloud data…'); }
+      try { activateGoogleAccount(account, true); setCloudStatus('Google account connected. Checking cloud data…'); }
       catch (error) { cloudAccountRef.current = null; setCloudAccount(null); setCloudStatus(error instanceof Error ? error.message : 'Account recovery is required.'); }
-    }).catch(() => setCloudStatus('Google session unavailable; local data is still available.'));
+    }).catch(() => { if (generation === authGenerationRef.current) setCloudStatus('Google session unavailable. Your saved data remains on this device.'); })
+      .finally(() => setAuthRestoring(false));
   }, []);
+  useEffect(() => {
+    if (!cloudAccount) return;
+    const uid = cloudAccount.uid;
+    const timer = window.setTimeout(() => { if (cloudAccountRef.current?.uid === uid) setGuidesReady(true); }, 6500);
+    return () => window.clearTimeout(timer);
+  }, [cloudAccount]);
+  const markGuideSeen = (id: GuideId) => {
+    setSettings(previous => ({ ...previous, guidesSeen: normalizeGuides([...(previous.guidesSeen || []), id]) }));
+  };
+
   // Debounced writes, periodic reads and foreground/online retry keep ordinary
   // use within modest free-tier quotas. A network error never discards local edits.
   useEffect(() => {
@@ -1196,6 +1263,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       moods: await mergeBackupRows(current.moods, imported.moods),
     } : { ...imported, settings: {
       ...DEFAULT_SETTINGS, ...snapshot.settings,
+      // Importing an older backup must not resurrect tips already dismissed.
+      guidesSeen: normalizeGuides([...(current.settings.guidesSeen || []), ...(snapshot.settings.guidesSeen || [])]),
       favoriteExerciseIds: snapshot.settings.favoriteExerciseIds || [],
       weeklyWorkoutGoal: snapshot.settings.weeklyWorkoutGoal || DEFAULT_SETTINGS.weeklyWorkoutGoal,
       navStyle: snapshot.settings.navStyle || DEFAULT_SETTINGS.navStyle,
@@ -1261,6 +1330,9 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         moods,
         waterTodayMl,
         isAuthenticated,
+        authRestoring,
+        guidesReady,
+        markGuideSeen,
         todayKey,
         todayMeals,
         todayWorkouts,
@@ -1292,12 +1364,12 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addWaterMl,
         logFoodItem,
         logQuickAddMeals,
+        editMeal,
         removeMeal,
         logWorkout,
         removeWorkout,
         logWeight,
         logMood,
-        signIn,
         signOut,
         localOwnerId,
         cloudAvailable,

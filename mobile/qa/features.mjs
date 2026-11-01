@@ -1,11 +1,13 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const base = process.env.FITLIFE_URL || 'http://127.0.0.1:4173/';
+const base = nativeApp;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, acceptDownloads: true });
 const page = await context.newPage();
+await installNativeFixture(page);
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const storage = key => page.evaluate(k => JSON.parse(localStorage.getItem(k)), key);
 const workout = () => page.getByRole('button', { name: 'Workouts', exact: true });
@@ -13,7 +15,6 @@ const settings = () => page.getByRole('button', { name: 'Open settings' }).first
 const passphrase = 'fitlife-test-passphrase-123';
 try {
   await page.goto(base, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Quick launch (demo data)' }).click();
   await page.getByText("Today's overview").waitFor();
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
   assert.equal(await nav.getAttribute('data-nav-style'), 'glass');
@@ -34,31 +35,32 @@ try {
   const timer = page.getByRole('region', { name: 'Rest timer' });
   await timer.getByRole('button', { name: 'Start', exact: true }).click();
   await page.waitForTimeout(1100); await timer.getByRole('button', { name: 'Pause', exact: true }).click();
-  let state = await storage('fitlife_rest_timer_v1'); assert.equal(state.status, 'paused'); assert(state.remainingMs < 75000 && state.remainingMs > 0);
+  let state = await storage('fitlife_rest_timer_v1:qa-user'); assert.equal(state.status, 'paused'); assert(state.remainingMs < 75000 && state.remainingMs > 0);
   await timer.getByRole('button', { name: 'Add 15 seconds to rest timer' }).click();
-  assert((await storage('fitlife_rest_timer_v1')).remainingMs > state.remainingMs);
+  assert((await storage('fitlife_rest_timer_v1:qa-user')).remainingMs > state.remainingMs);
   await timer.getByRole('button', { name: 'Resume', exact: true }).click();
-  await page.evaluate(() => { const t=JSON.parse(localStorage.getItem('fitlife_rest_timer_v1')); t.endAt=Date.now()-10000; localStorage.setItem('fitlife_rest_timer_v1', JSON.stringify(t)); });
+  await page.evaluate(() => { const t=JSON.parse(localStorage.getItem('fitlife_rest_timer_v1:qa-user')); t.endAt=Date.now()-10000; localStorage.setItem('fitlife_rest_timer_v1:qa-user', JSON.stringify(t)); });
   await page.reload({ waitUntil: 'networkidle' }); await workout().click();
   await page.getByText('Rest complete').waitFor();
-  assert.equal((await storage('fitlife_rest_timer_v1')).status, 'complete', 'deadline should finish across app close');
+  assert.equal((await storage('fitlife_rest_timer_v1:qa-user')).status, 'complete', 'deadline should finish across app close');
   await page.getByRole('button', { name: 'Reset rest timer' }).click();
-  assert.equal(await page.evaluate(() => localStorage.getItem('fitlife_rest_timer_v1')), null);
+  assert.equal(await page.evaluate(() => localStorage.getItem('fitlife_rest_timer_v1:qa-user')), null);
   console.log('✓ Shifting glass navigation, favorites, demo-safe weekly goal and persistent wall-clock rest timer');
 
   await page.getByRole('button', { name: 'Home', exact: true }).click(); await settings().click();
   const picker = page.getByRole('group', { name: 'Color palette' });
   assert.equal(await picker.getByRole('button').count(), 5);
   const box = await picker.getByRole('button', { name: 'Matcha & Oat' }).boundingBox(); assert(box.width >= 44 && box.height >= 44);
-  await page.getByRole('button', { name: 'Solid', exact: true }).click();
-  assert.equal(await nav.getAttribute('data-nav-style'), 'solid');
+  assert.equal(await page.getByRole('button', { name: 'Solid', exact: true }).count(), 0, 'old nav appearance controls were removed');
+  assert.equal(await page.getByText('Shape, Density & Motion Feel', { exact: true }).count(), 0);
+  assert.equal(await nav.getAttribute('data-nav-style'), 'glass');
   await page.getByRole('switch', { name: 'Auto-start rest timer' }).click();
   await workout().click();
   await list.locator('.exercise-open').first().click();
   const sheet = page.getByRole('dialog');
   await sheet.getByRole('button', { name: /Log Workout Set/ }).click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_rest_timer_v1') || 'null')?.status === 'running');
-  assert.equal((await storage('fitlife_rest_timer_v1')).totalMs, 75000, 'auto-rest uses the logged exercise rest selection');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_rest_timer_v1:qa-user') || 'null')?.status === 'running');
+  assert.equal((await storage('fitlife_rest_timer_v1:qa-user')).totalMs, 75000, 'auto-rest uses the logged exercise rest selection');
   assert.equal(await page.getByRole('progressbar', { name: 'Weekly workout days' }).getAttribute('aria-valuenow'), '1', 'real workouts count once per day');
   await page.getByRole('button', { name: 'Home', exact: true }).click(); await settings().click();
   await page.getByRole('button', { name: 'Create backup', exact: true }).click();
@@ -87,7 +89,7 @@ try {
   assert.deepEqual(await storage('fitlife_workouts_v1'), recordsBefore, 'reimport should be idempotent');
   await page.getByRole('button', { name: 'Close backup' }).click();
   // Same-ID, different content: preserve both and do not duplicate on reimport.
-  await page.evaluate(() => { const w=JSON.parse(localStorage.getItem('fitlife_workouts_v1')); w[0].reps += 1; localStorage.setItem('fitlife_workouts_v1', JSON.stringify(w)); });
+  await page.evaluate(() => { const w=JSON.parse(localStorage.getItem('fitlife_workouts_v1')); w[0].reps += 1; localStorage.setItem('fitlife_workouts_v1', JSON.stringify(w)); const key=`fitlife_cloud_partition_v1:${localStorage.getItem('fitlife_cloud_owner_v1')}`; const part=JSON.parse(localStorage.getItem(key)); part.snapshot.workouts=w; localStorage.setItem(key,JSON.stringify(part)); });
   await page.reload({ waitUntil: 'networkidle' }); await settings().click();
   for (let i=0; i<2; i++) {
     await page.getByRole('button', { name: 'Import backup', exact: true }).click();
@@ -117,5 +119,5 @@ try {
   const storageAfterFailure = await page.evaluate(keys => Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)])), Object.keys(storageBeforeFailure));
   assert.deepEqual(storageAfterFailure, storageBeforeFailure, 'a simulated quota failure should roll back earlier writes');
   assert.deepEqual(errors, []);
-  console.log('✓ Compact palette and solid fallback; encrypted export, wrong-passphrase rejection, idempotent merge/conflicts, confirmed restore and quota rollback');
+  console.log('✓ Compact palette and persistent glass navigation; encrypted export, wrong-passphrase rejection, idempotent merge/conflicts, confirmed restore and quota rollback');
 } finally { await context.close(); await browser.close(); }

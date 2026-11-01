@@ -1,12 +1,13 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
 // A JS-level simulation of the bridge protocol. Android's real picker remains
 // a physical/emulator test; native chunk boundaries are separately unit tested.
-const base = process.env.FITLIFE_URL || 'http://127.0.0.1:4173/';
+const base = nativeApp;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-const page = await context.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+const page = await context.newPage(); await installNativeFixture(page); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
 await page.addInitScript(() => {
   let expected=0, data='';
   const emit=(type,value='') => window.dispatchEvent(new CustomEvent('fitlife-backup-part',{detail:{type,value}}));
@@ -19,7 +20,7 @@ await page.addInitScript(() => {
   };
 });
 try {
-  await page.goto(base,{waitUntil:'networkidle'}); await page.getByRole('button',{name:'Quick launch (demo data)'}).click();
+  await page.goto(base,{waitUntil:'networkidle'}); await page.getByText("Today's overview").waitFor();
   await page.getByRole('button',{name:'Open settings'}).first().click(); await page.getByRole('button',{name:'Create backup'}).click();
   const pass='fitlife-test-passphrase-123'; await page.getByLabel('Backup passphrase',{exact:true}).fill(pass); await page.getByLabel('Confirm passphrase').fill(pass);
   await page.getByRole('button',{name:'Encrypt and save'}).click(); await page.getByText('Encrypted backup saved.').waitFor();

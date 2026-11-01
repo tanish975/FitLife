@@ -1,4 +1,5 @@
 import { BackupSnapshot, validSnapshot } from './EncryptedBackup';
+import { GUIDE_IDS, normalizeGuides } from '../data/types';
 
 export const GUEST_OWNER = '__fitlife_guest_v1__';
 export const CLOUD_OWNER_KEY = 'fitlife_cloud_owner_v1';
@@ -80,14 +81,20 @@ function cloudCopy(snapshot: BackupSnapshot): BackupSnapshot {
  * Merge immutable activity records and content-specific deletion tombstones.
  * Profile, preferences and today's water deliberately stay device-local; each
  * device's snapshot contains a recovery copy, but concurrent values are not
- * silently guessed. This method never deletes a remote document.
+ * silently guessed. First-visit guide flags alone are merged monotonically so
+ * the same account does not repeatedly receive them on another device.
+ * This method never deletes a remote document.
  */
 export async function mergeCloud(local: CloudPayload, remotes: CloudPayload[]): Promise<CloudPayload> {
   if (!validCloudPayload(local) || !remotes.every(validCloudPayload)) throw new Error('Cloud data is invalid; nothing was overwritten.');
   const sources = [cloudCopy(local.snapshot), ...remotes.map(value => cloudCopy(value.snapshot))];
   const deleted = emptyDeletions();
   for (const kind of CLOUD_KINDS) deleted[kind] = [...new Set([local, ...remotes].flatMap(value => value.deleted[kind]))].sort();
-  const snapshot = { ...sources[0] };
+  // A snapshot from a release before the guide feature belongs to an existing
+  // user, so do not interrupt them with first-run tips after an upgrade.
+  const wasLegacyAccount = sources.some(source => source.settings.guidesSeen === undefined && source.profile.onboarded);
+  const completed = wasLegacyAccount ? [...GUIDE_IDS] : normalizeGuides(sources.flatMap(source => source.settings.guidesSeen || []));
+  const snapshot = { ...sources[0], settings: { ...sources[0].settings, guidesSeen: completed } };
   for (const kind of CLOUD_KINDS) {
     const tombstones = new Set(deleted[kind]);
     const all = sources.flatMap(source => source[kind] as { id: string }[]);
@@ -128,7 +135,7 @@ export function nativeCloudRequest<T>(method: keyof NativeCloud, payload?: strin
   if (!bridge) return Promise.reject(new Error('Google sign-in is available in the Android app.'));
   const requestId = `r_${Date.now()}_${++nextRequest}`;
   return new Promise<T>((resolve, reject) => {
-    const timeout = window.setTimeout(() => finish(new Error('Cloud request timed out. Your data stays on this device.')), 35000);
+    const timeout = window.setTimeout(() => finish(new Error('Cloud request timed out. Your data stays on this device.')), method === 'session' ? 5000 : 35000);
     function onResult(event: Event) {
       const detail = (event as CustomEvent).detail;
       if (!detail || detail.requestId !== requestId) return;

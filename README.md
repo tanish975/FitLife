@@ -9,13 +9,15 @@ Fitness, nutrition and progress in one local-first app. Log workouts and meals, 
 
 1. Open the [latest release](https://github.com/tanish975/FitLife/releases/latest) on your Android phone and download **FitLife.apk**.
 2. Open the downloaded file. If Android asks, allow your browser to install apps from that source, then confirm **Install**.
-3. Open FitLife. Data is stored on your device; the quick launch uses clearly labelled demo data.
+3. Open FitLife and sign in with Google. The first sign-in needs an internet connection. Existing unclaimed activity on the device is kept and merged into the first Google account. Profile details are optional.
 
 To update later, download the new APK and confirm **Update** over the existing app. Do **not** uninstall first: uninstalling can erase locally stored fitness data. The app can check GitHub for new releases on launch; automatic checks can be disabled and manual checks are available in **Settings → App updates**. Android requires your approval to install an update; updates are not silent.
 
 [All versions and release notes](https://github.com/tanish975/FitLife/releases) · [Standalone HTML download](https://github.com/tanish975/FitLife/releases/latest/download/FitLife-App.html)
 
-> **Current limitations:** The Android wrapper has not yet been tested on a physical device. Sign-in is a local demo; Firebase/cloud sync is not configured. Fitness data is not synchronized or backed up, calorie estimates are not medical advice, and the APK works on Android only. The standalone HTML is a separate offline web build.
+> **Current limitations:** Google sign-in, production cloud access and the Android wrapper have not yet been verified on a physical phone. Cloud sync covers meals, workouts, weights and moods when properly configured; it is not end-to-end encrypted. Use encrypted manual backups as well. Calorie estimates are not medical advice. The browser/standalone build cannot perform the required native Android Google sign-in; old browser data does not automatically transfer to Android.
+
+Short, skippable guides appear when you first visit Home and each other area. You can review them later in **Settings → Review app tips**.
 
 ## For maintainers
 

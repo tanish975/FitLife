@@ -1,11 +1,13 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
-const base = process.env.FITLIFE_URL || 'http://127.0.0.1:3000/';
+const base = nativeApp;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   const page = await context.newPage();
+  await installNativeFixture(page);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
@@ -36,13 +38,15 @@ try {
   await context.close();
 
   const browserPage = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await browserPage.addInitScript(() => localStorage.setItem('fitlife_auth_v1', 'true'));
+  await installNativeFixture(browserPage);
   await browserPage.goto(base, { waitUntil: 'networkidle' });
   await browserPage.getByRole('button', { name: 'Open settings', exact: true }).click();
   const link = browserPage.getByRole('link', { name: 'View latest release', exact: true });
   assert.equal(await link.getAttribute('href'), 'https://github.com/tanish975/FitLife/releases/latest');
-  assert.equal(await browserPage.getByRole('link', { name: 'Get FitLife.apk', exact: true }).getAttribute('href'), 'https://github.com/tanish975/FitLife/releases/latest/download/FitLife.apk');
   assert.equal(await browserPage.getByRole('switch', { name: 'Automatic update checks' }).count(), 0);
+  await browserPage.getByRole('button', { name: 'Profile', exact: true }).click();
+  await browserPage.getByRole('button', { name: 'Install on Phone' }).click();
+  assert.equal(await browserPage.getByRole('link', { name: 'Download FitLife.apk', exact: true }).getAttribute('href'), 'https://github.com/tanish975/FitLife/releases/latest/download/FitLife.apk');
   await browserPage.close();
   console.log('PASS: update settings, native bridge, privacy disclosure, touch target and GitHub release/download links.');
 } finally { await browser.close(); }

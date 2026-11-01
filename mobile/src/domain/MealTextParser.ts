@@ -9,7 +9,13 @@ export interface ParsedMealDraft {
   carbsG: number;
   fatG: number;
   fiberG: number;
+  sugarG?: number;
+  sodiumMg?: number;
+  nutritionNote?: string;
   category: MealCategory;
+  /** Unknown, ambiguous, or unmatched portions must be reviewed before logging. */
+  requiresReview?: boolean;
+  source?: 'catalog' | 'manual' | 'unknown';
 }
 
 const NUMBER_WORDS: Record<string, number> = {
@@ -44,6 +50,7 @@ export function parseMealFreeText(rawText: string, defaultCategory: MealCategory
   for (const segment of segments) {
     let multiplier = 1;
     let measure: { amount: number; unit: 'g' | 'ml' } | null = null;
+    let quantityUnit: string | null = null;
     let queryPart = segment.toLowerCase();
 
     // Check gram pattern like "150g chicken" or "200 g paneer"
@@ -55,16 +62,19 @@ export function parseMealFreeText(rawText: string, defaultCategory: MealCategory
       queryPart = gramMatch[3].trim();
     } else {
       // Check numeric prefix like "2 eggs" or "1.5 cups oats"
-      const numMatch = queryPart.match(/^(\d+(?:\.\d+)?)\s*(?:cups?|bowls?|slices?|pieces?|scoops?|servings?|plates?|tbsp|tsp)?\s+(.*)$/i);
+      const numMatch = queryPart.match(/^(\d+(?:\.\d+)?)\s+(?:(cups?|bowls?|slices?|pieces?|scoops?|servings?|plates?|tbsp|tsp)\s+)?(?:of\s+)?(.+)$/i);
       if (numMatch) {
-        multiplier = Math.max(0.25, Math.min(10, parseFloat(numMatch[1])));
-        queryPart = numMatch[2].trim();
+        multiplier = parseFloat(numMatch[1]);
+        if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 100) continue;
+        quantityUnit = numMatch[2]?.toLowerCase().replace(/s$/, '') || null;
+        queryPart = numMatch[3].trim();
       } else {
         // Check word number like "two eggs" or "a banana"
-        const wordMatch = queryPart.match(/^(a|an|one|two|three|four|five|six|half|couple)\s+(?:of\s+)?(?:cups?\s+of\s+|bowls?\s+of\s+)?(.*)$/i);
+        const wordMatch = queryPart.match(/^(a|an|one|two|three|four|five|six|half|couple)\s+(?:of\s+)?(?:(cups?|bowls?|slices?|pieces?|scoops?|servings?|plates?|tbsp|tsp)\s+of\s+)?(.*)$/i);
         if (wordMatch) {
           multiplier = NUMBER_WORDS[wordMatch[1].toLowerCase()] ?? 1;
-          queryPart = wordMatch[2].trim();
+          quantityUnit = wordMatch[2]?.toLowerCase().replace(/s$/, '') || null;
+          queryPart = wordMatch[3].trim();
         }
       }
     }
@@ -72,47 +82,45 @@ export function parseMealFreeText(rawText: string, defaultCategory: MealCategory
     if (!queryPart) continue;
 
     // Match against FOOD_CATALOG
-    const matched = findBestFoodMatch(queryPart);
-    if (matched) {
+    const match = findBestFoodMatch(queryPart);
+    if (match) {
+      const matched = match.item;
       // Catalog nutrition values are per labelled serving, not automatically per 100g.
       // Scale a mass/volume query against that serving when the label provides it.
       const servingMeasure = matched.servingLabel.match(/(\d+(?:\.\d+)?)\s*(g|ml)\b/i);
       const matchingMeasure = !!measure && !!servingMeasure && servingMeasure[2].toLowerCase() === measure.unit;
+      const labelUnit = matched.servingLabel.match(/(\d+(?:\.\d+)?)\s*(cups?|bowls?|slices?|pieces?|scoops?|plates?|tbsp|tsp)\b/i);
+      const unitMatches = !quantityUnit || quantityUnit === 'serving' || (!!labelUnit && labelUnit[2].toLowerCase().replace(/s$/, '') === quantityUnit);
+      const conflictingPreparation = /\b(dry|uncooked|raw)\b/i.test(matched.servingLabel) && /\b(cooked|boiled|steamed)\b/i.test(segment);
+      const requiresReview = !match.exact || (!!measure && (!matchingMeasure || conflictingPreparation)) || !unitMatches;
       const effectiveMultiplier = measure
         ? measure.amount / (matchingMeasure ? parseFloat(servingMeasure![1]) : 100)
-        : multiplier;
+        : quantityUnit && quantityUnit !== 'serving' && unitMatches ? multiplier / parseFloat(labelUnit![1]) : multiplier;
       const displayQty = measure
-        ? `${measure.amount} ${measure.unit}${matchingMeasure ? ` (catalog serving: ${matched.servingLabel})` : ` (assumes 100 ${measure.unit} per serving)`}`
-        : effectiveMultiplier === 1 ? matched.servingLabel : `${Math.round(effectiveMultiplier * 10) / 10} × (${matched.servingLabel})`;
+        ? `${measure.amount} ${measure.unit}${matchingMeasure ? ` (catalog serving: ${matched.servingLabel})` : ''}`
+        : quantityUnit ? `${multiplier} ${quantityUnit}${multiplier !== 1 && !['tbsp', 'tsp'].includes(quantityUnit) ? 's' : ''}` : effectiveMultiplier === 1 ? matched.servingLabel : `${Number(effectiveMultiplier.toPrecision(6))} × (${matched.servingLabel})`;
 
       results.push({
         name: measure ? `${measure.amount} ${measure.unit} ${matched.name}` : effectiveMultiplier !== 1 ? `${formatMultiplier(effectiveMultiplier)} ${matched.name}` : matched.name,
         servingLabel: displayQty,
-        calories: Math.round(matched.calories * effectiveMultiplier),
-        proteinG: Math.round(matched.proteinG * effectiveMultiplier * 10) / 10,
-        carbsG: Math.round(matched.carbsG * effectiveMultiplier * 10) / 10,
-        fatG: Math.round(matched.fatG * effectiveMultiplier * 10) / 10,
-        fiberG: Math.round(matched.fiberG * effectiveMultiplier * 10) / 10,
+        calories: requiresReview ? 0 : Math.round(matched.calories * effectiveMultiplier),
+        proteinG: requiresReview ? 0 : Math.round(matched.proteinG * effectiveMultiplier * 10) / 10,
+        carbsG: requiresReview ? 0 : Math.round(matched.carbsG * effectiveMultiplier * 10) / 10,
+        fatG: requiresReview ? 0 : Math.round(matched.fatG * effectiveMultiplier * 10) / 10,
+        fiberG: requiresReview ? 0 : Math.round(matched.fiberG * effectiveMultiplier * 10) / 10,
         category: defaultCategory,
+        requiresReview,
+        source: 'catalog',
       });
     } else {
-      // Fallback smart estimate for custom food name so quick-add always works
-      const titleCase = queryPart
-        .split(/\s+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-      // Unknown foods have no reliable match: label the generic placeholder clearly.
-      const estimateMultiplier = measure ? measure.amount / 100 : multiplier;
-      const baseCalories = 160;
+      // Do not fabricate nutrition for an unrecognized food. The user supplies
+      // label or recipe values in the review form before it can be logged.
+      const titleCase = queryPart.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
       results.push({
-        name: `${measure ? `${measure.amount} ${measure.unit} ` : multiplier !== 1 ? `${formatMultiplier(multiplier)} ` : ''}${titleCase} (generic estimate)`,
-        servingLabel: measure ? `${measure.amount} ${measure.unit} (generic 100 ${measure.unit} reference)` : `${Math.round(multiplier * 10) / 10} generic serving`,
-        calories: Math.round(baseCalories * estimateMultiplier),
-        proteinG: Math.round(9 * estimateMultiplier),
-        carbsG: Math.round(18 * estimateMultiplier),
-        fatG: Math.round(6 * estimateMultiplier),
-        fiberG: Math.round(2.5 * estimateMultiplier),
-        category: defaultCategory,
+        name: `${measure ? `${measure.amount} ${measure.unit} ` : multiplier !== 1 ? `${formatMultiplier(multiplier)} ` : ''}${titleCase}`,
+        servingLabel: measure ? `${measure.amount} ${measure.unit}` : `${Math.round(multiplier * 10) / 10} ${quantityUnit || 'serving'}${multiplier !== 1 && !['tbsp', 'tsp'].includes(quantityUnit || '') ? 's' : ''}`,
+        calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0,
+        category: defaultCategory, requiresReview: true, source: 'unknown',
       });
     }
   }
@@ -121,13 +129,15 @@ export function parseMealFreeText(rawText: string, defaultCategory: MealCategory
 }
 
 function formatMultiplier(n: number): string {
-  return `${Math.round(n * 10) / 10}×`;
+  return `${Number(n.toPrecision(6))}×`;
 }
 
-function findBestFoodMatch(query: string): FoodItem | null {
+function findBestFoodMatch(query: string): { item: FoodItem; exact: boolean } | null {
   const normalized = query.toLowerCase().replace(/s\b/g, '').trim();
   if (!normalized) return null;
 
+  const ambiguous = new Set(['protein','breakfast','lunch','dinner','snack','indian','fruit','vegetarian','vegan','meat','fish','seafood','salad','bread','wheat','rice','carbs','healthy','bowl','shake','omega','curry','nuts','chocolate','omelette','preworkout','paneer','moong','sambar','broccoli']);
+  const exactTagCount = FOOD_CATALOG.filter(item => item.tags.some(tag => tag.toLowerCase().replace(/s\b/g, '') === normalized)).length;
   let bestScore = 0;
   let bestItem: FoodItem | null = null;
 
@@ -149,11 +159,13 @@ function findBestFoodMatch(query: string): FoodItem | null {
       }
     }
 
+    if (!(itemName === normalized || tags.includes(normalized))) score = Math.min(90, score);
     if (score > bestScore) {
       bestScore = score;
       bestItem = item;
     }
   }
 
-  return bestScore >= 25 ? bestItem : null;
+  const exactName = bestItem?.name.toLowerCase().replace(/s\b/g, '') === normalized;
+  return bestItem && bestScore >= 25 ? { item: bestItem, exact: bestScore === 100 && (exactName || (!ambiguous.has(normalized) && exactTagCount === 1)) } : null;
 }

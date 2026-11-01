@@ -9,7 +9,7 @@ export interface SegmentOption<T extends string> {
 
 interface SegmentedSelectorProps<T extends string> {
   options: SegmentOption<T>[];
-  selected: T;
+  selected: T | null;
   onChange: (value: T, origin: HTMLElement) => void;
   scrollable?: boolean;
   size?: 'sm' | 'md';

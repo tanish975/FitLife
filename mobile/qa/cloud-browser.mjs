@@ -58,7 +58,7 @@ try {
   for (const size of [{width:320,height:480},{width:390,height:844},{width:640,height:360}]) {
     await page.setViewportSize(size);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `native entry fits ${size.width}x${size.height}`);
-    const action = page.getByRole('button', { name: 'Continue to FitLife', exact:true });
+    const action = page.getByRole('button', { name: 'Sign in with Google', exact:true });
     const box = await action.boundingBox(); assert.ok(box && box.y >= 0 && box.y + box.height <= size.height + 1, 'entry action remains visible');
   }
   await page.setViewportSize({width:390,height:844});
@@ -82,6 +82,36 @@ try {
   await settings().click();
   await page.getByRole('button', { name:'Sync now' }).click();
   await waitCloudRows('alice', 2);
+
+  // Editing the same logical meal must tombstone its exact previous content.
+  // A stale second-device snapshot must not resurrect it on the next merge.
+  await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('__qa_cloud')); c.alice['b'.repeat(32)] = c.alice['a'.repeat(32)]; localStorage.setItem('__qa_cloud', JSON.stringify(c)); });
+  await page.getByRole('button', { name:'Meals', exact:true }).click();
+  await page.getByRole('button', { name:'Edit Alice private oats' }).click();
+  let editor = page.getByRole('dialog', { name:'Review meal details' });
+  await editor.getByRole('button', { name:'Save nutrition details' }).click();
+  await editor.waitFor({ state:'hidden' });
+  assert.equal((await storage('fitlife_cloud_partition_v1:alice')).deleted.meals.length, 0, 'no-op edit never tombstones a live record');
+  await page.getByRole('button', { name:'Edit Alice private oats' }).click();
+  editor = page.getByRole('dialog', { name:'Review meal details' });
+  await editor.getByLabel('Calories (kcal)').fill('410');
+  await editor.getByLabel('Sugar (g) · optional').fill('4.5');
+  await editor.getByLabel('Sodium (mg) · optional').fill('95');
+  await editor.getByLabel('Nutrition source or notes · optional').fill('Package label');
+  await editor.getByRole('button', { name:'Save nutrition details' }).click();
+  await editor.waitFor({ state:'hidden' });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:alice') || '{}').deleted?.meals?.length === 1);
+  await page.getByRole('button', { name:'Home', exact:true }).click(); await settings().click();
+  await page.getByRole('button', { name:'Sync now' }).click();
+  await page.waitForFunction(() => {
+    const c = JSON.parse(localStorage.getItem('__qa_cloud') || '{}'); const raw = c.alice?.['a'.repeat(32)];
+    if (!raw) return false; const p = JSON.parse(raw);
+    return p.deleted.meals.length === 1 && p.snapshot.meals.some(m => m.name === 'Alice private oats' && m.calories === 410 && m.sugarG === 4.5 && m.sodiumMg === 95);
+  }, null, { timeout:15000 });
+  const edited = await cloudRows('alice');
+  assert.equal(edited.length, 2, 'stale snapshot does not duplicate the edited meal');
+  assert.equal(edited.filter(m => m.name === 'Alice private oats').length, 1);
+  assert.equal(edited.find(m => m.name === 'Alice private oats').nutritionNote, 'Package label');
 
   await page.getByRole('button', { name:'Sign out of Google' }).click();
   await page.waitForFunction(() => localStorage.getItem('fitlife_cloud_owner_v1') === '__fitlife_guest_v1__');
@@ -108,5 +138,5 @@ try {
   await page.getByText('Cloud data is invalid; nothing was overwritten.').waitFor();
   assert.deepEqual((await storage('fitlife_cloud_partition_v1:alice')).snapshot.meals, before.snapshot.meals, 'malformed cloud snapshot must not overwrite local data');
   assert.deepEqual(errors, []);
-  console.log('PASS: simulated native boundary: first-claim merge, offline persistence/retry, cross-account isolation, account return and malformed-cloud protection');
+  console.log('PASS: simulated native boundary: first-claim merge, offline persistence/retry, cross-account isolation, meal edit tombstones against stale devices, account return and malformed-cloud protection');
 } finally { await context.close(); await browser.close(); }

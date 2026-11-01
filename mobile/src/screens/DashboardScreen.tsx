@@ -29,12 +29,14 @@ interface DashboardScreenProps {
   onNavigateTab: (tab: MainTabId) => void;
   onOpenInstall: () => void;
   onOpenSettings: () => void;
+  onEditProfile: () => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onNavigateTab,
   onOpenInstall,
   onOpenSettings,
+  onEditProfile,
 }) => {
   const {
     profile,
@@ -188,7 +190,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         }`,
         xp: 20,
         timestamp: w.timestamp,
-        badge: `${w.caloriesBurned} kcal`,
+        badge: w.energyEstimateAvailable === false ? 'Not estimated' : `${w.caloriesBurned} kcal`,
       });
     }
 
@@ -264,8 +266,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </div>
       </div>
 
-      {/* HERO STAT CARD — Solid Natural Surface */}
-      <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-md animate-stagger-2">
+      {/* Personalized numbers are only shown after the user supplies details. */}
+      {profile.onboarded ? <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-md animate-stagger-2" data-guide-target="daily-overview" aria-label="Daily overview">
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex-1 space-y-2">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[#151F19] border border-[#355440] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#7BB38F]">
@@ -325,14 +327,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
                 <div className="text-[10px] text-[#84877F]">Burned</div>
                 <div className="font-heading text-xs font-bold text-[#DE9473]">
-                  <AnimatedCounter value={burnedToday} />
+                  {todayWorkouts.some(w => w.energyEstimateAvailable === false) ? 'Not estimated' : <AnimatedCounter value={burnedToday} />}
                 </div>
               </div>
             </div>
-      </div>
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="daily-overview" aria-label="Daily overview"><div><strong>{Math.round(totals.calories)} kcal logged today</strong><p>Add your own profile details to see estimated targets. It is optional.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></section>}
 
       {/* FOUR ANIMATED MACRO RINGS (Customizable Visibility) */}
-      {settings.dashboardWidgets.showMacros && (
+      {settings.dashboardWidgets.showMacros && profile.onboarded && (
         <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 animate-stagger-3">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Macro Rings</h2>
@@ -380,7 +382,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
       {/* DAILY HYDRATION TRACKER WIDGET (Customizable in Settings) */}
       {settings.dashboardWidgets.showHydration && (
-        <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 animate-stagger-3">
+        <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 animate-stagger-3" data-guide-target="daily-hydration" aria-label="Hydration and water">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">
@@ -475,7 +477,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       )}
 
       {/* RULE-BASED AI COACH CARD */}
-      {settings.dashboardWidgets.showAiCoach && (
+      {settings.dashboardWidgets.showAiCoach && profile.onboarded && (
         <div className="rounded-[26px] border border-[#3E5245] bg-[#1E2520] p-4 shadow-sm animate-stagger-5">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">

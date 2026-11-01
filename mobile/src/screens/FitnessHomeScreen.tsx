@@ -7,6 +7,7 @@ import { AnimatedRing } from '../components/AnimatedRing';
 import { FitLifeBrand } from '../components/FitnessSidebars';
 import { MainTabId } from '../components/GlassBottomNav';
 import { useFitLife } from '../data/FitLifeStore';
+import { EXERCISE_CATALOG } from '../data/ExerciseCatalog';
 import { MuscleGroup } from '../data/types';
 import { MOOD_OPTIONS, generateAiCoachMessage } from '../domain/AiCoach';
 import { calculateHealthScore } from '../domain/HealthScoreCalculator';
@@ -19,12 +20,13 @@ interface FitnessHomeProps {
   onNavigateTab: (tab: MainTabId) => void;
   onOpenDaily: () => void;
   onOpenSettings: () => void;
+  onEditProfile: () => void;
   onOpenWorkouts: (group?: MuscleGroup) => void;
 }
 
 const number = (value: number) => Math.round(value).toLocaleString();
 
-export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, onOpenDaily, onOpenSettings, onOpenWorkouts }) => {
+export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, onOpenDaily, onOpenSettings, onEditProfile, onOpenWorkouts }) => {
   const {
     profile, settings, themeColors, meals, workouts, weights, moods, todayMeals, todayWorkouts, todayMood,
     waterTodayMl, macroTargets, gamification, addWaterMl, logMood, toggleThemeMode,
@@ -41,6 +43,7 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
   const caloriesRemaining = macroTargets.calories - totals.calories;
   const caloriePercent = Math.max(0, Math.min(100, Math.round(totals.calories / Math.max(1, macroTargets.calories) * 100)));
   const burnedToday = todayWorkouts.reduce((sum, workout) => sum + workout.caloriesBurned, 0);
+  const burnUnavailable = todayWorkouts.some(workout => workout.energyEstimateAvailable === false);
   const workoutSets = todayWorkouts.reduce((sum, workout) => sum + workout.sets, 0);
   const health = calculateHealthScore({
     caloriesConsumed: totals.calories, calorieTarget: macroTargets.calories,
@@ -78,7 +81,7 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
 
   return (
     <div className="fitness-home">
-      <header className="fitness-home-bar">
+      <header className="fitness-home-bar" data-guide-target="home-settings" aria-label="Home settings and appearance">
         <div className="home-mobile-brand"><FitLifeBrand /></div>
         <div className="home-desktop-label"><strong>Dashboard</strong><span>Your fitness, all in one place.</span></div>
         <div className="home-header-actions">
@@ -96,25 +99,25 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
           <button className="home-streak" onClick={() => onNavigateTab('profile')} aria-label={`View your ${gamification.currentStreak} day streak`}><Flame size={16} /><strong>{gamification.currentStreak}</strong><span>day streak</span></button>
         </section>
 
-        <section className="home-overview" aria-labelledby="overview-title">
+        <section className="home-overview" data-guide-target="home-overview" aria-labelledby="overview-title">
           <div className="home-card-heading"><div><h2 id="overview-title">Today's overview</h2>{usingDemoData && <span className="home-demo-label">Demo data</span>}</div><button onClick={onOpenDaily}>Details <ArrowRight size={15} /></button></div>
-          <div className="overview-main">
+          {profile.onboarded ? <div className="overview-main">
             <div className="overview-primary"><span>{caloriesRemaining >= 0 ? 'Calories remaining' : 'Calories over target'}</span><div><strong>{number(Math.abs(caloriesRemaining))}</strong><small>kcal</small></div><p>Daily target: {number(macroTargets.calories)} kcal</p></div>
             <div className="overview-ring" aria-label={`${caloriePercent}% of your daily calorie target logged`}>
               <AnimatedRing progress={totals.calories / Math.max(1, macroTargets.calories)} size={104} strokeWidth={8} startColor={themeColors.accentPrimary}>
                 <strong>{caloriePercent}%</strong><span>of target</span>
               </AnimatedRing>
             </div>
-          </div>
+          </div> : <div className="profile-needed"><div><strong>Make this yours, whenever you’re ready.</strong><p>Add your details to see estimated calorie and nutrition targets. You can keep using FitLife without them.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></div>}
           <div className="overview-stats">
             <div><span>Eaten</span><strong>{number(totals.calories)} <small>kcal</small></strong></div>
-            <div><span>Est. burned</span><strong>{number(burnedToday)} <small>kcal</small></strong></div>
+            <div><span>Est. burned</span><strong>{burnUnavailable ? '—' : number(burnedToday)} <small>{burnUnavailable ? 'not estimated' : 'kcal'}</small></strong></div>
             <div><span>Exercise logs</span><strong>{todayWorkouts.length} <small>today</small></strong></div>
           </div>
-          <p className="overview-note">Targets are estimates. Remaining = target minus food; exercise calories are separate.</p>
+          <p className="overview-note">{profile.onboarded ? 'Targets are estimates. Remaining = target minus food; exercise calories are separate.' : 'Food and exercise logs are shown here. Add your profile only if you want personal estimates.'}</p>
         </section>
 
-        <div className="home-quick-actions" aria-label="Quick actions">
+        <div className="home-quick-actions" data-guide-target="home-actions" aria-label="Quick actions">
           <button className="home-action primary" onClick={() => onOpenWorkouts()}><span className="home-action-icon"><Dumbbell size={20} /></span><span><strong>Log workout</strong><small>Move your way</small></span><Plus size={19} /></button>
           <button className="home-action secondary" onClick={() => onNavigateTab('meals')}><span className="home-action-icon"><Utensils size={20} /></span><span><strong>Log a meal</strong><small>Fuel your day</small></span><Plus size={19} /></button>
         </div>
@@ -122,14 +125,15 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
         <section className="home-section" aria-labelledby="training-title">
           <div className="home-section-heading"><div><h2 id="training-title">Your next workout</h2><p>Find a session that works for you.</p></div><button onClick={() => onOpenWorkouts()}>See all <ChevronRight size={16} /></button></div>
           <div className="home-training-feature">
-            <div className="home-training-copy"><span><Dumbbell size={15} /> ADAPTIVE WORKOUTS</span><h3>Stronger,<br />one day at a time.</h3><p>Explore 42 exercises for every fitness level.</p><button onClick={() => onOpenWorkouts()}>Browse workouts <ArrowRight size={16} /></button></div>
+            <div className="home-training-copy"><span><Dumbbell size={15} /> ADAPTIVE WORKOUTS</span><h3>Stronger,<br />one day at a time.</h3><p>Explore {EXERCISE_CATALOG.length} exercises for every fitness level.</p><button onClick={() => onOpenWorkouts()}>Browse workouts <ArrowRight size={16} /></button></div>
             <img src={partnerTraining} alt="A man and a woman exercising with dumbbells together" />
           </div>
         </section>
 
         {settings.dashboardWidgets.showMacros && <section className="home-section" aria-labelledby="macros-title">
-          <div className="home-section-heading"><div><h2 id="macros-title">Your nutrition</h2><p>Today's progress towards your targets.</p></div><button onClick={() => onNavigateTab('meals')}>Log meal <Plus size={16} /></button></div>
+          <div className="home-section-heading"><div><h2 id="macros-title">Your nutrition</h2><p>{profile.onboarded ? "Today's progress towards your targets." : "Today's logged nutrition."}</p></div><button onClick={() => onNavigateTab('meals')}>Log meal <Plus size={16} /></button></div>
           <div className="home-macro-grid">{macros.map(macro => {
+            if (!profile.onboarded) return <button key={macro.label} className="home-macro" onClick={() => onNavigateTab('meals')} aria-label={`${macro.label}, ${number(macro.amount)} grams logged. Open meals.`}><strong>{number(macro.amount)} g</strong><span>{macro.label}</span><small>logged today</small></button>;
             const fraction = macro.amount / Math.max(1, macro.target);
             const pct = Math.min(100, Math.round(fraction * 100));
             return <button key={macro.label} className="home-macro" onClick={() => onNavigateTab('meals')} aria-label={`${macro.label}, ${number(macro.amount)} of ${macro.target} grams. Open meals.`}>
@@ -158,7 +162,7 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
           <div className="home-mood-list no-scrollbar">{MOOD_OPTIONS.map(mood => <button key={mood.id} aria-pressed={todayMood === mood.id} onClick={() => logMood(mood.id)} className={todayMood === mood.id ? 'is-selected' : ''}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div>
         </section>}
 
-        {settings.dashboardWidgets.showAiCoach && <section className="home-coach" aria-labelledby="coach-title">
+        {settings.dashboardWidgets.showAiCoach && profile.onboarded && <section className="home-coach" aria-labelledby="coach-title">
           <span className="home-coach-icon"><Sparkles size={20} /></span><div><p>DAILY GUIDANCE <span>· rule-based</span></p><h2 id="coach-title">{coach.headline}</h2><p>{coach.body}</p><button onClick={() => onNavigateTab(todayWorkouts.length ? 'meals' : 'workouts')}>{todayWorkouts.length ? 'View nutrition' : 'Find a workout'} <ArrowRight size={15} /></button></div>
         </section>}
 

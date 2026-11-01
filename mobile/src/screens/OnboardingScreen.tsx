@@ -18,25 +18,25 @@ interface OnboardingScreenProps {
   onCancel?: () => void;
 }
 
-type ProfileField = 'age' | 'height' | 'weight';
+type ProfileField = 'sex' | 'age' | 'height' | 'weight' | 'goal' | 'activity';
 const numberOr = (value: string, fallback: number) => {
   const parsed = Number(value);
   return value.trim() !== '' && Number.isFinite(parsed) ? parsed : fallback;
 };
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, onCancel }) => {
-  const { profile, settings, latestWeightKg, updateProfile } = useFitLife();
+  const { profile, settings, latestWeightKg, weights, updateProfile } = useFitLife();
   const unit = settings.weightUnit;
 
   const [name, setName] = useState(profile.name);
-  const [sex, setSex] = useState<BiologicalSex>(profile.sex);
+  const [sex, setSex] = useState<BiologicalSex | null>(profile.onboarded ? profile.sex : null);
   // Strings let people clear and replace values without the old default
   // immediately snapping back into the field on every keystroke.
-  const [ageInput, setAgeInput] = useState(String(profile.age));
-  const [heightInput, setHeightInput] = useState(String(profile.heightCm));
-  const [weightInput, setWeightInput] = useState(() => String(displayWeight(latestWeightKg, unit, 1)));
-  const [goal, setGoal] = useState<FitnessGoal>(profile.goal);
-  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile.activityLevel);
+  const [ageInput, setAgeInput] = useState(profile.onboarded ? String(profile.age) : '');
+  const [heightInput, setHeightInput] = useState(profile.onboarded ? String(profile.heightCm) : '');
+  const [weightInput, setWeightInput] = useState(() => profile.onboarded || weights.length ? String(displayWeight(latestWeightKg, unit, 1)) : '');
+  const [goal, setGoal] = useState<FitnessGoal | null>(profile.onboarded ? profile.goal : null);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(profile.onboarded ? profile.activityLevel : null);
   const [fieldError, setFieldError] = useState<{ field: ProfileField; message: string } | null>(null);
 
   const age = numberOr(ageInput, profile.age);
@@ -49,12 +49,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
   const previewTargets = useMemo(
     () =>
       calculateMacroTargets({
-        sex,
+        sex: sex || 'male', // Calculated only for a hidden preview until an explicit choice.
         age,
         heightCm,
         weightKg,
-        goal,
-        activityLevel,
+        goal: goal || 'maintain',
+        activityLevel: activityLevel || 'moderate',
       }),
     [sex, age, heightCm, weightKg, goal, activityLevel]
   );
@@ -63,6 +63,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
     () => calculateBmi(weightKg, heightCm),
     [weightKg, heightCm]
   );
+
+  const previewReady = !!sex && !!goal && !!activityLevel && Number.isInteger(Number(ageInput)) && Number(ageInput) >= 14 && Number(ageInput) <= 99 &&
+    Number(heightInput) >= 120 && Number(heightInput) <= 230 && weightInput.trim() !== '' &&
+    Number(weightInput) >= displayWeight(30, unit, 1) && Number(weightInput) <= displayWeight(250, unit, 1);
 
   const showFieldError = (field: ProfileField, message: string) => {
     setFieldError({ field, message });
@@ -73,12 +77,13 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const parsedAge = Number(ageInput);
     const parsedHeight = Number(heightInput);
     const parsedWeight = Number(weightInput);
     const minWeight = displayWeight(30, unit, 1);
     const maxWeight = displayWeight(250, unit, 1);
+    if (!sex) { showFieldError('sex', 'Choose a biological sex for this estimate.'); return; }
     if (!ageInput.trim() || !Number.isInteger(parsedAge) || parsedAge < 14 || parsedAge > 99) {
       showFieldError('age', 'Enter an age from 14 to 99.');
       return;
@@ -91,8 +96,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       showFieldError('weight', `Enter a weight from ${minWeight} to ${maxWeight} ${unit}.`);
       return;
     }
+    if (!goal) { showFieldError('goal', 'Choose a fitness goal.'); return; }
+    if (!activityLevel) { showFieldError('activity', 'Choose your usual activity level.'); return; }
     setFieldError(null);
-    updateProfile({
+    const saved = await updateProfile({
       name: name.trim() || 'FitLife Athlete',
       sex,
       age: parsedAge,
@@ -102,7 +109,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       activityLevel,
       onboarded: true,
     });
-    onFinish();
+    if (saved) onFinish();
   };
 
   return (
@@ -132,8 +139,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
         </span>
       </div>
 
-      {/* Live Calculated Targets Hero Preview (Solid Deep Sage Surface) */}
-      <div className="relative overflow-hidden rounded-[26px] bg-[#213026] p-4 shadow-xl border border-[#3E634B]">
+      {/* Live preview only uses values explicitly entered by this person. */}
+      {previewReady ? <div className="relative overflow-hidden rounded-[26px] bg-[#213026] p-4 shadow-xl border border-[#3E634B]" data-guide-target="onboarding-preview" aria-label="Estimated targets preview">
         <div className="flex items-center justify-between">
           <div>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#7BB38F]">
@@ -182,10 +189,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             </div>
           </div>
         </div>
-      </div>
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="onboarding-preview" aria-label="Estimated targets preview"><div><strong>Estimates will appear here</strong><p>Choose a sex, enter your own measurements, and pick a goal and activity level to preview them.</p></div></section>}
 
       {/* Biometrics Card */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4">
+      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4" data-guide-target="onboarding-details" aria-label="Profile details">
         <div>
           <label htmlFor="onboarding-name" className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">Athlete Name</label>
           <input
@@ -197,7 +204,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
           />
         </div>
 
-        <div>
+        <div id="onboarding-sex" tabIndex={-1}>
           <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">Biological Sex</label>
           <SegmentedSelector<BiologicalSex>
             options={[
@@ -205,7 +212,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               { value: 'female', label: 'Female (-161 BMR)' },
             ]}
             selected={sex}
-            onChange={setSex}
+            onChange={value => { setSex(value); setFieldError(null); }}
           />
         </div>
 
@@ -257,12 +264,13 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             />
           </div>
         </div>
-        {fieldError && <p id="onboarding-error" className="onboarding-error" role="alert">{fieldError.message}</p>}
+        {fieldError && !['goal','activity'].includes(fieldError.field) && <p id="onboarding-error" className="onboarding-error" role="alert">{fieldError.message}</p>}
       </div>
 
       {/* Primary Goal Selection */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-2.5">
+      <div id="onboarding-goal" tabIndex={-1} className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-2.5">
         <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">Primary Fitness Goal</h3>
+        {fieldError?.field === 'goal' && <p className="onboarding-error" role="alert">{fieldError.message}</p>}
         <div className="grid grid-cols-1 gap-2">
           {(Object.keys(GOAL_CONFIG) as FitnessGoal[]).map((gKey) => {
             const cfg = GOAL_CONFIG[gKey];
@@ -271,7 +279,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               <PressScale
                 key={gKey}
                 ariaPressed={isSelected}
-                onClick={() => setGoal(gKey)}
+                onClick={() => { setGoal(gKey); setFieldError(null); }}
                 className={`flex items-center justify-between rounded-2xl border p-3 transition ${
                   isSelected
                     ? 'border-[#528B67] bg-[#213026]'
@@ -303,8 +311,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       </div>
 
       {/* Activity Level Selection */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-2.5">
+      <div id="onboarding-activity" tabIndex={-1} className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-2.5">
         <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">Weekly Activity Multiplier</h3>
+        {fieldError?.field === 'activity' && <p className="onboarding-error" role="alert">{fieldError.message}</p>}
         <div className="space-y-2">
           {(Object.keys(ACTIVITY_MULTIPLIERS) as ActivityLevel[]).map((aKey) => {
             const item = ACTIVITY_MULTIPLIERS[aKey];
@@ -313,7 +322,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               <PressScale
                 key={aKey}
                 ariaPressed={isSelected}
-                onClick={() => setActivityLevel(aKey)}
+                onClick={() => { setActivityLevel(aKey); setFieldError(null); }}
                 className={`flex items-center justify-between rounded-2xl border p-3 transition ${
                   isSelected
                     ? 'border-[#C2A878] bg-[#2B271F]'

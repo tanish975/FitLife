@@ -1,15 +1,17 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
-const base = process.env.FITLIFE_URL || 'http://127.0.0.1:3000/';
+const base = nativeApp;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
+await installNativeFixture(page);
 const click = (name) => page.getByRole('button', { name, exact: true }).click();
 const waitText = (name) => page.getByText(name, { exact: false }).first().waitFor();
-const load = async () => { await page.goto(base, { waitUntil: 'networkidle' }); await waitText('Welcome to FitLife'); };
-const demo = async () => { await click('Quick launch (demo data)'); await waitText("Today's overview"); };
+const load = async () => { await page.goto(base, { waitUntil: 'networkidle' }); await waitText("Today's overview"); };
+const demo = async () => { await waitText("Today's overview"); };
 const storage = (key) => page.evaluate((k) => JSON.parse(localStorage.getItem(k)), key);
 const closeCelebration = async () => {
   const overlay = page.getByText('Achievement Unlocked', { exact: true });
@@ -89,7 +91,8 @@ try {
   assert.ok(meals.some(m => m.name.includes('150 g Grilled Chicken Breast') && m.calories === 248), 'grams scale to the catalog serving, not a guessed 100g');
   assert.ok(meals.some(m => m.name.includes('Whole Boiled Egg') && m.calories === 144), 'quantity parser');
   await quickMeal.fill('2 mystery soup');
-  assert.ok(await page.getByText('(generic estimate)', { exact: false }).count() > 0, 'unmatched food is labelled as an estimate');
+  assert.ok(await page.getByText('Nutrition details needed', { exact: true }).count() > 0, 'unmatched food requires review');
+  assert.ok(await page.getByRole('button', { name: 'Add (1)' }).isDisabled(), 'unmatched food cannot be logged with invented nutrition');
   await noOverflow('meals');
   await page.setViewportSize({ width: 320, height: 700 });
   const formFits = await page.locator('form').first().evaluate(form => {
@@ -119,7 +122,8 @@ try {
     accentValues.add(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim()));
   }
   assert.equal(accentValues.size, 5, 'five distinct natural palettes');
-  await click('Nightfall'); await click('Crisp (14px)'); await click('Spacious'); await click('Minimal');
+  await click('Nightfall');
+  assert.equal(await page.getByText('Shape, Density & Motion Feel', { exact: true }).count(), 0);
   await click('4.0L'); await click('90s'); await click('Pounds (lb)');
   await page.getByRole('switch', { name: 'Haptic feedback' }).click();
   for (const widget of ['4 Macro Rings Card', 'Daily Hydration Tracker', '11-State Mood Check-In', 'Daily guidance', 'Today’s Activity Feed']) {
@@ -129,13 +133,10 @@ try {
     assert.equal(await sw.getAttribute('aria-checked'), 'false');
   }
   const cfg = await storage('fitlife_settings_v2');
-  assert.deepEqual([cfg.themeMode, cfg.cornerStyle, cfg.densityStyle, cfg.motionStyle, cfg.waterGoalMl, cfg.defaultRestSeconds, cfg.weightUnit, cfg.hapticsEnabled], ['dark', 'sharp', 'spacious', 'reduced', 4000, 90, 'lb', false]);
+  assert.deepEqual([cfg.themeMode, cfg.waterGoalMl, cfg.defaultRestSeconds, cfg.weightUnit, cfg.hapticsEnabled], ['dark', 4000, 90, 'lb', false]);
   await click('Back'); await waitText("Today's overview");
   for (const heading of ['Your nutrition', 'Stay hydrated', 'How are you feeling?', "Today's activity"]) assert.equal(await page.getByText(heading, { exact: true }).count(), 0, `hidden widget: ${heading}`);
   assert.equal(await page.locator('.home-coach').count(), 0);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'reduced');
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.density), 'spacious');
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--radius-card').trim()), '14px');
   await noGradients();
   assert.ok(await contrast('.home-action.primary') >= 4.5, 'primary action contrast in dark mode');
   assert.ok(await contrast('.home-action.secondary') >= 4.5, 'secondary action contrast in dark mode');
@@ -143,13 +144,15 @@ try {
 
   await click('Open settings');
   for (const widget of ['4 Macro Rings Card', 'Daily Hydration Tracker', '11-State Mood Check-In', 'Daily guidance', 'Today’s Activity Feed']) await page.getByRole('switch', { name: widget }).click();
-  await click('QR & Install Guide');
+  assert.equal(await page.getByText('Install FitLife on Your Phone', { exact: true }).count(), 0);
+  await click('Profile');
+  await click('Install on Phone');
   const install = page.getByRole('dialog', { name: 'Install FitLife on Phone' }); await install.waitFor();
-  await install.getByAltText('Scan QR Code to open FitLife on phone').waitFor();
+  await install.getByText('A QR link is available when FitLife is hosted', { exact:false }).waitFor();
   assert.match(await install.innerText(), /differently signed older APK/i);
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('dialog').count(), 0, 'install dialog closes with Escape');
-  await click('Back');
+  await click('Home');
   await click('Add 250 milliliters of water');
   assert.equal((await storage('fitlife_water_v1')).amountMl, 250);
   assert.equal(await page.getByRole('progressbar', { name: 'Water towards daily goal' }).getAttribute('aria-valuemax'), '4000');
@@ -170,28 +173,9 @@ try {
   assert.equal(await page.getByText('Demo data', { exact: true }).count(), 0);
   assert.deepEqual(errors, []);
 
-  // Fresh, first-run signup reaches onboarding and retains a usable flow.
-  const firstRun = await browser.newPage({ viewport: { width: 320, height: 700 }, isMobile: true, hasTouch: true });
-  await firstRun.goto(base, { waitUntil: 'networkidle' });
-  await firstRun.getByText('Welcome to FitLife').waitFor();
-  await firstRun.getByRole('button', { name: 'Create Profile', exact: true }).click();
-  await firstRun.getByRole('textbox', { name: 'Full Name' }).fill('Asha Tester');
-  await firstRun.getByRole('textbox', { name: 'Email Address' }).fill('example@example.com');
-  await firstRun.getByRole('button', { name: 'Continue to Onboarding' }).click();
-  await firstRun.getByText('Body & Goal Calibration').waitFor();
-  assert.equal(await firstRun.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'onboarding at 320px');
-  await firstRun.getByRole('button', { name: 'Complete profile & continue' }).click();
-  await firstRun.getByText('Good ', { exact: false }).first().waitFor();
-  assert.ok((await firstRun.locator('body').innerText()).includes('Asha'));
-  assert.equal(await firstRun.getByText('Demo data', { exact: true }).count(), 0, 'fresh profile starts without sample activity');
-  await firstRun.getByRole('button', { name: 'Profile', exact: true }).click();
-  await firstRun.getByRole('button', { name: 'Exit profile', exact: true }).click();
-  await firstRun.getByRole('button', { name: 'Continue as Asha Tester', exact: true }).click();
-  await firstRun.getByText("Today's overview").waitFor();
-  assert.equal((await firstRun.evaluate(() => JSON.parse(localStorage.getItem('fitlife_profile_v1')))).name, 'Asha Tester', 'local profile survives sign out and return');
-  await firstRun.close();
+  // First-run, authentication and contextual guides are covered in guides.mjs.
 
-  console.log('PASS: first-run flow, fitness-first home, balanced photos, all viewports, local logging & hydration, rule-based mood, 5 palettes, themes, widget settings, customization, dialogs, data confirmation, 5 tabs and daily details.');
+  console.log('PASS: simulated native session, fitness-first home, balanced photos, all viewports, local logging & hydration, rule-based mood, 5 palettes, themes, widget settings, customization, dialogs, data confirmation, 5 tabs and daily details.');
 } catch (e) {
   console.error('FAILED:', e.stack || e.message);
   console.error('PAGE:', page.url());

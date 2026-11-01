@@ -1,11 +1,13 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-const base=process.env.FITLIFE_URL || 'http://127.0.0.1:4173/';
+const base = nativeApp;
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 try {
  for(const [width,height] of [[320,480],[360,640],[390,844],[640,360],[768,1024]]){
   const page=await browser.newPage({viewport:{width,height},isMobile:width<700,hasTouch:width<700});
-  await page.goto(base,{waitUntil:'networkidle'}); await page.getByRole('button',{name:'Quick launch (demo data)'}).click();
+  await installNativeFixture(page);
+  await page.goto(base,{waitUntil:'networkidle'}); await page.getByText("Today's overview").waitFor();
   await page.getByRole('button',{name:'Workouts',exact:true}).click(); await page.getByText('Rest timer').waitFor(); await page.waitForTimeout(450);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`workout overflows at ${width}x${height}`);
   const controls=page.getByRole('region',{name:'Rest timer'}).getByRole('button');

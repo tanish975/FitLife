@@ -22,7 +22,8 @@ export function getWorkoutPrescription(
   goal: FitnessGoal,
   weightKg: number,
   heightCm: number,
-  age = 18
+  age = 18,
+  profileReady = true
 ): WorkoutPrescription {
   const bmiInfo = calculateBmi(weightKg, heightCm);
 
@@ -34,11 +35,14 @@ export function getWorkoutPrescription(
   let goalRationale = 'Steady volume and moderate rest for all-around conditioning.';
 
   if (exercise.muscleGroup === 'Cardio') {
-    suggestedSets = goal === 'endurance' || goal === 'lose_weight' ? 4 : 3;
-    suggestedReps = 15; // minutes / intervals
+    // Repetitions for cardio are displayed as minutes, so avoid accidentally
+    // suggesting three or four 15-minute blocks as a default. Short indoor
+    // movements start at one minute; all durations remain user-editable.
+    suggestedSets = 1;
+    suggestedReps = exercise.id.startsWith('ex-home-') ? 1 : 10;
     suggestedRestSeconds = 45;
-    protocolName = 'Metabolic Conditioning';
-    goalRationale = 'A starting template for cardio intervals. Adjust the pace and rest to suit your fitness.';
+    protocolName = 'Cardio at your pace';
+    goalRationale = 'A brief starting template, not a target. Adjust the time, pace and rest to suit your fitness.';
   } else {
     switch (goal) {
       case 'gain_muscle':
@@ -81,8 +85,14 @@ export function getWorkoutPrescription(
     ? 0
     : Math.max(2.5, Math.round((exercise.defaultWeightKg * weightMultiplier) / 2.5) * 2.5);
 
+  if (!profileReady && exercise.muscleGroup !== 'Cardio') {
+    protocolName = 'Starting template';
+    goalRationale = 'A generic starting point, not a personalized prescription. Adjust sets, repetitions and rest to your ability.';
+  }
   let bmiCautionNote: string | null = null;
-  if (age < 18) {
+  if (!profileReady) {
+    bmiCautionNote = null;
+  } else if (age < 18) {
     bmiCautionNote = 'Adult BMI categories do not apply below age 18. Adjust exercises to your ability and seek qualified guidance.';
   } else if (bmiInfo.category === 'Obese' || bmiInfo.bmi >= 29) {
     bmiCautionNote = `BMI is a rough screening measure and does not assess fitness. Use a comfortable load and range of motion; stop if you experience pain.`;
@@ -104,4 +114,17 @@ export function getWorkoutPrescription(
     goalRationale,
     bmiCautionNote,
   };
+}
+
+/** Rough gross energy only. Cardio has a duration; strength entries do not.
+ * A generic 3.5 MET home / 5 MET other-cardio assumption is not a measurement
+ * and does not model actual pace or individual physiology. One MET is about
+ * 1 kcal/kg/hour: https://pacompendium.com/ .
+ */
+export function estimateWorkoutCalories(exercise: ExerciseItem, sets: number, repsOrMinutes: number, weightKg: number): number {
+  if (exercise.muscleGroup === 'Cardio') {
+    const genericMet = exercise.id.startsWith('ex-home-') ? 3.5 : 5;
+    return Math.max(0, Math.round(genericMet * Math.max(0, weightKg) * sets * repsOrMinutes / 60));
+  }
+  return Math.max(0, Math.round(exercise.caloriesPerSet * sets * (1 + repsOrMinutes / 35)));
 }

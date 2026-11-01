@@ -1,24 +1,27 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
-const base = process.env.FITLIFE_URL || 'http://127.0.0.1:3000/';
+const base = nativeApp;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const errors = [];
 
 // Instrument only the theme reveal: pause its WAAPI animation so screenshots
 // and geometry assertions examine real rendered frames rather than timing luck.
 async function newApp({ fallback = false, unsupported = false, throwsView = false, throwsPseudo = false,
-                        pause = true, inAppReduced = false, osReduced = false,
+                        pause = true, inAppReduced = false, inAppMotion = null, osReduced = false,
                         viewport = { width: 390, height: 844 }, deviceScaleFactor = 1 } = {}) {
   const context = await browser.newContext({ viewport, isMobile: viewport.width < 600, hasTouch: viewport.width < 600,
     deviceScaleFactor, reducedMotion: osReduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
   const page = await context.newPage();
+  await installNativeFixture(page);
   page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(({ fallback, unsupported, throwsView, throwsPseudo, pause, inAppReduced }) => {
+  await page.addInitScript(({ fallback, unsupported, throwsView, throwsPseudo, pause, inAppReduced, inAppMotion }) => {
     try {
       localStorage.setItem('fitlife_auth_v1', 'true');
-      if (inAppReduced && !localStorage.getItem('fitlife_settings_v2')) {
-        localStorage.setItem('fitlife_settings_v2', JSON.stringify({ motionStyle: 'reduced' }));
+      if (inAppReduced || inAppMotion) {
+        const current = JSON.parse(localStorage.getItem('fitlife_settings_v2') || '{}');
+        localStorage.setItem('fitlife_settings_v2', JSON.stringify({ ...current, motionStyle: inAppMotion || 'reduced' }));
       }
     } catch {}
     if (fallback || unsupported) Object.defineProperty(document, 'startViewTransition', { value: undefined, configurable: true });
@@ -40,7 +43,7 @@ async function newApp({ fallback = false, unsupported = false, throwsView = fals
       }
       return animation;
     };
-  }, { fallback, unsupported, throwsView, throwsPseudo, pause, inAppReduced });
+  }, { fallback, unsupported, throwsView, throwsPseudo, pause, inAppReduced, inAppMotion });
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.getByText("Today's overview", { exact: true }).waitFor();
   // Avoid sampling rings while their initial progress animation is running.
@@ -154,17 +157,8 @@ try {
     await page.getByRole('button', { name: 'Nightfall', exact: true }).click();
     await page.waitForTimeout(120); assert.equal(await count(page), beforeSame, 'selecting the current mode does not replay');
     await startReveal(page, page.getByRole('button', { name: 'Daylight', exact: true }), { keyboard: true }); await finishReveal(page);
-    await page.getByRole('button', { name: 'Gentle', exact: true }).click();
-    const gentle = await startReveal(page, page.getByRole('button', { name: 'Nightfall', exact: true }));
-    assert.equal(gentle.options.duration, 420, 'gentle motion shortens the reveal'); await finishReveal(page);
-    await page.getByRole('button', { name: 'Minimal', exact: true }).click();
-    const beforeMinimal = await count(page);
-    await page.getByRole('button', { name: 'Daylight', exact: true }).click();
-    assert.equal(await mode(page), 'light'); assert.equal(await count(page), beforeMinimal, 'in-app reduced motion changes immediately');
-    assert.equal(await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).transitionDuration)), 0.00001);
-
+    // Legacy in-app motion settings remain compatible and are tested below.
     // Daily Dashboard's own accessible toggle has an independent origin.
-    await page.getByRole('button', { name: 'Full Spring', exact: true }).click();
     await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.getByRole('button', { name: 'Details', exact: true }).click();
     const dailyToggle = page.getByRole('button', { name: 'Toggle Daylight or Nightfall Theme' });
@@ -232,10 +226,17 @@ try {
     const layer = page.locator('[data-fitlife-theme-fallback]');
     assert.equal(await layer.locator('[data-fitlife-theme-choice=light]').evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
     assert.notEqual(await layer.locator('[data-fitlife-theme-choice=dark]').evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)', 'incoming theme segment appears selected');
-    await page.getByRole('button', { name: 'Minimal', exact: true }).click();
-    assert.equal(await mode(page), 'dark'); assert.equal(await setting(page, 'motionStyle'), 'reduced');
+    await page.getByRole('button', { name: 'Coastal Eucalyptus', exact: true }).click();
+    assert.equal(await mode(page), 'dark'); assert.equal(await setting(page, 'paletteId'), 'coastal_eucalyptus');
     assert.equal(await page.locator('[data-fitlife-theme-fallback]').count(), 0);
     await context.close();
+  }
+
+  // A saved legacy Gentle preference still changes duration after its UI removal.
+  {
+    const { page, context } = await newApp({ inAppMotion: 'gentle' });
+    const gentle = await startReveal(page, page.getByRole('button', { name: 'Switch to nightfall theme' }));
+    assert.equal(gentle.options.duration, 420); await finishReveal(page); await context.close();
   }
 
   // Honor operating-system reduced motion; older engines must still switch.
