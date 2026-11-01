@@ -180,7 +180,7 @@ try {
   await firstRun.getByRole('button', { name: 'Continue to Onboarding' }).click();
   await firstRun.getByText('Body & Goal Calibration').waitFor();
   assert.equal(await firstRun.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'onboarding at 320px');
-  await firstRun.getByRole('button', { name: 'Save Targets & Open Dashboard' }).first().click();
+  await firstRun.getByRole('button', { name: 'Complete profile & continue' }).click();
   await firstRun.getByText('Good ', { exact: false }).first().waitFor();
   assert.ok((await firstRun.locator('body').innerText()).includes('Asha'));
   assert.equal(await firstRun.getByText('Demo data', { exact: true }).count(), 0, 'fresh profile starts without sample activity');

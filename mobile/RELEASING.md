@@ -67,6 +67,8 @@ npm run build
 
 `ANDROID_HOME` should point to the Android SDK. Alternatively set `ANDROID_BUILD_TOOLS_DIR` and `ANDROID_JAR` explicitly. Outputs are `../FitLife.apk` and `../FitLife-App.html`; they are generated and not committed. The build does not generate a replacement signing key automatically. Before distributing, choose a versionCode greater than every existing release.
 
+The release workflow runs `npm run test:qa` against the production preview; it also runs `test:mobile` as part of that command. Locally, start `npx vite preview --host 127.0.0.1 --port 4173` in a separate terminal and run either command from `mobile/`. The mobile checks cover onboarding button hit targets, phone-sized layouts, simulated keyboard resizing, touch scrolling, search, logging, reduced motion, and resizing in Chromium. This is emulation, not a substitute for testing the signed APK and its keyboard on an actual phone.
+
 ## Privacy and scope
 
 The Android app checks GitHub Releases at launch at most once every six hours by default. The request shares ordinary network metadata (including IP address) with GitHub but **does not include fitness or profile data**. Users can disable automatic checks or manually check under Settings → App updates. The app remains usable offline. The standalone HTML and PWA do not perform Android APK update checks.

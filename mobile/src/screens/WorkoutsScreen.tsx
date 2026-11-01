@@ -19,6 +19,7 @@ import { displayWeight, formatWeight, parseInputToKg } from '../domain/WeightCon
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
 import { EmptyState } from '../components/EmptyState';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import partnerTraining from '../assets/partner-training.jpg';
 
 const MUSCLE_GROUPS: MuscleGroup[] = [
@@ -32,21 +33,28 @@ const MUSCLE_GROUPS: MuscleGroup[] = [
   'Cardio',
   'Full Body',
 ];
+const CATALOG_PAGE_SIZE = 10;
 
 export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initialGroup = 'All' }) => {
   const { profile, settings, latestWeightKg, workouts, todayWorkouts, logWorkout, removeWorkout } =
     useFitLife();
   const unit = settings.weightUnit;
+  const reducedMotion = useReducedMotion();
 
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>(initialGroup);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(CATALOG_PAGE_SIZE);
+  const updateGroup = (value: MuscleGroup) => { setSelectedGroup(value); setVisibleCount(CATALOG_PAGE_SIZE); };
+  const updateSearch = (value: string) => { setSearchQuery(value); setVisibleCount(CATALOG_PAGE_SIZE); };
 
   // Modal Bottom Sheet state for Adaptive Workout Engine set entry
   const [selectedExercise, setSelectedExercise] = useState<ExerciseItem | null>(null);
   const [isSheetClosing, setIsSheetClosing] = useState(false);
-  const [sets, setSets] = useState(3);
-  const [reps, setReps] = useState(10);
-  const [weightInput, setWeightInput] = useState(0);
+  const [setsInput, setSetsInput] = useState('3');
+  const [repsInput, setRepsInput] = useState('10');
+  const [weightInput, setWeightInput] = useState('0');
+  const sets = Math.max(1, Math.min(20, Math.floor(Number(setsInput) || 1)));
+  const reps = Math.max(1, Math.min(100, Math.floor(Number(repsInput) || 1)));
   const [restSeconds, setRestSeconds] = useState(75);
 
   useEffect(() => {
@@ -73,46 +81,49 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
 
   const openExerciseSheet = (ex: ExerciseItem) => {
     const presc = getWorkoutPrescription(ex, profile.goal, latestWeightKg, profile.heightCm, profile.age);
-    setSets(presc.suggestedSets);
-    setReps(presc.suggestedReps);
+    setSetsInput(String(presc.suggestedSets));
+    setRepsInput(String(presc.suggestedReps));
     // Catalog loads do not establish a person's strength. Reuse only a real prior
     // entry, otherwise start at zero so the user chooses a comfortable load.
     const previousLog = workouts
       .filter((entry) => entry.exerciseId === ex.id && entry.id.startsWith('wk-'))
       .sort((a, b) => b.timestamp - a.timestamp)[0];
-    setWeightInput(ex.isBodyweight || !previousLog ? 0 : displayWeight(previousLog.weightKg, unit, 1));
+    setWeightInput(String(ex.isBodyweight || !previousLog ? 0 : displayWeight(previousLog.weightKg, unit, 1)));
     setRestSeconds(settings.defaultRestSeconds || presc.suggestedRestSeconds);
     setIsSheetClosing(false);
     setSelectedExercise(ex);
   };
 
-  const closeSheetSmoothly = (afterClose?: () => void) => {
+  const closeSheetSmoothly = () => {
+    if (isSheetClosing) return;
+    if (reducedMotion) { setSelectedExercise(null); return; }
     setIsSheetClosing(true);
     setTimeout(() => {
       setSelectedExercise(null);
       setIsSheetClosing(false);
-      afterClose?.();
-    }, 240);
+    }, 150);
   };
 
   const handleConfirmLog = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedExercise) return;
-    const weightKg = selectedExercise.isBodyweight ? 0 : parseInputToKg(weightInput, unit);
+    if (!selectedExercise || isSheetClosing) return;
+    const weightKg = selectedExercise.isBodyweight ? 0 : parseInputToKg(Number(weightInput), unit);
     const burned = Math.round(selectedExercise.caloriesPerSet * sets * (1 + reps / 35));
 
-    closeSheetSmoothly(() => {
-      logWorkout({
-        exerciseId: selectedExercise.id,
-        exerciseName: selectedExercise.name,
-        muscleGroup: selectedExercise.muscleGroup,
-        sets: Math.max(1, sets),
-        reps: Math.max(1, reps),
-        weightKg,
-        caloriesBurned: burned,
-        restSeconds,
-      });
-    });
+    // Confirm immediately; do not delay the actual save behind an exit animation.
+    const entry = {
+      exerciseId: selectedExercise.id,
+      exerciseName: selectedExercise.name,
+      muscleGroup: selectedExercise.muscleGroup,
+      sets,
+      reps,
+      weightKg,
+      caloriesBurned: burned,
+      restSeconds,
+    };
+    setSelectedExercise(null);
+    setIsSheetClosing(false);
+    logWorkout(entry);
   };
 
   const filteredExercises = useMemo(() => {
@@ -165,7 +176,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
           label: g,
         }))}
         selected={selectedGroup}
-        onChange={setSelectedGroup}
+        onChange={updateGroup}
       />
 
       {/* Search Box */}
@@ -175,13 +186,13 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
           id="exercise-search"
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => updateSearch(e.target.value)}
           placeholder="Search 42 exercises (bench, squat, pull-ups, HIIT, deadlift...)"
           className="w-full rounded-2xl border border-[#2F3A33] bg-[#1E2520] py-2.5 pl-10 pr-9 text-xs text-[#F4F1EA] outline-none placeholder:text-[#636961] focus:border-[#6BA37E]"
         />
         {searchQuery && (
           <button
-            onClick={() => setSearchQuery('')}
+            onClick={() => updateSearch('')}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[#84877F] hover:text-[#F4F1EA]"
           >
             <X className="h-4 w-4" />
@@ -198,8 +209,9 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
           <span className="text-[11px] text-[#D8C39E]">Tap for Adaptive Sheet →</span>
         </div>
 
-        <div className="space-y-2 max-h-[330px] overflow-y-auto pr-0.5">
-          {filteredExercises.map((ex) => (
+        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle="Try a different search or muscle group." />}
+        <div className="space-y-2 pr-0.5" data-testid="exercise-catalog-list">
+          {filteredExercises.slice(0, visibleCount).map((ex) => (
             <PressScale
               key={ex.id}
               onClick={() => openExerciseSheet(ex)}
@@ -233,6 +245,12 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             </PressScale>
           ))}
         </div>
+        <p className="catalog-count" aria-live="polite">Showing {Math.min(visibleCount, filteredExercises.length)} of {filteredExercises.length} exercises</p>
+        {visibleCount < filteredExercises.length && (
+          <button type="button" className="catalog-more" onClick={() => setVisibleCount((count) => count + CATALOG_PAGE_SIZE)}>
+            Show more exercises ({filteredExercises.length - visibleCount} remaining)
+          </button>
+        )}
       </div>
 
       {/* Logged Workouts Today */}
@@ -289,7 +307,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
       {selectedExercise && prescription && (
         <div
           onClick={() => closeSheetSmoothly()}
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-[#0E120F]/80 backdrop-blur-sm transition-opacity duration-200 ${
+          className={`fixed inset-0 z-50 !m-0 flex items-end justify-center bg-[#0E120F]/80 transition-opacity duration-150 ${
             isSheetClosing ? 'opacity-0' : 'opacity-100'
           }`}
         >
@@ -298,7 +316,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             aria-modal="true"
             aria-labelledby="workout-sheet-title"
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-h-[92dvh] overflow-y-auto max-w-[430px] rounded-t-[30px] border-t border-[#2F3A33] bg-[#181E1A] p-5 shadow-2xl transition-transform duration-250 ${
+            className={`workout-sheet w-full max-h-[92dvh] overflow-y-auto max-w-[430px] rounded-t-[30px] border-t border-[#2F3A33] bg-[#181E1A] p-5 shadow-2xl transition-transform duration-150 ${
               isSheetClosing ? 'translate-y-full' : 'translate-y-0 animate-slide-up'
             }`}
           >
@@ -354,7 +372,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                     <button
                       type="button"
                       aria-label="Decrease sets"
-                      onClick={() => setSets((s) => Math.max(1, s - 1))}
+                      onClick={() => setSetsInput(String(Math.max(1, sets - 1)))}
                       className="h-11 w-11 shrink-0 rounded-lg bg-[#2A332D] text-sm font-bold text-[#F4F1EA]"
                     >
                       −
@@ -364,14 +382,14 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                       aria-label="Sets"
                       min={1}
                       max={20}
-                      value={sets}
-                      onChange={(e) => setSets(Number(e.target.value) || 1)}
+                      value={setsInput}
+                      onChange={(e) => setSetsInput(e.target.value)}
                       className="w-7 min-w-0 bg-transparent text-center font-heading text-base font-bold text-[#F4F1EA] outline-none"
                     />
                     <button
                       type="button"
                       aria-label="Increase sets"
-                      onClick={() => setSets((s) => s + 1)}
+                      onClick={() => setSetsInput(String(Math.min(20, sets + 1)))}
                       className="h-11 w-11 shrink-0 rounded-lg bg-[#2A332D] text-sm font-bold text-[#F4F1EA]"
                     >
                       +
@@ -387,7 +405,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                     <button
                       type="button"
                       aria-label="Decrease reps or minutes"
-                      onClick={() => setReps((r) => Math.max(1, r - 1))}
+                      onClick={() => setRepsInput(String(Math.max(1, reps - 1)))}
                       className="h-11 w-11 shrink-0 rounded-lg bg-[#2A332D] text-sm font-bold text-[#F4F1EA]"
                     >
                       −
@@ -397,14 +415,14 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                       aria-label={selectedExercise.muscleGroup === 'Cardio' ? 'Minutes' : 'Reps'}
                       min={1}
                       max={100}
-                      value={reps}
-                      onChange={(e) => setReps(Number(e.target.value) || 1)}
+                      value={repsInput}
+                      onChange={(e) => setRepsInput(e.target.value)}
                       className="w-7 min-w-0 bg-transparent text-center font-heading text-base font-bold text-[#F4F1EA] outline-none"
                     />
                     <button
                       type="button"
                       aria-label="Increase reps or minutes"
-                      onClick={() => setReps((r) => r + 1)}
+                      onClick={() => setRepsInput(String(Math.min(100, reps + 1)))}
                       className="h-11 w-11 shrink-0 rounded-lg bg-[#2A332D] text-sm font-bold text-[#F4F1EA]"
                     >
                       +
@@ -427,7 +445,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                       step="0.5"
                       min={0}
                       value={weightInput}
-                      onChange={(e) => setWeightInput(Number(e.target.value) || 0)}
+                      onChange={(e) => setWeightInput(e.target.value)}
                       className="mt-1 w-full rounded-lg bg-[#141916] py-1 text-center font-heading text-base font-bold text-[#7BB38F] outline-none"
                     />
                   )}

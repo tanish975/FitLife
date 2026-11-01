@@ -6,8 +6,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 button:focus-visible, [role="button"]:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 3px; }
 .app-shell { display: grid; grid-template-columns: 220px minmax(0, 600px) 280px; column-gap: 24px; justify-content: center; max-width: 1320px; min-height: 100dvh; padding: 0 24px; margin: 0 auto; color: var(--text-primary); }
-.app-entry-shell { min-height: 100dvh; display: flex; justify-content: center; background: var(--bg-base); }
-.app-entry-shell .app-main { width: min(100%, 560px); }
+.app-entry-shell { min-height: 100vh; min-height: 100dvh; display: flex; justify-content: center; background: var(--bg-base); }
+.app-entry-shell .app-main { width: 100%; max-width: 560px; }
 .app-main { min-width: 0; min-height: 100dvh; width: 100%; background: var(--bg-card); border-inline: 1px solid var(--border-subtle); }
 .legacy-screen { min-height: 100dvh; background: var(--bg-base); padding-top: 15px; }
 .fitlife-splash { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--bg-base); }
@@ -161,3 +161,43 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible, input:focu
 
 /* Do not let a transient toast cover an open workout/install sheet. */
 body:has([role="dialog"]) .app-toast { visibility: hidden; }
+
+/* Entry actions remain visible without trapping the page in a nested scroller. */
+.auth-entry-content { padding-bottom: 100px; padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+.entry-action-bar { position: fixed; z-index: 45; left: 50%; bottom: var(--entry-keyboard-inset, 0px); transform: translateX(-50%); width: 100%; max-width: 560px; padding: 9px 16px 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-subtle); background: var(--bg-card); }
+.entry-action-inner { width: 100%; }
+.entry-action-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; padding: 11px 16px; border: 0; border-radius: var(--radius-btn); color: var(--bg-base); background: var(--accent-primary-text); font-size: 14px; font-weight: 800; line-height: 1.3; text-align: center; touch-action: manipulation; }
+.entry-action-button:active { opacity: .9; }
+.app-entry-shell .app-toast { bottom: 79px; bottom: calc(79px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+.onboarding-error { margin-top: 8px; padding: 9px 11px; border: 1px solid var(--accent-secondary); border-radius: 10px; color: var(--accent-secondary-text); background: var(--accent-secondary-soft); font-size: 12px; line-height: 1.4; }
+
+/* Press feedback is CSS-only: swiping a list never schedules React renders. */
+button, a, [role="button"] { touch-action: manipulation; }
+.press-scale { -webkit-tap-highlight-color: transparent; }
+.press-scale[role="button"]:active { opacity: .86; }
+@media (hover: hover) and (pointer: fine) {
+  .press-scale[role="button"]:active { transform: scale(var(--press-scale, .97)); transition: transform 100ms ease-out; }
+}
+.catalog-more { width: 100%; min-height: 48px; margin-top: 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-btn); color: var(--accent-primary-text); background: var(--accent-primary-soft); font-size: 13px; font-weight: 750; }
+.catalog-count { margin: 5px 2px 0; color: var(--text-secondary); font-size: 11px; }
+
+/* Celebration is a small notice, not a full-screen touch/scroll blocker. */
+.celebration-layer { position: fixed; z-index: 70; inset: 0; pointer-events: none; }
+.celebration-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.celebration-banner { position: absolute; top: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: flex; align-items: flex-start; gap: 10px; width: calc(100% - 24px); max-width: 400px; padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); color: var(--text-primary); background: var(--bg-card); box-shadow: 0 4px 14px rgba(0, 0, 0, .12); pointer-events: auto; }
+.celebration-icon { display: flex; flex: 0 0 38px; align-items: center; justify-content: center; min-height: 38px; border-radius: 12px; background: var(--accent-primary-soft); font-size: 20px; }
+.celebration-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.celebration-copy > span { color: var(--accent-primary-text); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.celebration-copy strong { font-size: 13px; line-height: 1.3; }
+.celebration-copy small { color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
+.celebration-banner button { display: flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; color: var(--text-secondary); background: var(--bg-recessed); }
+
+/* Frequent navigation should respond quickly while keeping a gentle transition. */
+.animate-screen-enter, .animate-tab-right, .animate-tab-left { animation-duration: 200ms; }
+[data-motion="gentle"] .animate-screen-enter,
+[data-motion="gentle"] .animate-tab-right,
+[data-motion="gentle"] .animate-tab-left { animation-duration: 150ms; }
+.workout-sheet { max-height: 92vh; max-height: 92dvh; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; padding-bottom: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+
+/* Avoid forced zoom when focusing profile fields on mobile Safari. */
+@media (max-width: 650px) { .app-entry-shell input { font-size: 16px; } }

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Check, Flame, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Flame, Sparkles } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
 import { ActivityLevel, BiologicalSex, FitnessGoal } from '../data/types';
 import {
@@ -11,12 +11,18 @@ import { displayWeight, parseInputToKg } from '../domain/WeightConverter';
 import { calculateBmi } from '../domain/BmiCalculator';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
-import { AnimatedCounter } from '../components/AnimatedCounter';
+import { EntryActionBar } from '../components/EntryActionBar';
 
 interface OnboardingScreenProps {
   onFinish: () => void;
   onCancel?: () => void;
 }
+
+type ProfileField = 'age' | 'height' | 'weight';
+const numberOr = (value: string, fallback: number) => {
+  const parsed = Number(value);
+  return value.trim() !== '' && Number.isFinite(parsed) ? parsed : fallback;
+};
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, onCancel }) => {
   const { profile, settings, latestWeightKg, updateProfile } = useFitLife();
@@ -24,16 +30,19 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
 
   const [name, setName] = useState(profile.name);
   const [sex, setSex] = useState<BiologicalSex>(profile.sex);
-  const [age, setAge] = useState<number>(profile.age);
-  const [heightCm, setHeightCm] = useState<number>(profile.heightCm);
-  const [weightInput, setWeightInput] = useState<number>(() =>
-    displayWeight(latestWeightKg, unit, 1)
-  );
+  // Strings let people clear and replace values without the old default
+  // immediately snapping back into the field on every keystroke.
+  const [ageInput, setAgeInput] = useState(String(profile.age));
+  const [heightInput, setHeightInput] = useState(String(profile.heightCm));
+  const [weightInput, setWeightInput] = useState(() => String(displayWeight(latestWeightKg, unit, 1)));
   const [goal, setGoal] = useState<FitnessGoal>(profile.goal);
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile.activityLevel);
+  const [fieldError, setFieldError] = useState<{ field: ProfileField; message: string } | null>(null);
 
+  const age = numberOr(ageInput, profile.age);
+  const heightCm = numberOr(heightInput, profile.heightCm);
   const weightKg = useMemo(
-    () => parseInputToKg(weightInput, unit) || profile.weightKg,
+    () => parseInputToKg(numberOr(weightInput, 0), unit) || profile.weightKg,
     [weightInput, unit, profile.weightKg]
   );
 
@@ -55,13 +64,40 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
     [weightKg, heightCm]
   );
 
+  const showFieldError = (field: ProfileField, message: string) => {
+    setFieldError({ field, message });
+    window.requestAnimationFrame(() => {
+      const input = document.getElementById(`onboarding-${field}`) as HTMLInputElement | null;
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ block: 'center', behavior: 'auto' });
+    });
+  };
+
   const handleSave = () => {
+    const parsedAge = Number(ageInput);
+    const parsedHeight = Number(heightInput);
+    const parsedWeight = Number(weightInput);
+    const minWeight = displayWeight(30, unit, 1);
+    const maxWeight = displayWeight(250, unit, 1);
+    if (!ageInput.trim() || !Number.isInteger(parsedAge) || parsedAge < 14 || parsedAge > 99) {
+      showFieldError('age', 'Enter an age from 14 to 99.');
+      return;
+    }
+    if (!heightInput.trim() || !Number.isFinite(parsedHeight) || parsedHeight < 120 || parsedHeight > 230) {
+      showFieldError('height', 'Enter a height from 120 to 230 cm.');
+      return;
+    }
+    if (!weightInput.trim() || !Number.isFinite(parsedWeight) || parsedWeight < minWeight || parsedWeight > maxWeight) {
+      showFieldError('weight', `Enter a weight from ${minWeight} to ${maxWeight} ${unit}.`);
+      return;
+    }
+    setFieldError(null);
     updateProfile({
       name: name.trim() || 'FitLife Athlete',
       sex,
-      age: Math.max(14, Math.min(99, age)),
-      heightCm: Math.max(120, Math.min(230, heightCm)),
-      weightKg: Math.max(30, Math.min(250, weightKg)),
+      age: parsedAge,
+      heightCm: parsedHeight,
+      weightKg: Math.max(30, Math.min(250, parseInputToKg(parsedWeight, unit))),
       goal,
       activityLevel,
       onboarded: true,
@@ -70,22 +106,24 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
   };
 
   return (
-    <div className="space-y-4 px-4 pb-28 pt-3 animate-screen-enter">
+    <>
+    <div className="space-y-4 px-4 pb-28 pt-3">
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           {onCancel && (
             <PressScale
               onClick={onCancel}
+              ariaLabel="Back"
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#2F3A33] bg-[#1E2520] text-[#B8B5AD]"
             >
               <ArrowLeft className="h-4 w-4" />
             </PressScale>
           )}
           <div>
-            <h1 className="font-heading text-lg font-bold text-[#F4F1EA]">Body & Goal Calibration</h1>
+            <h1 className="font-heading text-lg font-bold text-[#F4F1EA]">Complete your profile</h1>
             <p className="text-xs text-[#84877F]">
-              Mifflin-St Jeor BMR → TDEE → Personalized Macros
+              Body & Goal Calibration · BMR → TDEE → Personalized Macros
             </p>
           </div>
         </div>
@@ -102,10 +140,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               <Sparkles className="h-3.5 w-3.5" /> Estimated daily target
             </span>
             <div className="mt-1 flex items-baseline gap-1.5">
-              <AnimatedCounter
-                value={previewTargets.calories}
-                className="font-heading text-3xl font-extrabold text-[#F4F1EA]"
-              />
+              <span className="font-heading text-3xl font-extrabold text-[#F4F1EA]">{Math.round(previewTargets.calories).toLocaleString()}</span>
               <span className="text-xs font-medium text-[#B8B5AD]">kcal / day</span>
             </div>
             <p className="mt-0.5 text-[11px] text-[#B8B5AD]">
@@ -152,8 +187,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       {/* Biometrics Card */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">Athlete Name</label>
+          <label htmlFor="onboarding-name" className="mb-1.5 block text-xs font-semibold text-[#B8B5AD]">Athlete Name</label>
           <input
+            id="onboarding-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -175,40 +211,53 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
 
         <div className="grid grid-cols-3 gap-2.5">
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-[#84877F]">Age (yrs)</label>
+            <label htmlFor="onboarding-age" className="mb-1 block text-[11px] font-medium text-[#84877F]">Age (yrs)</label>
             <input
+              id="onboarding-age"
               type="number"
+              inputMode="numeric"
               min={14}
               max={99}
-              value={age}
-              onChange={(e) => setAge(Number(e.target.value) || 24)}
+              value={ageInput}
+              aria-invalid={fieldError?.field === 'age' || undefined}
+              aria-describedby={fieldError?.field === 'age' ? 'onboarding-error' : undefined}
+              onChange={(e) => { setAgeInput(e.target.value); setFieldError(null); }}
               className="w-full rounded-xl border border-[#2F3A33] bg-[#141916] px-3 py-2 text-center font-heading text-sm font-bold text-[#F4F1EA] outline-none focus:border-[#6BA37E]"
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-[#84877F]">Height (cm)</label>
+            <label htmlFor="onboarding-height" className="mb-1 block text-[11px] font-medium text-[#84877F]">Height (cm)</label>
             <input
+              id="onboarding-height"
               type="number"
+              inputMode="decimal"
               min={120}
               max={230}
-              value={heightCm}
-              onChange={(e) => setHeightCm(Number(e.target.value) || 170)}
+              value={heightInput}
+              aria-invalid={fieldError?.field === 'height' || undefined}
+              aria-describedby={fieldError?.field === 'height' ? 'onboarding-error' : undefined}
+              onChange={(e) => { setHeightInput(e.target.value); setFieldError(null); }}
               className="w-full rounded-xl border border-[#2F3A33] bg-[#141916] px-3 py-2 text-center font-heading text-sm font-bold text-[#F4F1EA] outline-none focus:border-[#6BA37E]"
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-[#84877F]">
+            <label htmlFor="onboarding-weight" className="mb-1 block text-[11px] font-medium text-[#84877F]">
               Weight ({unit})
             </label>
             <input
+              id="onboarding-weight"
               type="number"
+              inputMode="decimal"
               step="0.1"
               value={weightInput}
-              onChange={(e) => setWeightInput(Number(e.target.value) || 0)}
+              aria-invalid={fieldError?.field === 'weight' || undefined}
+              aria-describedby={fieldError?.field === 'weight' ? 'onboarding-error' : undefined}
+              onChange={(e) => { setWeightInput(e.target.value); setFieldError(null); }}
               className="w-full rounded-xl border border-[#2F3A33] bg-[#141916] px-3 py-2 text-center font-heading text-sm font-bold text-[#7BB38F] outline-none focus:border-[#6BA37E]"
             />
           </div>
         </div>
+        {fieldError && <p id="onboarding-error" className="onboarding-error" role="alert">{fieldError.message}</p>}
       </div>
 
       {/* Primary Goal Selection */}
@@ -221,6 +270,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             return (
               <PressScale
                 key={gKey}
+                ariaPressed={isSelected}
                 onClick={() => setGoal(gKey)}
                 className={`flex items-center justify-between rounded-2xl border p-3 transition ${
                   isSelected
@@ -262,6 +312,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             return (
               <PressScale
                 key={aKey}
+                ariaPressed={isSelected}
                 onClick={() => setActivityLevel(aKey)}
                 className={`flex items-center justify-between rounded-2xl border p-3 transition ${
                   isSelected
@@ -293,14 +344,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
         </div>
       </div>
 
-      <PressScale scaleDown={0.97} onClick={handleSave}>
-        <button
-          type="button"
-          className="w-full rounded-2xl bg-[#528B67] hover:bg-[#5E9A74] py-3.5 font-heading text-sm font-bold text-[#F4F1EA] shadow-lg"
-        >
-          Save Targets & Open Dashboard
-        </button>
-      </PressScale>
     </div>
+    <EntryActionBar>
+      <button type="button" onClick={handleSave} className="entry-action-button">
+        Complete profile & continue <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </EntryActionBar>
+    </>
   );
 };

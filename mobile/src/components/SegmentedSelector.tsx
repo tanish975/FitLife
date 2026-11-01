@@ -53,7 +53,7 @@ export function SegmentedSelector<T extends string>({
           >
             <div
               data-fitlife-theme-choice={themePreview ? opt.value : undefined}
-              className={`relative flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl font-medium transition-all duration-300 ${
+              className={`relative flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl font-medium transition-colors duration-150 ${
                 size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-3.5 py-2 text-xs sm:text-sm'
               } ${
                 isActive

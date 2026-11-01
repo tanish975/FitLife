@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fitlife-fitness-v6';
+const CACHE_NAME = 'fitlife-fitness-v7';
 const CORE = ['./', './index.html', './icon.svg', './icon-192.png', './icon-512.png', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

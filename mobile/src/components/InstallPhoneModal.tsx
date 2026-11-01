@@ -59,7 +59,7 @@ export const InstallPhoneModal: React.FC<InstallPhoneModalProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#0E120F]/80 p-0 sm:p-4 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#0E120F]/80 p-0 sm:p-4 animate-fade-in"
     >
       <div
         role="dialog"

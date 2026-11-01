@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { CelebrationPayload } from '../data/FitLifeStore';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
@@ -15,103 +16,75 @@ interface Particle {
   radius: number;
   color: string;
   alpha: number;
-  rotation: number;
-  vRot: number;
 }
 
-// Natural botanical & earthy confetti tones
 const COLORS = ['#6BA37E', '#C47451', '#C89643', '#D8C39E', '#87B5AD', '#F4F1EA'];
 
-/**
- * CelebrationOverlay — Canvas particle burst when a badge unlocks, fired from a
- * one-shot flow; auto-dismisses so it's never something to tap through.
- */
-export const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
-  celebration,
-  onDismiss,
-}) => {
+/** A small, non-blocking achievement notice. It never captures the entire
+ * screen, so a celebration cannot interrupt taps or vertical scrolling. */
+export const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({ celebration, onDismiss }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!celebration) return;
+    const timer = window.setTimeout(() => dismissRef.current(), 2400);
+    if (reducedMotion) return () => window.clearTimeout(timer);
 
-    const timer = setTimeout(() => {
-      onDismiss();
-    }, 3200);
-
-    if (reducedMotion) return () => clearTimeout(timer);
     const canvas = canvasRef.current;
-    if (!canvas) return () => clearTimeout(timer);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return () => clearTimeout(timer);
-
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return () => window.clearTimeout(timer);
     const width = (canvas.width = window.innerWidth);
     const height = (canvas.height = window.innerHeight);
-
-    const particles: Particle[] = Array.from({ length: 85 }).map(() => {
+    const particles: Particle[] = Array.from({ length: 24 }, () => {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 3 + Math.random() * 9;
+      const speed = 2 + Math.random() * 5;
       return {
         x: width / 2,
-        y: height * 0.35,
+        y: Math.min(height * 0.2, 110),
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 3,
-        radius: 3 + Math.random() * 5,
+        vy: Math.sin(angle) * speed - 2,
+        radius: 2 + Math.random() * 3,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
         alpha: 1,
-        rotation: Math.random() * Math.PI,
-        vRot: (Math.random() - 0.5) * 0.2,
       };
     });
-
     let rafId = 0;
-    const animate = () => {
+    const start = performance.now();
+    const animate = (now: number) => {
       ctx.clearRect(0, 0, width, height);
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.18;
-        p.vx *= 0.985;
-        p.alpha = Math.max(0, p.alpha - 0.011);
-        p.rotation += p.vRot;
-
-        ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.radius, -p.radius * 0.6, p.radius * 2, p.radius * 1.2);
-        ctx.restore();
+      for (const particle of particles) {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.vy += 0.12;
+        particle.alpha = Math.max(0, particle.alpha - 0.02);
+        ctx.globalAlpha = particle.alpha;
+        ctx.fillStyle = particle.color;
+        ctx.fillRect(particle.x, particle.y, particle.radius * 2, particle.radius);
       }
-      rafId = requestAnimationFrame(animate);
+      ctx.globalAlpha = 1;
+      // Stop drawing once the brief burst is over, even if the notice remains.
+      if (now - start < 1000 && !document.hidden) rafId = window.requestAnimationFrame(animate);
+      else ctx.clearRect(0, 0, width, height);
     };
-
-    rafId = requestAnimationFrame(animate);
-    return () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(rafId);
-    };
-  }, [celebration, onDismiss, reducedMotion]);
+    rafId = window.requestAnimationFrame(animate);
+    return () => { window.clearTimeout(timer); window.cancelAnimationFrame(rafId); };
+  }, [celebration, reducedMotion]);
 
   if (!celebration) return null;
-
   return (
-    <div
-      onClick={onDismiss}
-      className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0E120F]/75 backdrop-blur-sm animate-fade-in"
-    >
-      <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-      <div className="relative z-10 mx-6 max-w-xs rounded-[28px] border border-[#497A5B] bg-[#1E2520] p-6 text-center shadow-2xl animate-pop-spring">
-        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#25382B] border border-[#497A5B] text-3xl">
-          {celebration.icon}
+    <div className="celebration-layer">
+      {!reducedMotion && <canvas ref={canvasRef} className="celebration-canvas" aria-hidden="true" />}
+      <div className="celebration-banner" role="status" aria-live="polite" onClick={onDismiss}>
+        <span className="celebration-icon" aria-hidden="true">{celebration.icon}</span>
+        <div className="celebration-copy">
+          <span>Achievement Unlocked</span>
+          <strong>{celebration.title}</strong>
+          <small>{celebration.subtitle}</small>
         </div>
-        <div className="inline-block rounded-full bg-[#25382B] px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
-          Achievement Unlocked
-        </div>
-        <h3 className="mt-2 font-heading text-lg font-bold text-[#F4F1EA]">{celebration.title}</h3>
-        <p className="mt-1 text-xs leading-relaxed text-[#B8B5AD]">{celebration.subtitle}</p>
-        <p className="mt-3 text-[10px] text-[#84877F]">Auto-dismissing...</p>
+        <button type="button" aria-label="Dismiss achievement" onClick={(event) => { event.stopPropagation(); onDismiss(); }}><X size={17} /></button>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Mail, ShieldCheck, User } from 'lucide-react'
 import { useFitLife } from '../data/FitLifeStore';
 import { PressScale } from '../components/PressScale';
 import { SegmentedSelector } from '../components/SegmentedSelector';
+import { EntryActionBar } from '../components/EntryActionBar';
 
 interface AuthScreenProps {
   onCompleteAuth: (isNewSignup: boolean) => void;
@@ -36,7 +37,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
   };
 
   return (
-    <div className="flex min-h-full flex-col justify-between px-5 py-7 animate-screen-enter">
+    <>
+    <div className="auth-entry-content flex min-h-full flex-col justify-between px-5 py-7">
       {/* Brand Header */}
       <div className="text-center pt-3">
         <div className="mx-auto mb-4 relative flex h-20 w-20 items-center justify-center rounded-[24px] bg-[#213026] border border-[#3E634B] shadow-xl overflow-hidden">
@@ -74,7 +76,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
           }}
         />
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
+        <form id="fitlife-auth-form" onSubmit={handleSubmit} className="mt-4 space-y-3.5">
           {mode === 'signup' && (
             <div>
               <label htmlFor="auth-name" className="mb-1 block text-xs font-medium text-[#B8B5AD]">Full Name</label>
@@ -115,15 +117,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
             </p>
           )}
 
-          <PressScale scaleDown={0.97}>
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#528B67] hover:bg-[#5E9A74] py-3 text-sm font-bold text-[#F4F1EA] shadow-md"
-            >
-              <span>{mode === 'signin' ? 'Continue to FitLife' : 'Continue to Onboarding'}</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </PressScale>
         </form>
 
         <div className="my-3.5 flex items-center gap-3">
@@ -152,5 +145,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onCompleteAuth }) => {
         </span>
       </div>
     </div>
+    <EntryActionBar>
+      <button type="submit" form="fitlife-auth-form" className="entry-action-button">
+        <span>{mode === 'signin' ? 'Continue to FitLife' : 'Continue to Onboarding'}</span>
+        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </EntryActionBar>
+    </>
   );
 };

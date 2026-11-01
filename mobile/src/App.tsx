@@ -16,6 +16,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { triggerHaptic } from './domain/Haptics';
+import { useMediaQuery } from './hooks/useMediaQuery';
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -32,6 +33,8 @@ const FitLifeShell: React.FC = () => {
   const [subScreen, setSubScreen] = useState<'none' | 'settings' | 'onboarding' | 'daily'>('none');
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<InstallPromptEvent | null>(null);
+  const showDesktopNavigation = useMediaQuery('(min-width: 651px)');
+  const showWellnessSidebar = useMediaQuery('(min-width: 1151px)');
 
   useEffect(() => {
     const timer = window.setTimeout(() => setShowSplash(false), 550);
@@ -89,9 +92,9 @@ const FitLifeShell: React.FC = () => {
   const showNavigation = !showSplash && isAuthenticated && profile.onboarded && subScreen !== 'onboarding';
   return (
     <div className={showNavigation ? 'app-shell' : 'app-entry-shell'}>
-      {showNavigation && <DesktopNavigation activeTab={activeTab} onSelectTab={handleSelectTab} onOpenDaily={openDaily} onOpenSettings={openSettings} onOpenInstall={() => setIsInstallOpen(true)} />}
+      {showNavigation && showDesktopNavigation && <DesktopNavigation activeTab={activeTab} onSelectTab={handleSelectTab} onOpenDaily={openDaily} onOpenSettings={openSettings} onOpenInstall={() => setIsInstallOpen(true)} />}
       <main className="app-main" id="main-content">{renderScreen()}</main>
-      {showNavigation && <WellnessSidebar onOpenDaily={openDaily} onSelectTab={handleSelectTab} />}
+      {showNavigation && showWellnessSidebar && <WellnessSidebar onOpenDaily={openDaily} onSelectTab={handleSelectTab} />}
       {showNavigation && <GlassBottomNav activeTab={activeTab} onSelectTab={handleSelectTab} />}
       {toastMessage && <div className="app-toast" role="status">{toastMessage}</div>}
       <CelebrationOverlay celebration={celebration} onDismiss={dismissCelebration} />

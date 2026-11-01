@@ -28,7 +28,9 @@ export const AnimatedRing: React.FC<AnimatedRingProps> = ({
   const { themeColors, settings } = useFitLife();
   const reducedMotion = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const currentProgressRef = useRef<number>(0);
+  // Draw the current value immediately on first mount; animate only actual
+  // changes, rather than running five canvas animations every time Home opens.
+  const currentProgressRef = useRef<number>(Math.max(0, Math.min(1, progress)));
 
   const resolvedStroke = startColor || themeColors.accentPrimary;
   const resolvedTrack = trackColor || themeColors.ringTrack;
@@ -39,9 +41,11 @@ export const AnimatedRing: React.FC<AnimatedRingProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
+    // Capping the backing resolution avoids large 3x/4x canvas redraws on
+    // phones while remaining crisp at the ring's small display size.
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
 
     const startVal = currentProgressRef.current;
     const targetVal = Math.max(0, Math.min(1, progress));
@@ -80,7 +84,7 @@ export const AnimatedRing: React.FC<AnimatedRingProps> = ({
       ctx.restore();
     };
 
-    if (reducedMotion) {
+    if (reducedMotion || Math.abs(targetVal - startVal) < 0.001) {
       currentProgressRef.current = targetVal;
       render(targetVal);
       return;

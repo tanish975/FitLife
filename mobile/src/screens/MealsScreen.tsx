@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, Search, Sparkles, Trash2, Utensils, X } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
 import { FOOD_CATALOG } from '../data/FoodCatalog';
@@ -6,28 +6,20 @@ import { MealCategory } from '../data/types';
 import { parseMealFreeText } from '../domain/MealTextParser';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
-import { Shimmer } from '../components/Shimmer';
 import { EmptyState } from '../components/EmptyState';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 
 const CATEGORIES: MealCategory[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const CATALOG_PAGE_SIZE = 10;
 
 export const MealsScreen: React.FC = () => {
   const { todayMeals, macroTargets, logFoodItem, logQuickAddMeals, removeMeal } = useFitLife();
   const [selectedCategory, setSelectedCategory] = useState<MealCategory>('Breakfast');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(CATALOG_PAGE_SIZE);
   const [quickAddText, setQuickAddText] = useState('');
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setIsSearching(false);
-      return;
-    }
-    setIsSearching(true);
-    const t = setTimeout(() => setIsSearching(false), 320);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+  const updateSearch = (value: string) => { setSearchQuery(value); setVisibleCount(CATALOG_PAGE_SIZE); };
+  const updateCategory = (value: MealCategory) => { setSelectedCategory(value); setVisibleCount(CATALOG_PAGE_SIZE); };
 
   const parsedQuickDrafts = useMemo(
     () => parseMealFreeText(quickAddText, selectedCategory),
@@ -103,7 +95,7 @@ export const MealsScreen: React.FC = () => {
           badge: categoryCounts[c] > 0 ? categoryCounts[c] : undefined,
         }))}
         selected={selectedCategory}
-        onChange={setSelectedCategory}
+        onChange={updateCategory}
       />
 
       {/* Quick-Add Natural Text Parser Card */}
@@ -179,13 +171,13 @@ export const MealsScreen: React.FC = () => {
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => updateSearch(e.target.value)}
           placeholder="Search 32+ foods (oats, paneer, chicken, idli, salmon...)"
           className="w-full rounded-2xl border border-[#2F3A33] bg-[#1E2520] py-2.5 pl-10 pr-9 text-xs text-[#F4F1EA] outline-none placeholder:text-[#636961] focus:border-[#6BA37E]"
         />
         {searchQuery && (
           <button
-            onClick={() => setSearchQuery('')}
+            onClick={() => updateSearch('')}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[#84877F] hover:text-[#F4F1EA]"
           >
             <X className="h-4 w-4" />
@@ -193,7 +185,7 @@ export const MealsScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Food Search Results or Shimmer Skeleton */}
+      {/* Food results update immediately; the page itself is the only vertical scroller. */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <h2 className="font-heading text-xs font-semibold uppercase tracking-wider text-[#84877F]">
@@ -202,9 +194,7 @@ export const MealsScreen: React.FC = () => {
           <span className="text-[11px] text-[#7BB38F]">Tap item to log →</span>
         </div>
 
-        {isSearching ? (
-          <Shimmer count={4} />
-        ) : filteredCatalog.length === 0 ? (
+        {filteredCatalog.length === 0 ? (
           <EmptyState
             title="No Matching Foods Found"
             subtitle={`Use the Quick Add box above to log "${searchQuery}" with a clearly labelled generic nutrition estimate.`}
@@ -212,12 +202,13 @@ export const MealsScreen: React.FC = () => {
             onAction={() => {
               const drafts = parseMealFreeText(searchQuery, selectedCategory);
               logQuickAddMeals(drafts);
-              setSearchQuery('');
+              updateSearch('');
             }}
           />
         ) : (
-          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-0.5">
-            {filteredCatalog.map((item) => (
+          <div>
+          <div className="space-y-2 pr-0.5" data-testid="food-catalog-list">
+            {filteredCatalog.slice(0, visibleCount).map((item) => (
               <PressScale
                 key={item.id}
                 onClick={() => logFoodItem(item, selectedCategory)}
@@ -253,6 +244,13 @@ export const MealsScreen: React.FC = () => {
                 </div>
               </PressScale>
             ))}
+          </div>
+          <p className="catalog-count" aria-live="polite">Showing {Math.min(visibleCount, filteredCatalog.length)} of {filteredCatalog.length} foods</p>
+          {visibleCount < filteredCatalog.length && (
+            <button type="button" className="catalog-more" onClick={() => setVisibleCount((count) => count + CATALOG_PAGE_SIZE)}>
+              Show more foods ({filteredCatalog.length - visibleCount} remaining)
+            </button>
+          )}
           </div>
         )}
       </div>

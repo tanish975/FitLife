@@ -9,12 +9,13 @@
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "typecheck": "tsc --noEmit",
     "build:standalone": "npm run build && node scripts/build-standalone.mjs",
-    "test:qa": "node qa/test.mjs",
+    "test:qa": "node qa/test.mjs && npm run test:mobile",
     "test:offline": "node qa/offline.mjs",
     "test:theme": "node qa/theme-reveal.mjs",
     "test:standalone": "node qa/standalone.mjs",
     "test:updates": "node qa/updates.mjs",
-    "test:native": "bash android/tests/run.sh"
+    "test:native": "bash android/tests/run.sh",
+    "test:mobile": "node qa/mobile.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
