@@ -172,27 +172,31 @@ try {
   assert.equal(await nav.locator('.is-active .mobile-nav-icon').evaluate(el => getComputedStyle(el).animationName), 'none');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
-  // Exact 15–35 BMI scale on the first render of every Progress visit.
-  // Prevent an already-scheduled mock cloud merge from overwriting the
-  // deliberately injected profile between storage setup and reload.
-  await page.evaluate(() => localStorage.setItem('__fixture_offline','1'));
-  await page.waitForTimeout(2000);
+  // Check each BMI on the first Progress render in a fresh, explicitly seeded
+  // account. This is a visual fixture, not a data-persistence test: changing
+  // localStorage in a running app races its own account/cloud persistence.
+  // Isolated contexts also avoid Chromium's intermittent file: reload storage
+  // loss from silently replacing the intended profile with the legacy fixture.
   for (const bmi of [12,15,18.5,25,30,35,39]) {
-    await page.evaluate(value => {
-      const profile = JSON.parse(localStorage.getItem('fitlife_profile_v1')); profile.age = 30; profile.heightCm = 170;
-      profile.weightKg = Number((value * 1.7 * 1.7).toFixed(3));
-      localStorage.setItem('fitlife_profile_v1', JSON.stringify(profile)); localStorage.setItem('fitlife_weights_v1', '[]');
-      const owner=localStorage.getItem('fitlife_cloud_owner_v1');
-      const key=`fitlife_cloud_partition_v1:${owner}`; const partition=JSON.parse(localStorage.getItem(key));
-      partition.snapshot.profile=profile; partition.snapshot.weights=[]; localStorage.setItem(key,JSON.stringify(partition));
-      localStorage.removeItem('__fixture_cloud');
-    }, bmi);
-    await page.reload({ waitUntil: 'domcontentloaded' }); await page.getByText("Today's overview").waitFor();
-    await clickTab('Progress');
-    const marker = page.getByTestId('bmi-marker'); await marker.waitFor();
-    const result = await marker.evaluate(el => ({ left: parseFloat(el.style.left), transition: getComputedStyle(el).transitionProperty, duration: getComputedStyle(el).transitionDuration }));
-    assert(Math.abs(result.left - Math.max(0, Math.min(100, (bmi - 15) / 20 * 100))) < .03, `BMI ${bmi} marker: ${JSON.stringify(result)}`);
-    assert.equal(parseFloat(result.duration), 0, 'BMI marker must not transition from a stale position');
+    const bmiContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+    try {
+      const bmiPage = await bmiContext.newPage();
+      bmiPage.on('pageerror', error => errors.push(error.message));
+      const profile = { name:'Tanish Patel', email:'tanish@fitlife.app', sex:'male', age:30, heightCm:170,
+        weightKg:Number((bmi * 1.7 * 1.7).toFixed(3)), goal:'lose_weight', activityLevel:'moderate', onboarded:true, uid:'qa-legacy' };
+      await installNativeFixture(bmiPage, { demoProfile:profile, emptyWeights:true });
+      await bmiPage.goto(base, { waitUntil: 'domcontentloaded' });
+      await bmiPage.getByText("Today's overview").waitFor();
+      const saved = await bmiPage.evaluate(() => ({ profile:JSON.parse(localStorage.getItem('fitlife_profile_v1') || '{}'), weights:JSON.parse(localStorage.getItem('fitlife_weights_v1') || '[]') }));
+      assert.equal(saved.profile.heightCm, 170, `BMI ${bmi} fixture height`);
+      assert.equal(saved.profile.weightKg, profile.weightKg, `BMI ${bmi} fixture weight`);
+      assert.equal(saved.weights.length, 0, `BMI ${bmi} fixture has no weight history`);
+      await bmiPage.getByRole('navigation', { name:'Main navigation' }).getByRole('button', { name:'Progress', exact:true }).click();
+      const marker = bmiPage.getByTestId('bmi-marker'); await marker.waitFor();
+      const result = await marker.evaluate(el => ({ left: parseFloat(el.style.left), transition: getComputedStyle(el).transitionProperty, duration: getComputedStyle(el).transitionDuration }));
+      assert(Math.abs(result.left - Math.max(0, Math.min(100, (bmi - 15) / 20 * 100))) < .03, `BMI ${bmi} marker: ${JSON.stringify(result)}`);
+      assert.equal(parseFloat(result.duration), 0, 'BMI marker must not transition from a stale position');
+    } finally { await bmiContext.close(); }
   }
   const native = await readFile('android/src/com/tanish/fitlife/MainActivity.java', 'utf8');
   assert.match(native, /evaluateJavascript\(.*__fitlifeHandleBack/); assert.doesNotMatch(native, /canGoBack\(\)/);

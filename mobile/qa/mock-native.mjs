@@ -23,7 +23,11 @@ export async function installNativeFixture(page, options = {}) {
       if (opts.demo) {
         // A genuine legacy fixture is deliberately different from the untouched
         // sample profile, so first-claim migration preserves the test history.
-        localStorage.setItem('fitlife_profile_v1', JSON.stringify({ name:'Tanish Patel', email:'tanish@fitlife.app', sex:'male', age:24, heightCm:176, weightKg:73.4, goal:'lose_weight', activityLevel:'moderate', onboarded:true, uid:'qa-legacy' }));
+        const profile = opts.demoProfile || { name:'Tanish Patel', email:'tanish@fitlife.app', sex:'male', age:24, heightCm:176, weightKg:73.4, goal:'lose_weight', activityLevel:'moderate', onboarded:true, uid:'qa-legacy' };
+        localStorage.setItem('fitlife_profile_v1', JSON.stringify(profile));
+        // Visual tests may intentionally begin with a known profile and no
+        // weight history. This seeds a new fixture, not an app-data restore.
+        if (opts.emptyWeights) localStorage.setItem('fitlife_weights_v1', '[]');
         const settings = JSON.parse(localStorage.getItem('fitlife_settings_v2') || '{}');
         localStorage.setItem('fitlife_settings_v2', JSON.stringify({ ...settings, guidesSeen: ids }));
       }
