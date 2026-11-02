@@ -88,7 +88,7 @@ export const WellnessSidebar: React.FC<Pick<SidebarProps, 'onOpenDaily' | 'onSel
         <section className="aside-water">
           <span className="aside-water-icon"><Droplets size={19} /></span>
           <div><strong>Stay hydrated</strong><small>{(waterTodayMl / 1000).toFixed(2).replace(/0$/, '')} / {(settings.waterGoalMl / 1000).toFixed(1)} L today</small></div>
-          <button onClick={() => addWaterMl(250)} aria-label="Add 250 milliliters of water"><Plus size={16} /></button>
+          <button onClick={() => addWaterMl(250)} aria-label="Add 250 ml of water"><Plus size={16} /></button>
         </section>
       )}
       <div className="aside-quick-title"><span>QUICK ACTIONS</span><span>✳</span></div>

@@ -51,22 +51,25 @@ try {
   await page.screenshot({ path: 'qa/fitness-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
 
-  await click('Add 250 milliliters of water');
+  await click('Add 250 ml of water');
   assert.equal((await storage('fitlife_water_v1')).amountMl, 250);
   await page.reload({ waitUntil: 'networkidle' }); await waitText("Today's overview");
   assert.equal((await storage('fitlife_water_v1')).amountMl, 250, 'hydration persists');
   await click('Remove 250 milliliters of water');
   assert.equal((await storage('fitlife_water_v1')).amountMl, 0);
+  await page.locator('summary').filter({hasText:'Check-in & activity'}).click();
   await click('Tired');
   assert.equal(await page.getByRole('button', { name: 'Tired', exact: true }).getAttribute('aria-pressed'), 'true');
   await waitText('Make room for recovery');
   assert.ok(await page.getByText('rule-based', { exact: false }).count() > 0);
   await closeCelebration();
 
+  await page.locator('summary').filter({hasText:'Workout ideas'}).click();
   await page.getByRole('button', { name: /Upper body/ }).click();
   await waitText('SHOULDERS EXERCISES');
   assert.equal(await page.getByRole('button', { name: 'Shoulders', exact: true }).getAttribute('aria-pressed'), 'true');
   await click('Home');
+  await page.locator('summary').filter({hasText:'Workout ideas'}).click();
   await page.getByRole('button', { name: /Lower body/ }).click();
   await waitText('LEGS EXERCISES');
   assert.equal(await page.getByRole('button', { name: 'Legs', exact: true }).getAttribute('aria-pressed'), 'true');
@@ -80,7 +83,7 @@ try {
   await page.waitForTimeout(450); await closeCelebration();
   assert.ok((await storage('fitlife_workouts_v1')).some(w => w.exerciseName === 'Barbell Back Squat' && w.id.startsWith('wk-')), 'workout saved locally');
 
-  await click('Meals'); await waitText('Meals & Nutrition');
+  await click('Meals'); await page.getByRole('heading', { name:'Meals', exact:true }).waitFor();
   const quickMeal = page.getByPlaceholder('Try "2 eggs and a banana" or "150g chicken & rice"');
   assert.equal(await quickMeal.evaluate(e => getComputedStyle(e).fontSize), '16px', 'mobile input is at least 16px');
   await quickMeal.fill('150g grilled chicken and 2 eggs');
@@ -109,7 +112,8 @@ try {
   await waitText('Daily Pulse'); await waitText('not your health');
   await click('Back to home');
 
-  await click('Open settings'); await waitText('Studio & Customization');
+  await click('Open settings'); await page.getByRole('heading',{name:'Settings',exact:true}).waitFor();
+  await page.locator('.settings-fold > summary').filter({hasText:'Appearance'}).click();
   const palettes = [
     ['Matcha & Oat', 'matcha_oat'], ['Coastal Eucalyptus', 'coastal_eucalyptus'],
     ['Terracotta & Olive', 'terracotta_olive'], ['Nordic Fjord & Birch', 'nordic_fjord'], ['Kyoto Cedar & Moss', 'kyoto_cedar'],
@@ -124,6 +128,9 @@ try {
   assert.equal(accentValues.size, 5, 'five distinct natural palettes');
   await click('Nightfall');
   assert.equal(await page.getByText('Shape, Density & Motion Feel', { exact: true }).count(), 0);
+  await page.locator('.settings-fold > summary').filter({hasText:'Goals & rest'}).click();
+  await page.locator('.settings-fold > summary').filter({hasText:'Units & haptics'}).click();
+  await page.locator('.settings-fold > summary').filter({hasText:'Home cards'}).click();
   await click('4.0L'); await click('90s'); await click('Pounds (lb)');
   await page.getByRole('switch', { name: 'Haptic feedback' }).click();
   for (const widget of ['4 Macro Rings Card', 'Daily Hydration Tracker', '11-State Mood Check-In', 'Daily guidance', 'Today’s Activity Feed']) {
@@ -143,6 +150,7 @@ try {
   await page.screenshot({ path: 'qa/fitness-night.png' });
 
   await click('Open settings');
+  await page.locator('.settings-fold > summary').filter({hasText:'Home cards'}).click();
   for (const widget of ['4 Macro Rings Card', 'Daily Hydration Tracker', '11-State Mood Check-In', 'Daily guidance', 'Today’s Activity Feed']) await page.getByRole('switch', { name: widget }).click();
   assert.equal(await page.getByText('Install FitLife on Your Phone', { exact: true }).count(), 0);
   await click('Profile');
@@ -153,7 +161,7 @@ try {
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('dialog').count(), 0, 'install dialog closes with Escape');
   await click('Home');
-  await click('Add 250 milliliters of water');
+  await click('Add 250 ml of water');
   assert.equal((await storage('fitlife_water_v1')).amountMl, 250);
   assert.equal(await page.getByRole('progressbar', { name: 'Water towards daily goal' }).getAttribute('aria-valuemax'), '4000');
   await click('Workouts');
@@ -163,13 +171,14 @@ try {
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('dialog').count(), 0, 'workout dialog closes with Escape');
   await click('Home'); await click('Open settings');
-  await click('Clear All Logs');
+  await page.locator('.settings-fold > summary').filter({hasText:'Data controls'}).click();
+  await click('Clear activity logs');
   assert.ok((await storage('fitlife_meals_v1')).length > 0, 'clearing requires confirmation');
   await click('Cancel');
   assert.ok((await storage('fitlife_meals_v1')).length > 0, 'cancel preserves logs');
-  await click('Clear All Logs'); await click('Confirm clear logs');
+  await click('Clear activity logs'); await click('Confirm clear logs');
   assert.equal((await storage('fitlife_meals_v1')).length, 0);
-  await click('Back'); await waitText('No activity logged yet');
+  await click('Back'); await page.locator('summary').filter({hasText:'Check-in & activity'}).click(); await waitText('No activity logged yet');
   assert.equal(await page.getByText('Demo data', { exact: true }).count(), 0);
   assert.deepEqual(errors, []);
 

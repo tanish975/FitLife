@@ -18,11 +18,12 @@ if (!js.includes('data:image/jpeg;base64,')) throw new Error('Fitness imagery wa
 const iconSvg = readFileSync(join(root, 'public/icon.svg')).toString('base64');
 const appleIcon = readFileSync(join(root, 'public/icon-192.png')).toString('base64');
 const magicUiLicense = readFileSync(join(root, 'public/licenses/Magic-UI-MIT.txt'), 'utf8');
+const animeLicense = readFileSync(join(root, 'public/licenses/AnimeJS-MIT.txt'), 'utf8');
 html = html.replace(script[0], '').replace(style[0], '')
   .replace(/\s*<link rel="manifest" href="\.\/manifest\.webmanifest"\s*\/>/, '')
   .replace('href="./icon.svg"', `href="data:image/svg+xml;base64,${iconSvg}"`)
   .replace('href="./icon-192.png"', `href="data:image/png;base64,${appleIcon}"`)
-  .replace('</head>', () => `<!-- Magic UI animated theme transition attribution:\n${magicUiLicense}\n-->\n<style>\n${css}\n</style>\n</head>`)
+  .replace('</head>', () => `<!-- Magic UI animated theme transition attribution:\n${magicUiLicense}\n-->\n<!-- Anime.js animation engine attribution:\n${animeLicense}\n-->\n<style>\n${css}\n</style>\n</head>`)
   .replace('</body>', () => `<script>${inlineScript}</script>\n</body>`)
   .replace("script-src 'self'", `script-src 'self' 'sha256-${scriptHash}'`);
 const output = resolve(root, '../FitLife-App.html');

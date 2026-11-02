@@ -8,7 +8,7 @@ try {
   const page=await browser.newPage({viewport:{width,height},isMobile:width<700,hasTouch:width<700});
   await installNativeFixture(page);
   await page.goto(base,{waitUntil:'networkidle'}); await page.getByText("Today's overview").waitFor();
-  await page.getByRole('button',{name:'Workouts',exact:true}).click(); await page.getByText('Rest timer').waitFor(); await page.waitForTimeout(450);
+  await page.getByRole('button',{name:'Workouts',exact:true}).click(); await page.locator('.training-disclosure > summary').filter({hasText:'Rest timer'}).click(); await page.waitForTimeout(450);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`workout overflows at ${width}x${height}`);
   const controls=page.getByRole('region',{name:'Rest timer'}).getByRole('button');
   for(let i=0;i<await controls.count();i++){const b=await controls.nth(i).boundingBox();assert(b.width>=44 && b.height>=44,`timer touch target too small at ${width}x${height}`);}

@@ -24,7 +24,7 @@ try {
   const fileErrors=[]; filePage.on('pageerror',e=>fileErrors.push(e.message));
   await filePage.goto(nativeApp); await filePage.getByText("Today's overview").waitFor();
   await filePage.evaluate(()=>localStorage.setItem('__fixture_offline','1'));
-  await filePage.getByRole('button',{name:'Add 250 milliliters of water'}).click();
+  await filePage.getByRole('button',{name:'Add 250 ml of water'}).click();
   await filePage.reload(); await filePage.getByText("Today's overview").waitFor();
   assert.equal(await filePage.getByRole('progressbar',{name:'Water towards daily goal'}).getAttribute('aria-valuenow'),'250');
   assert.equal(await filePage.locator('.home-training-feature img').evaluate(img=>img.complete && img.naturalWidth>0),true);

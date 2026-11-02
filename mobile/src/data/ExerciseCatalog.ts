@@ -526,6 +526,7 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
   },
 
   // Additional practical home, gym, and low-impact choices.
+  { id: "ex-wall-pushup", name: "Wall Push-Up", muscleGroup: "Chest", secondaryMuscles: "Chest, Triceps, Shoulders", equipment: "Wall", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 5, tip: "Place palms on a sturdy wall, keep your body aligned and bend elbows gently." },
   { id: "ex-incline-pushup", name: "Incline Push-Up", muscleGroup: "Chest", secondaryMuscles: "Chest, Triceps, Core", equipment: "Sturdy Bench", difficulty: "Beginner", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 8, tip: "Use a stable support; keep your body in one line and lower with control." },
   { id: "ex-db-floor-press", name: "Dumbbell Floor Press", muscleGroup: "Chest", secondaryMuscles: "Chest, Triceps, Front Delts", equipment: "Dumbbells", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 11, tip: "Keep wrists stacked and gently touch upper arms to the floor before pressing." },
   { id: "ex-band-pull-apart", name: "Resistance Band Pull-Apart", muscleGroup: "Back", secondaryMuscles: "Upper Back, Rear Delts", equipment: "Resistance Band", difficulty: "Beginner", isBodyweight: false, defaultWeightKg: 0, caloriesPerSet: 7, tip: "Keep ribs relaxed and pull the band apart without shrugging your shoulders." },

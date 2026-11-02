@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const original=readFileSync(resolve('../FitLife-App.html'),'utf8');
-assert.match(original,/Copyright \(c\) Magic UI/,'standalone retains the third-party MIT notice');
+assert.match(original,/Copyright \(c\) Magic UI/,'standalone retains the Magic UI MIT notice');
+assert.match(original,/Copyright \(c\) 2025 Julian Garnier/,'standalone retains the Anime.js MIT notice');
 const errors=[];
 try {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});

@@ -57,7 +57,7 @@ export function SegmentedSelector<T extends string>({
                 size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-3.5 py-2 text-xs sm:text-sm'
               } ${
                 isActive
-                  ? 'bg-[#528B67] text-[#F4F1EA] font-semibold shadow-sm scale-[1.02]'
+                  ? 'font-semibold shadow-sm scale-[1.02]'
                   : scrollable
                   ? 'border border-[#2F3A33] bg-[#1E2520] text-[#B8B5AD] hover:text-[#F4F1EA]'
                   : 'text-[#84877F] hover:text-[#F4F1EA]'
@@ -70,7 +70,7 @@ export function SegmentedSelector<T extends string>({
               <span className="truncate">{opt.label}</span>
               {opt.badge !== undefined && (
                 <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                  className={`rounded-full px-1.5 py-0.5 text-[0.625rem] font-bold leading-none ${
                     isActive ? 'bg-[#151A17]/35 text-[#F4F1EA]' : 'bg-[#2A332D] text-[#B8B5AD]'
                   }`}
                 >

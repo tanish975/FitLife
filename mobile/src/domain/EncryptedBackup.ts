@@ -1,4 +1,5 @@
 import { AppSettings, GUIDE_IDS, LoggedMeal, LoggedWorkout, MoodEntry, UserProfile, WeightEntry } from '../data/types';
+import { validPersonalSettings } from './PersonalFeatures';
 
 /** A local encrypted export. This is not cloud sync or an account. */
 export interface BackupSnapshot {
@@ -50,10 +51,12 @@ export function validSnapshot(value: unknown): value is BackupSnapshot {
   if (!oneOf(s.weightUnit, ['kg','lb']) || typeof s.hapticsEnabled !== 'boolean' || !oneOf(s.themeMode, ['light','dark']) || !oneOf(s.paletteId, ['matcha_oat','coastal_eucalyptus','terracotta_olive','nordic_fjord','kyoto_cedar']) || !oneOf(s.cornerStyle, ['sharp','organic','pebble']) || !oneOf(s.motionStyle, ['spring','gentle','reduced']) || !oneOf(s.densityStyle, ['compact','comfortable','spacious']) || !finite(s.defaultRestSeconds) || s.defaultRestSeconds < 1 || s.defaultRestSeconds > 3600 || !finite(s.waterGoalMl) || s.waterGoalMl < 0 || s.waterGoalMl > 8000 || !isRecord(s.dashboardWidgets) || !['showMacros','showHydration','showMood','showAiCoach','showActivityFeed'].every(key => typeof s.dashboardWidgets[key] === 'boolean')) return false;
   // New preferences are optional in older exports; normalize them before loading.
   if (s.autoStartRest !== undefined && typeof s.autoStartRest !== 'boolean') return false;
+  if (s.largeText !== undefined && typeof s.largeText !== 'boolean') return false;
   if (s.weeklyWorkoutGoal !== undefined && (!finite(s.weeklyWorkoutGoal) || s.weeklyWorkoutGoal < 1 || s.weeklyWorkoutGoal > 7)) return false;
   if (s.navStyle !== undefined && !oneOf(s.navStyle, ['glass','solid'])) return false;
   if (s.favoriteExerciseIds !== undefined && (!Array.isArray(s.favoriteExerciseIds) || s.favoriteExerciseIds.length > 500 || !s.favoriteExerciseIds.every((id: unknown) => str(id, 200)))) return false;
   if (s.guidesSeen !== undefined && (!Array.isArray(s.guidesSeen) || s.guidesSeen.length > GUIDE_IDS.length || !s.guidesSeen.every((id: unknown) => oneOf(id, [...GUIDE_IDS])) || new Set(s.guidesSeen).size !== s.guidesSeen.length)) return false;
+  if (!validPersonalSettings(s)) return false;
   if (!dateKey(w.dateKey) || !finite(w.amountMl) || w.amountMl < 0 || w.amountMl > 8000) return false;
   const arrays = [value.meals, value.workouts, value.weights, value.moods];
   if (!arrays.every(a => Array.isArray(a) && a.length <= MAX_ROWS && a.every(record))) return false;

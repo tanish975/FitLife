@@ -134,7 +134,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             </p>
           </div>
         </div>
-        <span className="rounded-full bg-[#213026] border border-[#3E634B] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
+        <span className="rounded-full bg-[#213026] border border-[#3E634B] px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
           {unit.toUpperCase()} Mode
         </span>
       </div>
@@ -143,14 +143,14 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       {previewReady ? <div className="relative overflow-hidden rounded-[26px] bg-[#213026] p-4 shadow-xl border border-[#3E634B]" data-guide-target="onboarding-preview" aria-label="Estimated targets preview">
         <div className="flex items-center justify-between">
           <div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#7BB38F]">
+            <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-[#7BB38F]">
               <Sparkles className="h-3.5 w-3.5" /> Estimated daily target
             </span>
             <div className="mt-1 flex items-baseline gap-1.5">
               <span className="font-heading text-3xl font-extrabold text-[#F4F1EA]">{Math.round(previewTargets.calories).toLocaleString()}</span>
               <span className="text-xs font-medium text-[#B8B5AD]">kcal / day</span>
             </div>
-            <p className="mt-0.5 text-[11px] text-[#B8B5AD]">
+            <p className="mt-0.5 text-[0.6875rem] text-[#B8B5AD]">
               BMR: <strong>{previewTargets.bmr}</strong> kcal · TDEE: <strong>{previewTargets.tdee}</strong> kcal · BMI:{' '}
               <strong style={{ color: previewBmi.color }}>
                 {previewBmi.bmi} {age < 18 ? '(adult categories do not apply)' : `(${previewBmi.category})`}
@@ -162,28 +162,28 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
           </div>
         </div>
 
-        <p className="mt-2 text-[11px] leading-relaxed text-[#B8B5AD]">{age < 18 ? 'These adult formulas and calorie targets are not appropriate guidance for people under 18. Ask a qualified health professional for individual advice.' : 'Calorie and macro targets are estimates, not medical advice. Individual needs vary; the calculation floor is not a safety guarantee.'}</p>
+        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">{age < 18 ? 'These adult formulas and calorie targets are not appropriate guidance for people under 18. Ask a qualified health professional for individual advice.' : 'Calorie and macro targets are estimates, not medical advice. Individual needs vary; the calculation floor is not a safety guarantee.'}</p>
         <div className="mt-3.5 grid grid-cols-4 gap-2 pt-3 border-t border-[#344A3C] text-center">
           <div className="rounded-xl bg-[#151A17] p-2">
-            <div className="text-[10px] text-[#84877F]">Protein</div>
+            <div className="text-[0.625rem] text-[#84877F]">Protein</div>
             <div className="font-heading text-xs font-bold text-[#7BB38F]">
               {previewTargets.proteinG}g
             </div>
           </div>
           <div className="rounded-xl bg-[#151A17] p-2">
-            <div className="text-[10px] text-[#84877F]">Carbs</div>
+            <div className="text-[0.625rem] text-[#84877F]">Carbs</div>
             <div className="font-heading text-xs font-bold text-[#D8C39E]">
               {previewTargets.carbsG}g
             </div>
           </div>
           <div className="rounded-xl bg-[#151A17] p-2">
-            <div className="text-[10px] text-[#84877F]">Fats</div>
+            <div className="text-[0.625rem] text-[#84877F]">Fats</div>
             <div className="font-heading text-xs font-bold text-[#E0B467]">
               {previewTargets.fatG}g
             </div>
           </div>
           <div className="rounded-xl bg-[#151A17] p-2">
-            <div className="text-[10px] text-[#84877F]">Fiber</div>
+            <div className="text-[0.625rem] text-[#84877F]">Fiber</div>
             <div className="font-heading text-xs font-bold text-[#87B5AD]">
               {previewTargets.fiberG}g
             </div>
@@ -218,7 +218,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
 
         <div className="grid grid-cols-3 gap-2.5">
           <div>
-            <label htmlFor="onboarding-age" className="mb-1 block text-[11px] font-medium text-[#84877F]">Age (yrs)</label>
+            <label htmlFor="onboarding-age" className="mb-1 block text-[0.6875rem] font-medium text-[#84877F]">Age (yrs)</label>
             <input
               id="onboarding-age"
               type="number"
@@ -233,7 +233,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             />
           </div>
           <div>
-            <label htmlFor="onboarding-height" className="mb-1 block text-[11px] font-medium text-[#84877F]">Height (cm)</label>
+            <label htmlFor="onboarding-height" className="mb-1 block text-[0.6875rem] font-medium text-[#84877F]">Height (cm)</label>
             <input
               id="onboarding-height"
               type="number"
@@ -248,7 +248,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             />
           </div>
           <div>
-            <label htmlFor="onboarding-weight" className="mb-1 block text-[11px] font-medium text-[#84877F]">
+            <label htmlFor="onboarding-weight" className="mb-1 block text-[0.6875rem] font-medium text-[#84877F]">
               Weight ({unit})
             </label>
             <input
@@ -289,11 +289,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-heading text-xs font-bold text-[#F4F1EA]">{cfg.label}</span>
-                    <span className="rounded-md bg-[#2A352E] px-1.5 py-0.5 text-[10px] font-semibold text-[#7BB38F]">
+                    <span className="rounded-md bg-[#2A352E] px-1.5 py-0.5 text-[0.625rem] font-semibold text-[#7BB38F]">
                       {cfg.calorieDelta > 0 ? `+${cfg.calorieDelta}` : cfg.calorieDelta} kcal
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-[#84877F]">{cfg.subtitle}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{cfg.subtitle}</p>
                 </div>
                 <div
                   className={`flex h-5 w-5 items-center justify-center rounded-full border ${
@@ -332,11 +332,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-heading text-xs font-bold text-[#F4F1EA]">{item.label}</span>
-                    <span className="rounded-md bg-[#2E2B23] px-1.5 py-0.5 text-[10px] font-semibold text-[#D8C39E]">
+                    <span className="rounded-md bg-[#2E2B23] px-1.5 py-0.5 text-[0.625rem] font-semibold text-[#D8C39E]">
                       ×{item.multiplier}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-[#84877F]">{item.subtitle}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{item.subtitle}</p>
                 </div>
                 <div
                   className={`flex h-5 w-5 items-center justify-center rounded-full border ${

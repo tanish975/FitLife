@@ -92,7 +92,7 @@ export const InstallPhoneModal: React.FC<InstallPhoneModalProps> = ({
         <div className="mt-4 rounded-[22px] bg-[#213026] border border-[#3E634B] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#2B4234] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#2B4234] px-2.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
                 <Sparkles className="h-3 w-3" /> Native Android Package
               </span>
               <h4 className="mt-1.5 font-heading text-sm font-bold text-[#F4F1EA]">
@@ -124,7 +124,7 @@ export const InstallPhoneModal: React.FC<InstallPhoneModalProps> = ({
               </PressScale>
             )}
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-[#B8B5AD]">Updates signed with the same key install over the app. A differently signed older APK may require uninstalling it, which can erase local data.</p>
+          <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">Updates signed with the same key install over the app. A differently signed older APK may require uninstalling it, which can erase local data.</p>
         </div>
 
         {/* Scan QR Code with Phone Camera */}
@@ -142,17 +142,17 @@ export const InstallPhoneModal: React.FC<InstallPhoneModalProps> = ({
           ) : (
             <div className="mx-auto h-36 w-36 rounded-2xl bg-[#262F2A] animate-pulse" />
           )}
-          {appUrl && isLoopback && <p className="mt-2 text-[11px] leading-relaxed text-[#B8B5AD]">This address points to this device only. Host FitLife at a phone-accessible URL before scanning from another device.</p>}
+          {appUrl && isLoopback && <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">This address points to this device only. Host FitLife at a phone-accessible URL before scanning from another device.</p>}
           {appUrl && <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#141916] p-2 border border-[#2F3A33]">
             <input
               type="text"
               readOnly
               value={appUrl}
-              className="w-full bg-transparent text-[11px] text-[#B8B5AD] outline-none truncate px-1"
+              className="w-full bg-transparent text-[0.6875rem] text-[#B8B5AD] outline-none truncate px-1"
             />
             <button
               onClick={handleCopy}
-              className="flex shrink-0 items-center gap-1 rounded-lg bg-[#242E27] px-2.5 py-1.5 text-[11px] font-semibold text-[#7BB38F] hover:bg-[#2E3A32]"
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-[#242E27] px-2.5 py-1.5 text-[0.6875rem] font-semibold text-[#7BB38F] hover:bg-[#2E3A32]"
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? 'Copied' : 'Copy'}

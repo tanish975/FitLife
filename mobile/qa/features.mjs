@@ -10,6 +10,9 @@ const page = await context.newPage();
 await installNativeFixture(page);
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const storage = key => page.evaluate(k => JSON.parse(localStorage.getItem(k)), key);
+// Cloud merge deterministically orders rows by ID; an unrelated sync may
+// finish during an import. Compare every record and field, not array order.
+const byId = rows => [...rows].sort((a,b) => a.id.localeCompare(b.id));
 const workout = () => page.getByRole('button', { name: 'Workouts', exact: true });
 const settings = () => page.getByRole('button', { name: 'Open settings' }).first();
 const passphrase = 'fitlife-test-passphrase-123';
@@ -19,7 +22,7 @@ try {
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
   assert.equal(await nav.getAttribute('data-nav-style'), 'glass');
   const homeX = await nav.locator('.mobile-nav-selection').evaluate(el => getComputedStyle(el).transform);
-  await workout().click(); await page.getByText('Rest timer').waitFor(); await page.waitForTimeout(400);
+  await workout().click(); await page.locator('.training-disclosure > summary').filter({hasText:'Rest timer'}).waitFor(); await page.waitForTimeout(400);
   assert.notEqual(await nav.locator('.mobile-nav-selection').evaluate(el => getComputedStyle(el).transform), homeX, 'glass selection should move');
   assert.equal(await page.getByRole('progressbar', { name: 'Weekly workout days' }).getAttribute('aria-valuenow'), '0', 'demo records should not count as personal goal');
   const list = page.getByTestId('exercise-catalog-list');
@@ -32,6 +35,7 @@ try {
   assert.ok(await list.getByText(exerciseName, { exact: true }).count());
   await page.reload({ waitUntil: 'networkidle' }); await workout().click();
   assert.equal((await storage('fitlife_settings_v2')).favoriteExerciseIds.length, 1, 'favorite should persist');
+  await page.locator('.training-disclosure > summary').filter({hasText:'Rest timer'}).click();
   const timer = page.getByRole('region', { name: 'Rest timer' });
   await timer.getByRole('button', { name: 'Start', exact: true }).click();
   await page.waitForTimeout(1100); await timer.getByRole('button', { name: 'Pause', exact: true }).click();
@@ -41,6 +45,7 @@ try {
   await timer.getByRole('button', { name: 'Resume', exact: true }).click();
   await page.evaluate(() => { const t=JSON.parse(localStorage.getItem('fitlife_rest_timer_v1:qa-user')); t.endAt=Date.now()-10000; localStorage.setItem('fitlife_rest_timer_v1:qa-user', JSON.stringify(t)); });
   await page.reload({ waitUntil: 'networkidle' }); await workout().click();
+  await page.locator('.training-disclosure > summary').filter({hasText:'Rest timer'}).click();
   await page.getByText('Rest complete').waitFor();
   assert.equal((await storage('fitlife_rest_timer_v1:qa-user')).status, 'complete', 'deadline should finish across app close');
   await page.getByRole('button', { name: 'Reset rest timer' }).click();
@@ -48,12 +53,14 @@ try {
   console.log('✓ Shifting glass navigation, favorites, demo-safe weekly goal and persistent wall-clock rest timer');
 
   await page.getByRole('button', { name: 'Home', exact: true }).click(); await settings().click();
+  await page.locator('.settings-fold > summary').filter({hasText:'Appearance'}).click();
   const picker = page.getByRole('group', { name: 'Color palette' });
   assert.equal(await picker.getByRole('button').count(), 5);
   const box = await picker.getByRole('button', { name: 'Matcha & Oat' }).boundingBox(); assert(box.width >= 44 && box.height >= 44);
   assert.equal(await page.getByRole('button', { name: 'Solid', exact: true }).count(), 0, 'old nav appearance controls were removed');
   assert.equal(await page.getByText('Shape, Density & Motion Feel', { exact: true }).count(), 0);
   assert.equal(await nav.getAttribute('data-nav-style'), 'glass');
+  await page.locator('.settings-fold > summary').filter({hasText:'Goals & rest'}).click();
   await page.getByRole('switch', { name: 'Auto-start rest timer' }).click();
   await workout().click();
   await list.locator('.exercise-open').first().click();
@@ -63,6 +70,7 @@ try {
   assert.equal((await storage('fitlife_rest_timer_v1:qa-user')).totalMs, 75000, 'auto-rest uses the logged exercise rest selection');
   assert.equal(await page.getByRole('progressbar', { name: 'Weekly workout days' }).getAttribute('aria-valuenow'), '1', 'real workouts count once per day');
   await page.getByRole('button', { name: 'Home', exact: true }).click(); await settings().click();
+  await page.locator('.settings-fold > summary').filter({hasText:'Encrypted backup'}).click();
   await page.getByRole('button', { name: 'Create backup', exact: true }).click();
   await page.getByLabel('Backup passphrase', { exact: true }).fill(passphrase); await page.getByLabel('Confirm passphrase').fill(passphrase);
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Encrypt and save' }).click()]);
@@ -77,25 +85,26 @@ try {
   await page.getByLabel('Backup passphrase', { exact: true }).fill('wrong-password');
   await page.getByRole('button', { name: 'Decrypt and restore' }).click();
   await page.getByText('Wrong passphrase or the backup was changed.').waitFor();
-  assert.deepEqual(await storage('fitlife_workouts_v1'), recordsBefore, 'failed authentication must not alter data');
+  assert.deepEqual(byId(await storage('fitlife_workouts_v1')), byId(recordsBefore), 'failed authentication must not alter data');
   const tampered = { ...envelope, data: (envelope.data[0] === 'A' ? 'B' : 'A') + envelope.data.slice(1) };
   await page.locator('input[type=file]').setInputFiles({ name: 'changed.fitlife', mimeType: 'application/octet-stream', buffer: Buffer.from(JSON.stringify(tampered)) });
   await page.getByLabel('Backup passphrase', { exact: true }).fill(passphrase); await page.getByRole('button', { name: 'Decrypt and restore' }).click();
   await page.getByText('Wrong passphrase or the backup was changed.').waitFor();
-  assert.deepEqual(await storage('fitlife_workouts_v1'), recordsBefore, 'tampered ciphertext must not alter data');
+  assert.deepEqual(byId(await storage('fitlife_workouts_v1')), byId(recordsBefore), 'tampered ciphertext must not alter data');
   await page.locator('input[type=file]').setInputFiles({ name: 'FitLife-backup.fitlife', mimeType: 'application/octet-stream', buffer: encrypted });
   await page.getByLabel('Backup passphrase', { exact: true }).fill(passphrase); await page.getByRole('button', { name: 'Decrypt and restore' }).click();
-  await page.getByText(/Activity merged\. Your current profile/).waitFor();
-  assert.deepEqual(await storage('fitlife_workouts_v1'), recordsBefore, 'reimport should be idempotent');
+  await page.getByText(/Activity, steps, favorite meals and plan merged/).waitFor();
+  assert.deepEqual(byId(await storage('fitlife_workouts_v1')), byId(recordsBefore), 'reimport should be idempotent');
   await page.getByRole('button', { name: 'Close backup' }).click();
   // Same-ID, different content: preserve both and do not duplicate on reimport.
   await page.evaluate(() => { const w=JSON.parse(localStorage.getItem('fitlife_workouts_v1')); w[0].reps += 1; localStorage.setItem('fitlife_workouts_v1', JSON.stringify(w)); const key=`fitlife_cloud_partition_v1:${localStorage.getItem('fitlife_cloud_owner_v1')}`; const part=JSON.parse(localStorage.getItem(key)); part.snapshot.workouts=w; localStorage.setItem(key,JSON.stringify(part)); });
   await page.reload({ waitUntil: 'networkidle' }); await settings().click();
+  await page.locator('.settings-fold > summary').filter({hasText:'Encrypted backup'}).click();
   for (let i=0; i<2; i++) {
     await page.getByRole('button', { name: 'Import backup', exact: true }).click();
     await page.locator('input[type=file]').setInputFiles({ name: 'FitLife-backup.fitlife', mimeType: 'application/octet-stream', buffer: encrypted });
     await page.getByLabel('Backup passphrase', { exact: true }).fill(passphrase); await page.getByRole('button', { name: 'Decrypt and restore' }).click();
-    await page.getByText(/Activity merged\. Your current profile/).waitFor();
+    await page.getByText(/Activity, steps, favorite meals and plan merged/).waitFor();
     assert.equal((await storage('fitlife_workouts_v1')).length, recordsBefore.length + 1, 'same-ID conflict must preserve both exactly once');
     await page.getByRole('button', { name: 'Close backup' }).click();
   }
@@ -106,7 +115,7 @@ try {
   assert(await page.getByRole('button', { name: 'Decrypt and restore' }).isDisabled(), 'replace requires explicit confirmation');
   await page.getByLabel('I understand this replaces my current data.').check();
   await page.getByRole('button', { name: 'Decrypt and restore' }).click(); await page.getByText('Backup restored to this device.').waitFor();
-  assert.deepEqual(await storage('fitlife_workouts_v1'), recordsBefore, 'confirmed replace should restore exported records');
+  assert.deepEqual(byId(await storage('fitlife_workouts_v1')), byId(recordsBefore), 'confirmed replace should restore exported records');
   await page.getByRole('button', { name: 'Close backup' }).click();
   const storageBeforeFailure = await page.evaluate(() => Object.fromEntries(['fitlife_profile_v1','fitlife_settings_v2','fitlife_meals_v1','fitlife_workouts_v1','fitlife_weights_v1','fitlife_moods_v1','fitlife_water_v1'].map(key => [key, localStorage.getItem(key)])));
   await page.getByRole('button', { name: 'Import backup', exact: true }).click();

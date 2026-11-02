@@ -23,6 +23,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import androidx.activity.ComponentActivity;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,7 +35,7 @@ import javax.net.ssl.HttpsURLConnection;
 import org.json.JSONObject;
 
 /** Offline-first WebView wrapper. Remote pages never run inside its JS bridge. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends ComponentActivity {
     private static final String APP_ASSET = "file:///android_asset/index.html";
     private static final String RELEASE_API = "https://api.github.com/repos/tanish975/FitLife/releases/latest";
     private static final String RELEASE_PAGE = "https://github.com/tanish975/FitLife/releases/latest";
@@ -47,6 +48,8 @@ public final class MainActivity extends Activity {
 
     private WebView webView;
     private CloudBridge cloudBridge;
+    private StepsBridge stepsBridge;
+    private ReminderBridge reminderBridge;
     private boolean checking;
     private boolean backPending;
     private int backRequestId;
@@ -92,6 +95,10 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(backupBridge, "FitLifeBackup");
         cloudBridge = new CloudBridge(this, webView);
         webView.addJavascriptInterface(cloudBridge, "FitLifeCloud");
+        stepsBridge = new StepsBridge(this, webView, cloudBridge);
+        webView.addJavascriptInterface(stepsBridge, "FitLifeSteps");
+        reminderBridge = new ReminderBridge(this, webView);
+        webView.addJavascriptInterface(reminderBridge, "FitLifeReminders");
         setContentView(webView);
         webView.loadUrl(APP_ASSET); // same origin as the previous FitLife APK
         mainHandler.postDelayed(() -> checkForUpdates(false), 2500);
@@ -315,7 +322,20 @@ public final class MainActivity extends Activity {
         });
     }
 
+    void stopTrackingForSignOut(String uid) throws Exception {
+        if (stepsBridge != null) stepsBridge.stopForSignOut(uid);
+        if (reminderBridge != null) reminderBridge.stopForSignOut(uid);
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (stepsBridge != null) stepsBridge.onPermissionResult(requestCode, permissions, grantResults);
+        if (reminderBridge != null) reminderBridge.onPermissionResult(requestCode, grantResults);
+    }
+
     @Override protected void onDestroy() {
+        if (stepsBridge != null) stepsBridge.destroy();
+        if (reminderBridge != null) reminderBridge.destroy();
         if (cloudBridge != null) cloudBridge.destroy();
         mainHandler.removeCallbacksAndMessages(null);
         updateExecutor.shutdownNow();
@@ -323,6 +343,8 @@ public final class MainActivity extends Activity {
             webView.removeJavascriptInterface("FitLifeAndroid");
             webView.removeJavascriptInterface("FitLifeBackup");
             webView.removeJavascriptInterface("FitLifeCloud");
+            webView.removeJavascriptInterface("FitLifeSteps");
+            webView.removeJavascriptInterface("FitLifeReminders");
             webView.removeJavascriptInterface("AndroidHaptics");
             webView.destroy();
         }

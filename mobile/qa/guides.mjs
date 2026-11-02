@@ -43,7 +43,7 @@ try {
   for (const kind of ['meals','workouts','weights','moods']) assert.equal(alice.snapshot[kind].length, 0, `fresh ${kind} is empty`);
   let body = await page.locator('body').innerText();
   assert(!body.includes('73.4') && !body.includes('176 cm') && !body.includes('Calories remaining'), 'placeholder demographics and targets do not appear as facts');
-  assert.equal(await guide(page,'Home').getByText('Tip 1 of 3').count(), 1);
+  assert.equal(await guide(page,'Home').getByText('Tip 1 of 4').count(), 1);
   await guide(page,'Home').getByRole('button', { name:'Next' }).click();
   assert.equal(await guide(page,'Home').getByText('Log in a tap').count(), 1);
   await guide(page,'Home').getByRole('button', { name:'Previous tip' }).click();
@@ -65,7 +65,7 @@ try {
   await guide(page,'Workouts').getByRole('button', { name:'Skip guide' }).focus();
   await page.keyboard.press('Escape');
   await guide(page,'Workouts').waitFor({ state:'hidden' });
-  await page.getByRole('button', { name:'Show no-equipment home exercises' }).click();
+  await page.getByRole('button', { name:'Explore no-equipment home exercises' }).click();
   await page.getByPlaceholder(/Search .*exercise/i).fill('March in Place');
   await page.getByText('March in Place', { exact:true }).first().click();
   const workout = page.getByRole('dialog', { name:'March in Place' }); await workout.waitFor();
@@ -128,14 +128,14 @@ try {
   await tab(page,'Home').click();
   await page.getByRole('button', { name:'Open settings', exact:true }).click();
   assert.equal(await guide(page,'Settings').count(), 0, 'Settings does not repeat after first visit');
-  await page.getByRole('button', { name:'Sync now', exact:true }).click();
+  await page.getByRole('button', { name:/^(Sync now|Retry sync)$/ }).click();
   await page.waitForFunction(() => {
     const raw=JSON.parse(localStorage.getItem('__fixture_cloud') || '{}').alice?.['c'.repeat(32)];
     const seen=raw && JSON.parse(raw).snapshot.settings.guidesSeen;
     return seen && ['dashboard','meals','workouts','progress','profile','settings','daily','onboarding'].every(id => seen.includes(id));
   }, null, { timeout:15000 });
   const cloud = await page.evaluate(() => JSON.parse(localStorage.getItem('__fixture_cloud')));
-  await page.getByRole('button', { name:'Sign out of Google', exact:true }).click();
+  await page.getByRole('button', { name:'Sign out', exact:true }).click();
   await page.getByRole('button', { name:'Sign in with Google', exact:true }).waitFor();
   await page.evaluate(() => localStorage.setItem('__fixture_next','bob'));
   await page.getByRole('button', { name:'Sign in with Google', exact:true }).click();
@@ -145,16 +145,25 @@ try {
   await skip(page);
   await page.getByRole('button', { name:'Open settings', exact:true }).click();
   await guide(page,'Settings').waitFor(); await skip(page);
-  await page.getByRole('button', { name:'Sign out of Google', exact:true }).click();
+  await page.getByRole('button', { name:'Sign out', exact:true }).click();
   await page.getByRole('button', { name:'Sign in with Google', exact:true }).waitFor();
   await page.evaluate(() => localStorage.setItem('__fixture_next','alice'));
   await page.getByRole('button', { name:'Sign in with Google', exact:true }).click(); await waitHome(page);
   await page.waitForTimeout(2200);
   assert.equal(await guide(page,'Home').count(), 0, 'returning account retains its own guide state');
   assert.equal((await slot(page,'alice')).snapshot.profile.name, 'Asha Athlete');
-  const beforeReload=await page.evaluate(()=>({url:location.href,cur:localStorage.getItem('__fixture_current'),owner:localStorage.getItem('fitlife_cloud_owner_v1'),keys:Object.keys(localStorage)}));
-  await page.reload(); try { await waitHome(page); } catch (e) { console.log('RELOAD DEBUG', beforeReload, await page.url(), await page.locator('body').innerText(), await page.evaluate(()=>({cur:localStorage.getItem('__fixture_current'),owner:localStorage.getItem('fitlife_cloud_owner_v1'),auth:localStorage.getItem('fitlife_auth_v1'),keys:Object.keys(localStorage)})), errors); throw e; } await page.waitForTimeout(2200);
+  // Native Firebase session and the remote database live *outside* WebView
+  // localStorage. Preserve only those simulated bridge values in the harness;
+  // Chromium file: storage may otherwise drop fixture keys on a reload.
+  const nativeState=await page.evaluate(()=>({cur:localStorage.getItem('__fixture_current'),cloud:localStorage.getItem('__fixture_cloud')}));
+  await page.addInitScript(state=>{
+    if(state.cur && !localStorage.getItem('__fixture_current')) localStorage.setItem('__fixture_current',state.cur);
+    if(state.cloud && !localStorage.getItem('__fixture_cloud')) localStorage.setItem('__fixture_cloud',state.cloud);
+  },nativeState);
+  await page.reload(); await waitHome(page); await page.waitForTimeout(2200);
   assert.equal(await guide(page,'Home').count(), 0, 'native session and guide state restore on reload');
+  assert.equal((await slot(page,'alice')).snapshot.profile.name, 'Asha Athlete', 'account profile is retained or recovered on reload');
+  assert.equal((await slot(page,'alice')).snapshot.workouts.length, 1, 'account activity is retained or recovered on reload');
   await context.close();
 
   // An existing unclaimed profile must not lose rows just because their IDs

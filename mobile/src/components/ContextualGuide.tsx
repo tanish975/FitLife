@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Compass, LocateFixed, X } from 'lucide-react';
 import { GuideId } from '../data/types';
+import { MotionEntry } from './MotionEntry';
 
 type GuideStep = { title: string; description: string; target: string };
 interface Guide { area: string; steps: GuideStep[] }
@@ -10,17 +11,20 @@ export const GUIDES: Record<GuideId, Guide> = {
   dashboard: { area: 'Home', steps: [
     { title: 'Your day at a glance', description: 'See your meals, movement and hydration here. Personal targets appear after you add your profile details.', target: 'home-overview' },
     { title: 'Log in a tap', description: 'Use these shortcuts to open workouts or meals. You can also add water further down the page.', target: 'home-actions' },
+    { title: 'Connect your steps', description: 'Optionally connect Health Connect or your phone sensor. Counts are not added together, and readings can sync to your account.', target: 'home-steps' },
     { title: 'Explore at your own pace', description: 'Use the five tabs to explore. Settings and the day/night switch are up here.', target: 'home-settings' },
   ] },
   meals: { area: 'Meals', steps: [
     { title: 'Choose a meal', description: 'Pick breakfast, lunch, dinner or a snack before you add food.', target: 'meals-category' },
     { title: 'Describe and review', description: 'Type what you ate, then check the portions and nutrition. Unknown foods need your own details.', target: 'meals-quick' },
+    { title: 'Favorite and repeat', description: 'Heart a logged meal to save it. Use Log again to adjust the portion and review its nutrition.', target: 'meals-shortcuts' },
     { title: 'Browse or add your own', description: 'Search the food list, or use Custom meal for a label or recipe. You can edit a logged meal later.', target: 'meals-search' },
   ] },
   workouts: { area: 'Workouts', steps: [
-    { title: 'Find a movement', description: 'Explore the catalog or filter for no-equipment home exercises.', target: 'workouts-home' },
-    { title: 'Need a plan?', description: 'Try a session idea and use the rest timer at your own pace.', target: 'workouts-plan' },
-    { title: 'Make each set yours', description: 'Open an exercise to review its instructions, adjust your sets and log it. Heart favorites for later.', target: 'workouts-catalog' },
+    { title: 'Start a guided workout', description: 'Choose a session for step-by-step sets, form cues and rest. Pause or skip anytime.', target: 'workouts-guided' },
+    { title: 'Plan your week', description: 'Choose workout or rest days and see your weekly progress. Change the plan anytime.', target: 'workouts-plan' },
+    { title: 'Find home movements', description: 'Explore no-equipment exercises. Open one for form cues and easier alternatives.', target: 'workouts-home' },
+    { title: 'Log and save exercises', description: 'Adjust reps, sets and weight, log your work, or heart a movement for later.', target: 'workouts-catalog' },
   ] },
   progress: { area: 'Progress', steps: [
     { title: 'Log a check-in', description: 'Enter your weight when you want to. You can use the app without recording it.', target: 'progress-weight' },
@@ -33,9 +37,10 @@ export const GUIDES: Record<GuideId, Guide> = {
     { title: 'Manage your account', description: 'Open Settings for themes, Google sync and encrypted backups.', target: 'profile-settings' },
   ] },
   settings: { area: 'Settings', steps: [
-    { title: 'Choose your look', description: 'Change the palette, light or dark appearance and everyday preferences here.', target: 'settings-appearance' },
-    { title: 'Protect your progress', description: 'Check your Google sync status or make an encrypted backup. Keep your backup passphrase safe.', target: 'settings-data' },
-    { title: 'Updates and controls', description: 'Find update checks and data controls further down. Destructive actions ask for confirmation.', target: 'settings-updates' },
+    { title: 'Sync and backup', description: 'See your last sync, retry changes, or export an encrypted backup. Keep its passphrase safe.', target: 'settings-data' },
+    { title: 'Reminders on this phone', description: 'Optional workout and water reminders use notifications on this phone. Android may delay them.', target: 'settings-reminders' },
+    { title: 'Comfort and appearance', description: 'Turn on larger text or reduce motion here. Open Appearance below for palettes and day/night mode.', target: 'settings-accessibility' },
+    { title: 'Replay these tips', description: 'Review any guide again here; app updates and data controls are below.', target: 'settings-guide-replay' },
   ] },
   daily: { area: 'Daily dashboard', steps: [
     { title: 'A closer look at today', description: 'Your daily dashboard brings your logged activity together. Targets appear after profile setup.', target: 'daily-overview' },
@@ -77,7 +82,7 @@ export const ContextualGuide: React.FC<{
       <button type="button" className="guide-close" onClick={onClose} aria-label="Close guide"><X size={19} aria-hidden="true" /></button>
     </div>
     <div className="guide-copy" aria-live="polite" aria-atomic="true">
-      <h2>{item.title}</h2><p>{item.description}</p>
+      <MotionEntry className="guide-step-content" key={`${id}:${step}`}><h2>{item.title}</h2><p>{item.description}</p></MotionEntry>
     </div>
     <div className="guide-progress"><span>Tip {step + 1} of {guide.steps.length}</span><span className="guide-dots" aria-hidden="true">{guide.steps.map((_, i) => <i key={i} className={i === step ? 'is-current' : ''} />)}</span></div>
     <div className="guide-actions">

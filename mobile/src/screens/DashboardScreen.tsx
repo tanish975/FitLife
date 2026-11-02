@@ -223,7 +223,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           >
             <span>🔥</span>
             <AnimatedCounter value={gamification.currentStreak} />
-            <span className="text-[10px] font-semibold uppercase">d</span>
+            <span className="text-[0.625rem] font-semibold uppercase">d</span>
           </PressScale>
 
           {/* Level Pill */}
@@ -270,7 +270,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {profile.onboarded ? <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-md animate-stagger-2" data-guide-target="daily-overview" aria-label="Daily overview">
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex-1 space-y-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#151F19] border border-[#355440] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#7BB38F]">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#151F19] border border-[#355440] px-2.5 py-1 text-[0.625rem] font-semibold uppercase tracking-wider text-[#7BB38F]">
               <Flame className="h-3 w-3 text-[#7BB38F]" />
               <span>{healthBreakdown.statusLabel}</span>
             </div>
@@ -299,33 +299,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               strokeWidth={10}
               startColor={themeColors.accentPrimary}
             >
-              <span className="text-[9px] font-bold uppercase tracking-widest text-[#7BB38F]">
+              <span className="text-[0.5625rem] font-bold uppercase tracking-widest text-[#7BB38F]">
                 Tracking
               </span>
               <AnimatedCounter
                 value={healthBreakdown.score}
                 className="font-heading text-2xl font-extrabold text-[#F4F1EA] leading-tight"
               />
-              <span className="text-[10px] text-[#84877F]">/ 100</span>
+              <span className="text-[0.625rem] text-[#84877F]">/ 100</span>
             </AnimatedRing>
           </div>
         </div>
-        <p className="pt-3 text-[11px] text-[#B8B5AD]">Tracking score reflects logs, not your health. Targets and exercise calories are estimates.</p>
+        <p className="pt-3 text-[0.6875rem] text-[#B8B5AD]">Tracking score reflects logs, not your health. Targets and exercise calories are estimates.</p>
         <div className="grid grid-cols-3 gap-2 pt-4">
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
-                <div className="text-[10px] text-[#84877F]">Target</div>
+                <div className="text-[0.625rem] text-[#84877F]">Target</div>
                 <div className="font-heading text-xs font-bold text-[#F4F1EA]">
                   {macroTargets.calories}
                 </div>
               </div>
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
-                <div className="text-[10px] text-[#84877F]">Eaten</div>
+                <div className="text-[0.625rem] text-[#84877F]">Eaten</div>
                 <div className="font-heading text-xs font-bold text-[#7BB38F]">
                   <AnimatedCounter value={totals.calories} />
                 </div>
               </div>
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
-                <div className="text-[10px] text-[#84877F]">Burned</div>
+                <div className="text-[0.625rem] text-[#84877F]">Burned</div>
                 <div className="font-heading text-xs font-bold text-[#DE9473]">
                   {todayWorkouts.some(w => w.energyEstimateAvailable === false) ? 'Not estimated' : <AnimatedCounter value={burnedToday} />}
                 </div>
@@ -368,8 +368,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       className="font-heading text-xs font-bold text-[#F4F1EA]"
                     />
                   </AnimatedRing>
-                  <span className="mt-1.5 text-[11px] font-semibold text-[#F4F1EA]">{m.label}</span>
-                  <span className="text-[10px] text-[#84877F]">
+                  <span className="mt-1.5 text-[0.6875rem] font-semibold text-[#F4F1EA]">{m.label}</span>
+                  <span className="text-[0.625rem] text-[#84877F]">
                     <AnimatedCounter value={m.consumed} />/{m.target}
                     {m.unit}
                   </span>
@@ -392,7 +392,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
                   Hydration & Water
                 </h2>
-                <p className="text-[11px] text-[#84877F]">
+                <p className="text-[0.6875rem] text-[#84877F]">
                   <AnimatedCounter value={waterTodayMl} /> ml / {settings.waterGoalMl} ml (
                   {waterProgressPct}%)
                 </p>
@@ -434,10 +434,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <div className="mb-2.5 flex items-center justify-between">
             <div>
               <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">11-State Mood Check-In</h2>
-              <p className="text-[11px] text-[#84877F]">Informs daily guidance & awards +5 XP</p>
+              <p className="text-[0.6875rem] text-[#84877F]">Informs daily guidance & awards +5 XP</p>
             </div>
             {todayMood && (
-              <span className="rounded-full bg-[#213026] border border-[#3E634B] px-2.5 py-0.5 text-[10px] font-semibold text-[#7BB38F]">
+              <span className="rounded-full bg-[#213026] border border-[#3E634B] px-2.5 py-0.5 text-[0.625rem] font-semibold text-[#7BB38F]">
                 Checked In ✓
               </span>
             )}
@@ -462,7 +462,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   >
                     <span className="text-xl leading-none">{m.emoji}</span>
                     <span
-                      className={`mt-1 text-[10px] font-semibold ${
+                      className={`mt-1 text-[0.625rem] font-semibold ${
                         isSelected ? 'text-[#F4F1EA]' : 'text-[#84877F]'
                       }`}
                     >
@@ -485,10 +485,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
+                <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
                   <Sparkles className="h-3 w-3" /> Daily guidance · rule-based
                 </span>
-                <span className="rounded-full bg-[#141916] border border-[#2F3A33] px-2.5 py-0.5 text-[10px] font-semibold text-[#7BB38F]">
+                <span className="rounded-full bg-[#141916] border border-[#2F3A33] px-2.5 py-0.5 text-[0.625rem] font-semibold text-[#7BB38F]">
                   {coachMessage.actionTag}
                 </span>
               </div>
@@ -551,13 +551,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       <h4 className="truncate font-heading text-xs font-semibold text-[#F4F1EA]">
                         {item.title}
                       </h4>
-                      <p className="truncate text-[11px] text-[#84877F]">{item.subtitle}</p>
+                      <p className="truncate text-[0.6875rem] text-[#84877F]">{item.subtitle}</p>
                     </div>
                   </div>
 
                   <div className="shrink-0 text-right pl-2">
                     <div className="font-heading text-xs font-bold text-[#F4F1EA]">{item.badge}</div>
-                    <div className="text-[10px] font-semibold text-[#7BB38F]">+{item.xp} XP</div>
+                    <div className="text-[0.625rem] font-semibold text-[#7BB38F]">+{item.xp} XP</div>
                   </div>
                 </PressScale>
               ))}

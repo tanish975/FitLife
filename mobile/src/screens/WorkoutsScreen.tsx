@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   ArrowRight,
@@ -16,17 +17,20 @@ import {
 } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
 import { EXERCISE_CATALOG } from '../data/ExerciseCatalog';
-import { WORKOUT_SESSION_IDEAS } from '../data/WorkoutSessions';
+import { WORKOUT_SESSION_IDEAS, type WorkoutSessionIdea } from '../data/WorkoutSessions';
+import { GuidedWorkout, loadGuided } from '../components/GuidedWorkout';
+import { WeeklyPlanner } from '../components/WeeklyPlanner';
+import { easierOption } from '../domain/ExerciseGuidance';
 import { ExerciseItem, MuscleGroup } from '../data/types';
 import { estimateWorkoutCalories, getWorkoutPrescription } from '../domain/AdaptiveWorkoutEngine';
 import { displayWeight, formatWeight, parseInputToKg } from '../domain/WeightConverter';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
+import { MotionEntry } from '../components/MotionEntry';
 import { EmptyState } from '../components/EmptyState';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { RestTimer } from '../components/RestTimer';
-import { formatDateKey } from '../domain/ProgressAggregator';
-import partnerTraining from '../assets/partner-training.jpg';
+
 
 const MUSCLE_GROUPS: MuscleGroup[] = [
   'All',
@@ -39,7 +43,7 @@ const MUSCLE_GROUPS: MuscleGroup[] = [
   'Cardio',
   'Full Body',
 ];
-const CATALOG_PAGE_SIZE = 10;
+const CATALOG_PAGE_SIZE = 5;
 type EquipmentFilter = 'any' | 'bodyweight' | 'dumbbells' | 'band' | 'machine';
 const NO_EQUIPMENT_COUNT = EXERCISE_CATALOG.filter((exercise) => exercise.equipment === 'Bodyweight').length;
 
@@ -56,6 +60,16 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [equipmentFilter, setEquipmentFilter] = useState<EquipmentFilter>('any');
   const [sessionId, setSessionId] = useState<string>('');
+  const [pickerId, setPickerId] = useState(WORKOUT_SESSION_IDEAS[0].id);
+  const [savedSession, setSavedSession] = useState(() => loadGuided(localOwnerId));
+  const [guided, setGuided] = useState<{ session: WorkoutSessionIdea; resume: boolean } | null>(null);
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const [restOpen, setRestOpen] = useState(false);
+  useEffect(() => { setGuided(null); setConfirmReplace(false); setSavedSession(loadGuided(localOwnerId)); }, [localOwnerId]);
+  const openGuided = (session: WorkoutSessionIdea, resume = false) => {
+    if (savedSession && !resume) { setConfirmReplace(true); return; }
+    setConfirmReplace(false); setGuided({session, resume});
+  };
   const [restStart, setRestStart] = useState<{ seconds: number; id: number } | null>(null);
   const [visibleCount, setVisibleCount] = useState(CATALOG_PAGE_SIZE);
   const updateGroup = (value: MuscleGroup) => { setSelectedGroup(value); setVisibleCount(CATALOG_PAGE_SIZE); };
@@ -152,7 +166,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
     setSelectedExercise(null);
     setIsSheetClosing(false);
     logWorkout(entry);
-    if (settings.autoStartRest) setRestStart({ seconds: restSeconds, id: Date.now() });
+    if (settings.autoStartRest) { setRestOpen(true); setRestStart({ seconds: restSeconds, id: Date.now() }); }
   };
 
   const lastSelectedWorkout = selectedExercise ? workouts.filter((entry) => entry.exerciseId === selectedExercise.id && entry.id.startsWith('wk-')).sort((a, b) => b.timestamp - a.timestamp)[0] : undefined;
@@ -187,54 +201,42 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
     [todayWorkouts]
   );
 
-  // A week starts on Monday in the device's local calendar. Multiple exercises
-  // on the same day count once; preloaded demo records never inflate the goal.
-  const weekStart = new Date();
-  weekStart.setHours(12, 0, 0, 0);
-  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const weeklyDays = new Set(workouts.filter((workout) => !workout.id.startsWith('seed-') && !workout.id.startsWith('today-wk-') && workout.dateKey >= formatDateKey(weekStart) && workout.dateKey < formatDateKey(weekEnd)).map((workout) => workout.dateKey)).size;
-  const goalPercent = Math.min(100, Math.round(weeklyDays / settings.weeklyWorkoutGoal * 100));
-
   return (
     <div className="space-y-4 px-4 pb-28 pt-2 animate-screen-enter">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Adaptive Workouts</h1>
+          <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Workouts</h1>
           <p className="text-xs text-[#84877F]">
-            {EXERCISE_CATALOG.length} exercises across 8 muscle groups · Adapt to your pace
+            {EXERCISE_CATALOG.length} exercises · your pace
           </p>
         </div>
         <div className="rounded-2xl border border-[#6E4433] bg-[#33241E] px-3 py-1.5 text-right">
-          <div className="text-[10px] font-medium text-[#DE9473]">Est. burn today</div>
+          <div className="text-[0.625rem] font-medium text-[#DE9473]">Est. burn today</div>
           <div className="font-heading text-xs font-bold text-[#F4F1EA]">{todayWorkouts.some(w => w.energyEstimateAvailable === false) ? 'Not estimated' : `~${totalBurnedToday} kcal`}</div>
         </div>
       </div>
 
-      {/* A training-first feature that keeps both athletes equally represented. */}
-      <section className="workout-feature" aria-label="Find your next workout">
-        <div className="workout-feature-copy"><span>YOUR NEXT SESSION</span><h2>Stronger,<br />every day.</h2><p>Find a workout that moves you.</p><button onClick={() => document.getElementById('exercise-search')?.focus()}>Find an exercise <span aria-hidden="true">→</span></button></div>
-        <img src={partnerTraining} alt="A man and woman training together with dumbbells" />
+      <section className="guided-picker" aria-labelledby="guided-picker-title" data-guide-target="workouts-guided">
+        <div className="guided-picker-heading"><span><Dumbbell size={21}/></span><div><p>TRAIN WITH A PLAN</p><h2 id="guided-picker-title">Guided workout</h2><small>One set at a time, at your pace.</small></div></div>
+        {savedSession && <button type="button" className="guided-resume" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === savedSession.sessionId); if (session) openGuided(session,true); }}>Resume {WORKOUT_SESSION_IDEAS.find(x => x.id === savedSession.sessionId)?.title} <ArrowRight size={16}/></button>}
+        <label htmlFor="guided-session-select">Choose a session</label><div className="guided-picker-controls"><select id="guided-session-select" value={pickerId} onChange={e => {setPickerId(e.target.value);setConfirmReplace(false);}}>{WORKOUT_SESSION_IDEAS.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="button" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === pickerId); if (session) openGuided(session); }}>Start</button></div>
+        {confirmReplace && <div className="guided-replace" role="alert"><p>Start a new session? Your logged sets stay saved, but the paused session will be replaced.</p><button type="button" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === pickerId); if (session) {setConfirmReplace(false);setGuided({session,resume:false});} }}>Start new session</button><button type="button" onClick={() => setConfirmReplace(false)}>Cancel</button></div>}
       </section>
-
+      <WeeklyPlanner />
       <section className="home-workout-shortcut" data-guide-target="workouts-home" aria-label="No-equipment workouts at home">
         <div className="home-workout-shortcut-icon"><Home size={19} aria-hidden="true" /></div>
         <div className="home-workout-shortcut-copy"><span className="training-eyebrow">TRAIN AT HOME</span><h2>No equipment needed</h2><p>{NO_EQUIPMENT_COUNT} movements · strength, core & cardio</p></div>
-        <button type="button" aria-label="Show no-equipment home exercises" onClick={() => {
+        <button type="button" aria-label="Explore no-equipment home exercises" onClick={() => {
           setSessionId(''); setSelectedGroup('All'); setSearchQuery(''); setEquipmentFilter('bodyweight'); setFavoritesOnly(false); setVisibleCount(CATALOG_PAGE_SIZE);
           revealExerciseCatalog();
         }}>Explore <ArrowRight size={15} aria-hidden="true" /></button>
       </section>
 
-      <section className="weekly-card" aria-label="Weekly workout goal">
-        <div className="weekly-copy"><span className="training-eyebrow">YOUR WEEK · MON—SUN</span><h2>Show up for yourself</h2><p>Workout days this week · goal in Settings</p><div className="weekly-progress" role="progressbar" aria-label="Weekly workout days" aria-valuemin={0} aria-valuemax={settings.weeklyWorkoutGoal} aria-valuenow={Math.min(weeklyDays, settings.weeklyWorkoutGoal)}><span style={{ width: `${goalPercent}%` }} /></div></div>
-        <div className="weekly-numbers">{weeklyDays}<small> / {settings.weeklyWorkoutGoal} days</small></div>
-      </section>
-      <RestTimer key={localOwnerId || "unclaimed"} defaultSeconds={settings.defaultRestSeconds} startRequest={restStart} />
+      <details className="training-disclosure" open={restOpen} onToggle={e => setRestOpen(e.currentTarget.open)}><summary>Rest timer <span aria-hidden="true">⌄</span></summary><RestTimer key={localOwnerId || 'unclaimed'} defaultSeconds={settings.defaultRestSeconds} startRequest={restStart} /></details>
 
-      <section className="session-ideas" data-guide-target="workouts-plan" aria-label="Workout session ideas">
+      <details className="training-disclosure"><summary>Browse session ideas <span aria-hidden="true">⌄</span></summary>
+      <section className="session-ideas" aria-label="Workout session ideas">
         <div className="session-heading"><div><span className="training-eyebrow">NEED A STARTING POINT?</span><h2>Try a session idea</h2></div>{sessionId && <button type="button" onClick={() => { setSessionId(''); setSelectedGroup('All'); setSearchQuery(''); setEquipmentFilter('any'); setFavoritesOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); }}>View all</button>}</div>
         <p>Choose movements that feel right, make space and adjust sets and rest. Stop if you feel pain.</p>
         <div className="session-list">
@@ -243,7 +245,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             {session.homeNoEquipment ? <Home size={16} aria-hidden="true" /> : <Dumbbell size={16} aria-hidden="true" />}<span><strong>{session.title}</strong><small>{session.detail}</small></span>
           </button>)}
         </div>
-      </section>
+      </section></details>
 
       {/* 8 Muscle Group Filter Chips */}
       <SegmentedSelector<MuscleGroup>
@@ -262,6 +264,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#84877F]" />
         <input
           id="exercise-search"
+          aria-label="Search exercises"
           type="text"
           value={searchQuery}
           onChange={(e) => updateSearch(e.target.value)}
@@ -271,6 +274,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         {searchQuery && (
           <button
             onClick={() => updateSearch('')}
+            aria-label="Clear exercise search"
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[#84877F] hover:text-[#F4F1EA]"
           >
             <X className="h-4 w-4" />
@@ -291,7 +295,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
           <h2 id="exercise-catalog-heading" data-guide-target="workouts-catalog" tabIndex={-1} className="font-heading text-xs font-semibold uppercase tracking-wider text-[#84877F]">
             {selectedSession ? selectedSession.title : equipmentFilter === 'bodyweight' ? `${selectedGroup === 'All' ? 'No-equipment' : `${selectedGroup} · no-equipment`} exercises` : `${selectedGroup} Exercises`} ({filteredExercises.length})
           </h2>
-          <span className="text-[11px] text-[#D8C39E]">Tap for details →</span>
+          <span className="text-[0.6875rem] text-[#D8C39E]">Tap for details →</span>
         </div>
 
         {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle={favoritesOnly ? 'Save exercises with the heart, or turn off Favorites.' : 'Try another search, session, equipment or muscle group.'} />}
@@ -300,8 +304,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             const favorite = settings.favoriteExerciseIds.includes(ex.id);
             return <div key={ex.id} data-exercise-id={ex.id} className="exercise-row">
               <button type="button" className="exercise-open" onClick={() => openExerciseSheet(ex)}>
-                <div className="min-w-0 pr-3"><div className="flex flex-wrap items-center gap-1.5"><h4 className="break-words font-heading text-xs font-semibold leading-snug text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[9px] font-semibold text-[#D8C39E]">{ex.muscleGroup}</span></div><p className="mt-0.5 text-[11px] text-[#84877F]">{ex.equipment} · {ex.difficulty} · {ex.secondaryMuscles}</p></div>
-                <div className="flex shrink-0 items-center gap-2"><div className="exercise-stats text-right"><div className="font-heading text-xs font-bold text-[#F4F1EA]">{ex.difficulty}</div><div className="text-[10px] font-semibold text-[#7BB38F]">+20 XP</div></div><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#528B67] text-[#F4F1EA]"><Plus className="h-4 w-4 stroke-[2.5]" /></div></div>
+                <div className="min-w-0 pr-3"><div className="flex flex-wrap items-center gap-1.5"><h4 className="break-words font-heading text-xs font-semibold leading-snug text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[0.5625rem] font-semibold text-[#D8C39E]">{ex.muscleGroup}</span></div><p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{ex.equipment} · {ex.difficulty} · {ex.secondaryMuscles}</p></div>
+                <div className="flex shrink-0 items-center gap-2"><div className="exercise-stats text-right"><div className="font-heading text-xs font-bold text-[#F4F1EA]">{ex.difficulty}</div><div className="text-[0.625rem] font-semibold text-[#7BB38F]">+20 XP</div></div><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#528B67] text-[#F4F1EA]"><Plus className="h-4 w-4 stroke-[2.5]" /></div></div>
               </button>
               <button type="button" className="exercise-favorite" aria-label={`${favorite ? 'Remove' : 'Add'} ${ex.name} ${favorite ? 'from' : 'to'} favorites`} aria-pressed={favorite} onClick={() => toggleFavoriteExercise(ex.id)}><Heart size={19} fill={favorite ? 'currentColor' : 'none'} /></button>
             </div>;
@@ -345,7 +349,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                     <h4 className="truncate font-heading text-xs font-semibold text-[#F4F1EA]">
                       {w.exerciseName}
                     </h4>
-                    <p className="truncate text-[11px] text-[#84877F]">
+                    <p className="truncate text-[0.6875rem] text-[#84877F]">
                       {w.sets} sets × {w.reps} {w.muscleGroup === 'Cardio' ? 'min' : 'reps'} ·{' '}
                       {w.weightKg > 0 ? formatWeight(w.weightKg, unit) : 'Bodyweight'} ·{' '}
                       <span className="text-[#7BB38F]">{w.energyEstimateAvailable === false ? 'Energy not estimated' : `~${w.caloriesBurned} kcal est.`}</span>
@@ -366,15 +370,17 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         )}
       </div>
 
+      {guided && <GuidedWorkout session={guided.session} resume={guided.resume} onExit={() => {setGuided(null);setSavedSession(loadGuided(localOwnerId));}} />}
+
       {/* MODAL BOTTOM SHEET — Adaptive Workout Engine Set Entry */}
-      {selectedExercise && prescription && (
+      {selectedExercise && prescription && createPortal(
         <div
           onClick={() => closeSheetSmoothly()}
           className={`fixed inset-0 z-50 !m-0 flex items-end justify-center bg-[#0E120F]/80 transition-opacity duration-150 ${
             isSheetClosing ? 'opacity-0' : 'opacity-100'
           }`}
         >
-          <div
+          <MotionEntry
             role="dialog"
             aria-modal="true"
             aria-labelledby="workout-sheet-title"
@@ -388,7 +394,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
 
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-1 rounded-full bg-[#213026] border border-[#3E634B] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
+                <div className="inline-flex items-center gap-1 rounded-full bg-[#213026] border border-[#3E634B] px-2.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
                   <Sparkles className="h-3 w-3" /> {prescription.protocolName}
                 </div>
                 <h3 id="workout-sheet-title" className="mt-1.5 font-heading text-base font-bold text-[#F4F1EA]">
@@ -414,13 +420,15 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             {/* Adaptive Engine Rationale & Form Tip */}
             <div className="mt-3 rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-3 text-xs space-y-1.5">
               <p className="text-[#F4F1EA]">{prescription.goalRationale}</p>
-              <p className="text-[11px] text-[#D8C39E]">💡 Coach Cue: {selectedExercise.tip}</p>
-              <p className="text-[11px] text-[#B8B5AD]">Load starts at zero or your previous entry. Choose an amount that suits your ability; start light and adjust as needed.</p>
+              <p className="text-[0.6875rem] text-[#D8C39E]">💡 Coach Cue: {selectedExercise.tip}</p>
+              <p className="text-[0.6875rem] text-[#B8B5AD]">Load starts at zero or your previous entry. Choose an amount that suits your ability; start light and adjust as needed.</p>
+              <p className="exercise-easier"><strong>Easier option:</strong> {easierOption(selectedExercise).note}</p>
+              {easierOption(selectedExercise).exerciseId && <button type="button" className="exercise-alternative" onClick={() => { const alt=EXERCISE_CATALOG.find(e => e.id === easierOption(selectedExercise).exerciseId); if (alt) openExerciseSheet(alt); }}>View easier movement</button>}
             </div>
 
             {/* Light BMI Caution Note (if applicable) */}
             {prescription.bmiCautionNote && (
-              <div className="mt-2.5 flex items-start gap-2 rounded-2xl border border-[#6E532B] bg-[#2E2418] p-3 text-[11px] text-[#E0B467]">
+              <div className="mt-2.5 flex items-start gap-2 rounded-2xl border border-[#6E532B] bg-[#2E2418] p-3 text-[0.6875rem] text-[#E0B467]">
                 <AlertCircle className="h-4 w-4 shrink-0 text-[#E0B467] mt-0.5" />
                 <span>{prescription.bmiCautionNote}</span>
               </div>
@@ -430,7 +438,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             <form onSubmit={handleConfirmLog} className="mt-4 space-y-3.5">
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-2 text-center">
-                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#84877F]">
+                  <label className="block text-[0.625rem] font-semibold uppercase tracking-wider text-[#84877F]">
                     Sets
                   </label>
                   <div className="mt-1 flex items-center justify-between">
@@ -463,7 +471,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                 </div>
 
                 <div className="rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-2 text-center">
-                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#84877F]">
+                  <label className="block text-[0.625rem] font-semibold uppercase tracking-wider text-[#84877F]">
                     {selectedExercise.muscleGroup === 'Cardio' ? 'Minutes' : 'Reps'}
                   </label>
                   <div className="mt-1 flex items-center justify-between">
@@ -496,7 +504,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                 </div>
 
                 <div className="col-span-2 rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-2.5 text-center">
-                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#84877F]">
+                  <label className="block text-[0.625rem] font-semibold uppercase tracking-wider text-[#84877F]">
                     Load ({unit})
                   </label>
                   {selectedExercise.isBodyweight ? (
@@ -538,8 +546,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                 </button>
               </PressScale>
             </form>
-          </div>
-        </div>
+          </MotionEntry>
+        </div>, document.body
       )}
     </div>
   );

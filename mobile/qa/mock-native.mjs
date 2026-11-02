@@ -9,6 +9,15 @@ export async function installNativeFixture(page, options = {}) {
   const opts = { signedIn: true, demo: true, uid: 'qa-user', name: 'Tanish Patel', email: 'tanish@fitlife.app', ...options };
   await page.addInitScript(opts => {
     const ids = ['dashboard','meals','workouts','progress','profile','settings','daily','onboarding'];
+    // A native Firebase session and remote database live outside WebView
+    // storage. Some restart tests can restore ONLY these simulated bridge
+    // keys; FitLife profile, settings and account partitions are never seeded.
+    if (opts.resumeFixture) {
+      for (const key of ['__fixture_seeded','__fixture_current','__fixture_next','__fixture_cloud','__fixture_offline']) {
+        const value = opts.resumeFixture[key];
+        if (typeof value === 'string' && localStorage.getItem(key) === null) localStorage.setItem(key, value);
+      }
+    }
     if (!localStorage.getItem('__fixture_seeded')) {
       localStorage.setItem('__fixture_seeded', '1');
       if (opts.demo) {
@@ -29,6 +38,39 @@ export async function installNativeFixture(page, options = {}) {
       if (localStorage.getItem('__fixture_offline') === '1') { respond(id, false, null, 'Cloud sync is offline. Your data stays on this device.'); return false; }
       return true;
     };
+    if (opts.steps) {
+      const emitSteps=(requestId,ok,result,error)=>setTimeout(()=>window.dispatchEvent(new CustomEvent('fitlife-steps-result',{detail:{requestId,ok,result,error}})), Number(localStorage.getItem('__fixture_steps_delay')||0));
+      const daysAgo=(delta=0)=>{const d=new Date();d.setDate(d.getDate()-delta);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+      const stepState=uid=>JSON.parse(localStorage.getItem(`__fixture_steps_${uid}`)||'{"phone":false,"health":false}');
+      const saveSteps=(uid,s)=>localStorage.setItem(`__fixture_steps_${uid}`,JSON.stringify(s));
+      const ensure=(id,uid)=>{if(current()!==uid){emitSteps(id,false,null,'Account changed.');return false;}return true;};
+      const deviceId='d'.repeat(32);
+      window.FitLifeSteps={
+        snapshot(id,uid,days) {
+          if(!ensure(id,uid))return;
+          localStorage.setItem(`__fixture_step_reads_${uid}`,String(Number(localStorage.getItem(`__fixture_step_reads_${uid}`)||0)+1));
+          const s=stepState(uid), now=Date.now();
+          const row=(source,count,dateKey=daysAgo())=>({deviceId,source,count,updatedAt:now,partial:source==='phone',dateKey});
+          const records=[...(s.phone?[row('phone',6200),row('phone',3300,daysAgo(1))]:[]),...(s.health?[row('health',4500),row('health',3000,daysAgo(1))]:[])];
+          emitSteps(id,true,{deviceId,phoneAvailable:true,phonePermission:true,phoneEnabled:s.phone,phoneRunning:s.phone,phoneNotificationVisible:true,healthEnabled:s.health,healthAvailability:'available',healthState:s.health?'ready':'disabled',records});
+        },
+        connectHealth(id,uid){if(!ensure(id,uid))return;const s=stepState(uid);s.health=true;saveSteps(uid,s);emitSteps(id,true,{});},
+        disconnectHealth(id,uid){if(!ensure(id,uid))return;const s=stepState(uid);s.health=false;saveSteps(uid,s);emitSteps(id,true,{});},
+        connectPhone(id,uid){if(!ensure(id,uid))return;const s=stepState(uid);s.phone=true;saveSteps(uid,s);emitSteps(id,true,{});},
+        disconnectPhone(id,uid){if(!ensure(id,uid))return;const s=stepState(uid);s.phone=false;saveSteps(uid,s);emitSteps(id,true,{});},
+      };
+    }
+    if (opts.reminders) {
+      const emitReminder=(requestId,ok,result,error)=>setTimeout(()=>window.dispatchEvent(new CustomEvent('fitlife-reminder-result',{detail:{requestId,ok,result,error}})),0);
+      const get=uid=>JSON.parse(localStorage.getItem(`__fixture_reminders_${uid}`)||'{"workout":{"enabled":false,"hour":8,"minute":0},"water":{"enabled":false,"hour":12,"minute":0}}');
+      const allowedReminder=(id,uid)=>{if(current()!==uid){emitReminder(id,false,null,'Account changed.');return false;}return true;};
+      const snapshot=uid=>({...get(uid),notificationsEnabled:localStorage.getItem('__fixture_notifications_denied')!=='1'});
+      window.FitLifeReminders={
+        snapshot(id,uid){if(allowedReminder(id,uid))emitReminder(id,true,snapshot(uid));},
+        configure(id,uid,kind,enabled,hour,minute){if(!allowedReminder(id,uid))return;if(enabled&&localStorage.getItem('__fixture_notifications_denied')==='1'){emitReminder(id,false,null,'Notification permission was not granted.');return;}const s=get(uid);s[kind]={enabled,hour,minute};localStorage.setItem(`__fixture_reminders_${uid}`,JSON.stringify(s));emitReminder(id,true,snapshot(uid));},
+        openSettings(id,uid){if(allowedReminder(id,uid))emitReminder(id,true,{});},
+      };
+    }
     window.FitLifeCloud = {
       session(id) {
         if (localStorage.getItem('__fixture_session_error') === '1') { respond(id, false, null, 'Session unavailable'); return; }

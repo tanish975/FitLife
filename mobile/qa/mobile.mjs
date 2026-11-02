@@ -185,18 +185,18 @@ try {
   console.log('✓ Keyboard viewport emulation, validation, editing, completion and persistence');
 
   await page.getByRole('button', { name: 'Workouts', exact: true }).click();
-  await page.getByText('Adaptive Workouts').waitFor();
+  await page.getByRole('heading',{name:'Workouts',exact:true}).waitFor();
   await page.waitForTimeout(250);
   await assertNoHorizontalOverflow(page, 'workouts');
   const exerciseList = page.getByTestId('exercise-catalog-list');
-  assert.equal(await exerciseList.locator('.exercise-open').count(), 10);
+  assert.equal(await exerciseList.locator('.exercise-open').count(), 5);
   await assertSwipeFromCardScrolls(page, context, 'exercise-catalog-list');
   await page.getByRole('button', { name: /Show more exercises/ }).click();
-  assert.equal(await exerciseList.locator('.exercise-open').count(), 20);
+  assert.equal(await exerciseList.locator('.exercise-open').count(), 10);
   await page.getByPlaceholder(/Search .*exercise/i).fill('a name that cannot match');
   await page.getByText('No exercises found').waitFor();
   await page.getByPlaceholder(/Search .*exercise/i).fill('');
-  assert.equal(await exerciseList.locator('.exercise-open').count(), 10, 'Search did not reset progressive disclosure');
+  assert.equal(await exerciseList.locator('.exercise-open').count(), 5, 'Search did not reset progressive disclosure');
   const previousWorkoutCount = await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_workouts_v1') || '[]').length);
   await exerciseList.getByRole('button').first().click();
   const dialog = page.getByRole('dialog');
@@ -220,7 +220,12 @@ try {
   const reps = dialog.getByRole('spinbutton', { name: /Reps|Minutes/ });
   await reps.fill('10');
   await dialog.getByRole('button', { name: /Log Workout Set/ }).click();
-  await page.waitForFunction(count => JSON.parse(localStorage.getItem('fitlife_workouts_v1') || '[]').length > count, previousWorkoutCount);
+  try {
+    await page.waitForFunction(count => JSON.parse(localStorage.getItem('fitlife_workouts_v1') || '[]').length > count, previousWorkoutCount);
+  } catch (error) {
+    console.error('Workout save diagnostics:', { previousWorkoutCount, currentCount: await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_workouts_v1') || '[]').length), dialogPresent: await dialog.count(), errors });
+    throw error;
+  }
   assert.equal(await dialog.count(), 0, 'Workout did not close after saving');
   const logged = await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_workouts_v1'))[0]);
   assert.equal(logged.sets, 3);
@@ -228,14 +233,14 @@ try {
   console.log('✓ Touch scrolling over exercise cards, pagination, search and workout save');
 
   await page.getByRole('button', { name: 'Meals', exact: true }).click();
-  await page.getByText('Meals & Nutrition').waitFor();
+  await page.getByRole('heading',{name:'Meals',exact:true}).waitFor();
   await page.waitForTimeout(250);
   await assertNoHorizontalOverflow(page, 'meals');
   const foodList = page.getByTestId('food-catalog-list');
-  assert.equal(await foodList.getByRole('button').count(), 10);
+  assert.equal(await foodList.getByRole('button').count(), 5);
   await assertSwipeFromCardScrolls(page, context, 'food-catalog-list');
   await page.getByRole('button', { name: /Show more foods/ }).click();
-  assert.equal(await foodList.getByRole('button').count(), 20);
+  assert.equal(await foodList.getByRole('button').count(), 10);
   await page.getByPlaceholder(/Search \d+ foods/).fill('paneer');
   assert.equal(await foodList.getByRole('button').count(), 3);
   assert.equal(await page.locator('.shimmer-pulse').count(), 0, 'Search still inserts an artificial loading state');

@@ -72,22 +72,24 @@ try {
   await page.getByRole('dialog', { name: 'Install FitLife on Phone' }).waitFor();
   assert.equal(await back(), true); await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Open Settings', exact: true }).click();
-  await page.getByRole('heading', { name: 'Studio & Customization' }).waitFor();
+  await page.getByRole('heading', { name: 'Settings' }).waitFor();
   assert.equal(await page.getByText('Shape, Density & Motion Feel', { exact: true }).count(), 0);
   assert.equal(await page.getByText('Install FitLife on Your Phone', { exact: true }).count(), 0);
-  await page.getByRole('button', { name: 'Clear All Logs' }).click();
+  await page.locator('.settings-fold > summary').filter({hasText:'Data controls'}).click();
+  await page.getByRole('button', { name: 'Clear activity logs' }).click();
   await page.getByRole('alert').waitFor(); assert.equal(await back(), true); await page.getByRole('alert').waitFor({ state: 'hidden' });
   assert((await storage('fitlife_meals_v1')).length > 0, 'Back cancels destructive confirmation');
+  await page.locator('.settings-fold > summary').filter({hasText:'Encrypted backup'}).click();
   await page.getByRole('button', { name: 'Create backup', exact: true }).click();
   await page.getByRole('button', { name: 'Close backup' }).waitFor(); assert.equal(await back(), true);
   await page.getByRole('button', { name: 'Close backup' }).waitFor({ state: 'hidden' });
   assert.equal(await back(), true); await page.getByRole('heading', { name: 'Athlete Profile' }).waitFor();
   assert.equal(await back(), true); await page.getByRole('heading', { name: 'Progress & Trends' }).waitFor();
-  assert.equal(await back(), true); await page.getByRole('heading', { name: 'Adaptive Workouts' }).waitFor();
+  assert.equal(await back(), true); await page.getByRole('heading', { name: 'Workouts', exact:true }).waitFor();
   await page.getByTestId('exercise-catalog-list').locator('.exercise-open').first().click();
   await page.getByRole('dialog').waitFor(); assert.equal(await back(), true); await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(await nav.getByRole('button', { name: 'Workouts' }).getAttribute('aria-current'), 'page');
-  assert.equal(await back(), true); await page.getByRole('heading', { name: 'Meals & Nutrition' }).waitFor();
+  assert.equal(await back(), true); await page.getByRole('heading', { name: 'Meals', exact:true }).waitFor();
   assert.equal(await back(), true); await page.getByText("Today's overview").waitFor();
   assert.equal(await back(), false);
 
@@ -95,11 +97,11 @@ try {
   await clickTab('Workouts');
   const shortcut = page.getByRole('region', { name: 'No-equipment workouts at home' });
   await shortcut.getByText('39 movements', { exact: false }).waitFor();
-  await shortcut.getByRole('button', { name: 'Show no-equipment home exercises' }).click();
+  await shortcut.getByRole('button', { name: 'Explore no-equipment home exercises' }).click();
   await page.getByRole('heading', { name: 'No-equipment exercises (39)' }).waitFor();
   assert.equal(await page.getByLabel('Filter by equipment').inputValue(), 'bodyweight');
   const catalog = page.getByTestId('exercise-catalog-list');
-  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /Show more exercises/ }).click();
+  for (let i = 0; i < 7; i++) await page.getByRole('button', { name: /Show more exercises/ }).click();
   assert.equal(await catalog.locator('.exercise-row').count(), 39);
   const ids = await catalog.locator('.exercise-row').evaluateAll(rows => rows.map(row => row.getAttribute('data-exercise-id')));
   assert.equal(ids.filter(id => id.startsWith('ex-home-')).length, 30);
@@ -110,7 +112,9 @@ try {
   assert.ok(await workout.getByText('Bodyweight').count()); assert.equal(await back(), true); await workout.waitFor({ state: 'hidden' });
 
   // A home idea is an ordered list, not an equipment-dependent workout.
+  await page.locator('.training-disclosure > summary').filter({hasText:'Browse session ideas'}).click();
   await page.getByRole('button', { name: /Home full body/ }).click();
+  await page.getByRole('button', { name: /Show more exercises/ }).click();
   assert.equal(await page.getByLabel('Filter by equipment').inputValue(), 'bodyweight');
   assert.deepEqual(await catalog.locator('.exercise-row').evaluateAll(rows => rows.map(row => row.getAttribute('data-exercise-id'))), [
     'ex-home-march-in-place','ex-home-air-squat','ex-home-kneeling-pushup','ex-glute-bridge','ex-bird-dog','ex-home-calf-raise',
@@ -126,6 +130,7 @@ try {
   assert.equal(await catalog.locator('.exercise-row').count(), 5);
   assert.equal(await page.getByLabel('Filter by equipment').inputValue(), 'bodyweight');
   await page.getByRole('button', { name: /Home core & back/ }).click();
+  await page.getByRole('button', { name: /Show more exercises/ }).click();
   assert.equal(await catalog.locator('.exercise-row').count(), 6);
   await page.getByRole('button', { name: /Full-body foundations/ }).click();
   assert.equal(await catalog.locator('.exercise-row').count(), 5);
@@ -168,6 +173,10 @@ try {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // Exact 15–35 BMI scale on the first render of every Progress visit.
+  // Prevent an already-scheduled mock cloud merge from overwriting the
+  // deliberately injected profile between storage setup and reload.
+  await page.evaluate(() => localStorage.setItem('__fixture_offline','1'));
+  await page.waitForTimeout(2000);
   for (const bmi of [12,15,18.5,25,30,35,39]) {
     await page.evaluate(value => {
       const profile = JSON.parse(localStorage.getItem('fitlife_profile_v1')); profile.age = 30; profile.heightCm = 170;
@@ -188,5 +197,5 @@ try {
   const native = await readFile('android/src/com/tanish/fitlife/MainActivity.java', 'utf8');
   assert.match(native, /evaluateJavascript\(.*__fitlifeHandleBack/); assert.doesNotMatch(native, /canGoBack\(\)/);
   assert.deepEqual(errors, []);
-  console.log('PASS: frosted persistent tab bar, JS Back/sheet history, 90-exercise discovery and 30 no-equipment home additions, reviewed nutrition, BMI first-paint position, reduced motion and responsive layouts');
+  console.log('PASS: frosted persistent tab bar, JS Back/sheet history, 91-exercise discovery and 30 no-equipment home additions, reviewed nutrition, BMI first-paint position, reduced motion and responsive layouts');
 } finally { await context.close(); await browser.close(); }

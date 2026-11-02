@@ -54,7 +54,7 @@ Restore with `openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in FitLife-signi
 
 ## Local release build
 
-Install Java 17, Node 20, Android SDK platform 35 and build-tools 36.0.0. The checked-in Gradle 9.3.1 wrapper verifies the distribution SHA-256. With the key in `.signing/`:
+Install Java 17, Node 20, Android SDK platform 36 and build-tools 36.0.0. The checked-in Gradle 9.3.1 wrapper verifies the distribution SHA-256. With the key in `.signing/`:
 
 ```sh
 cd mobile
@@ -68,7 +68,7 @@ npm run build
 
 `ANDROID_HOME` should point to the Android SDK. Alternatively set `ANDROID_BUILD_TOOLS_DIR` explicitly. Firebase Android configuration is public; signing keys remain private. Outputs are `../FitLife.apk` and `../FitLife-App.html`; they are generated and not committed. The build does not generate a replacement signing key automatically. Before distributing, choose a versionCode greater than every existing release.
 
-The release workflow runs `npm run test:qa` against the production preview; it also runs `test:mobile`, `test:features`, and `test:security` as part of that command. Locally, start `npx vite preview --host 127.0.0.1 --port 4173` in a separate terminal and run either command from `mobile/`. The mobile checks cover optional profile-editor and Google-entry button hit targets, phone-sized layouts, simulated keyboard resizing, touch scrolling, rapid tab switching, the simulated Android Back bridge, reviewed nutrition, BMI positions, search, logging, reduced motion, and resizing in Chromium. The first-visit guide checks use a clearly marked simulated native bridge on the file: standalone; production HTTP has no bypass. This is emulation, not a substitute for testing Google sign-in, the signed APK and its keyboard on an actual phone.
+The release workflow runs `npm run test:qa` (including simulated personal-feature checks) against the production preview; it also runs `test:mobile`, `test:features`, and `test:security` as part of that command. Locally, start `npx vite preview --host 127.0.0.1 --port 4173` in a separate terminal and run either command from `mobile/`. The mobile checks cover optional profile-editor and Google-entry button hit targets, phone-sized layouts, simulated keyboard resizing, touch scrolling, rapid tab switching, the simulated Android Back bridge, reviewed nutrition, BMI positions, search, logging, reduced motion, and resizing in Chromium. The first-visit guide checks use a clearly marked simulated native bridge on the file: standalone; production HTTP has no bypass. This is emulation, not a substitute for testing Google sign-in, the signed APK and its keyboard on an actual phone.
 
 ## Privacy and scope
 

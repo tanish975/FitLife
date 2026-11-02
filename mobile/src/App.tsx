@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, Settings2 } from 'lucide-react';
 import { FitLifeProvider, useFitLife } from './data/FitLifeStore';
 import { GlassBottomNav, MainTabId } from './components/GlassBottomNav';
+import { MotionEntry } from './components/MotionEntry';
 import { DesktopNavigation, WellnessSidebar, FitLifeBrand } from './components/FitnessSidebars';
 import { CelebrationOverlay } from './components/CelebrationOverlay';
 import { InstallPhoneModal } from './components/InstallPhoneModal';
@@ -18,7 +19,9 @@ import { OnboardingScreen } from './screens/OnboardingScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { triggerHaptic } from './domain/Haptics';
 import { useMediaQuery } from './hooks/useMediaQuery';
+import { useInputModality } from './hooks/useInputModality';
 import { FitnessLoader } from './components/FitnessLoader';
+import { StepTrackingProvider } from './components/StepTrackingProvider';
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -29,6 +32,7 @@ type SubScreen = 'none' | 'settings' | 'onboarding' | 'daily';
 declare global { interface Window { __fitlifeHandleBack?: () => boolean } }
 
 const FitLifeShell: React.FC = () => {
+  useInputModality();
   const { settings, isAuthenticated, authRestoring, guidesReady, markGuideSeen, localOwnerId, celebration, toastMessage, dismissCelebration } = useFitLife();
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<MainTabId>('dashboard');
@@ -141,22 +145,22 @@ const FitLifeShell: React.FC = () => {
       <FitnessLoader />
     );
     if (!isAuthenticated) return <div className="legacy-screen"><AuthScreen onCompleteAuth={() => { tabTrail.current = []; subTrail.current = []; setActiveTab('dashboard'); setSubScreen('none'); scrollToTop(); }} /></div>;
-    if (subScreen === 'onboarding') return <div className="legacy-screen"><OnboardingScreen onFinish={closeSubScreen} onCancel={closeSubScreen} /></div>;
-    if (subScreen === 'settings') return <div className="legacy-screen"><SettingsScreen onBack={closeSubScreen} onReviewGuide={reviewGuide} /></div>;
+    if (subScreen === 'onboarding') return <MotionEntry key="onboarding" className="legacy-screen"><OnboardingScreen onFinish={closeSubScreen} onCancel={closeSubScreen} /></MotionEntry>;
+    if (subScreen === 'settings') return <MotionEntry key="settings" className="legacy-screen"><SettingsScreen onBack={closeSubScreen} onReviewGuide={reviewGuide} /></MotionEntry>;
     if (subScreen === 'daily') return (
-      <div className="legacy-screen">
+      <MotionEntry key="daily" className="legacy-screen">
         <div className="daily-back-bar"><button onClick={closeSubScreen} aria-label="Back to home"><ArrowLeft size={20} /></button><span>Your daily dashboard</span><button onClick={openSettings} aria-label="Open settings"><Settings2 size={20} /></button></div>
         <DashboardScreen onNavigateTab={handleSelectTab} onOpenInstall={() => setIsInstallOpen(true)} onOpenSettings={openSettings} onEditProfile={openOnboarding} />
-      </div>
+      </MotionEntry>
     );
     return (
-      <div key={activeTab} className={tabDirection === 'right' ? 'animate-tab-right' : 'animate-tab-left'}>
+      <MotionEntry key={activeTab} className={tabDirection === 'right' ? 'animate-tab-right' : 'animate-tab-left'}>
         {activeTab === 'dashboard' && <FitnessHomeScreen onNavigateTab={handleSelectTab} onOpenDaily={openDaily} onOpenSettings={openSettings} onEditProfile={openOnboarding} onOpenWorkouts={(group) => handleSelectTab('workouts', group)} />}
         {activeTab === 'meals' && <div className="legacy-screen"><MealsScreen /></div>}
         {activeTab === 'workouts' && <div className="legacy-screen"><WorkoutsScreen key={workoutGroup} initialGroup={workoutGroup} /></div>}
         {activeTab === 'progress' && <div className="legacy-screen"><ProgressScreen onEditProfile={openOnboarding} /></div>}
         {activeTab === 'profile' && <div className="legacy-screen"><ProfileScreen onOpenSettings={openSettings} onEditOnboarding={openOnboarding} onOpenInstall={() => setIsInstallOpen(true)} /></div>}
-      </div>
+      </MotionEntry>
     );
   };
 
@@ -177,5 +181,5 @@ const FitLifeShell: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => <FitLifeProvider><FitLifeShell /></FitLifeProvider>;
+export const App: React.FC = () => <FitLifeProvider><StepTrackingProvider><FitLifeShell /></StepTrackingProvider></FitLifeProvider>;
 export default App;

@@ -23,6 +23,7 @@ try {
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.getByText("Today's overview", { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await page.locator('.settings-fold > summary').filter({hasText:'App updates'}).click();
   await page.getByText('Android version 1.0.17.', { exact: false }).waitFor();
   const automatic = page.getByRole('switch', { name: 'Automatic update checks' });
   assert.equal(await automatic.getAttribute('aria-checked'), 'true');
@@ -41,6 +42,7 @@ try {
   await installNativeFixture(browserPage);
   await browserPage.goto(base, { waitUntil: 'networkidle' });
   await browserPage.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await browserPage.locator('.settings-fold > summary').filter({hasText:'App updates'}).click();
   const link = browserPage.getByRole('link', { name: 'View latest release', exact: true });
   assert.equal(await link.getAttribute('href'), 'https://github.com/tanish975/FitLife/releases/latest');
   assert.equal(await browserPage.getByRole('switch', { name: 'Automatic update checks' }).count(), 0);

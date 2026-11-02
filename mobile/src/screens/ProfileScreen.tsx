@@ -103,7 +103,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
         <div className="fitness-profile-level">
           <div><span>LEVEL {gamification.level} PROGRESS</span><strong>{gamification.xpIntoLevel} / {gamification.xpForNextLevel} XP</strong></div>
-          <div className="fitness-profile-progress"><span style={{ width: `${Math.max(0, Math.round(gamification.levelProgress * 100))}%` }} /></div>
+          <div className="fitness-profile-progress"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, gamification.levelProgress))})` }} /></div>
           <p>{gamification.totalXp.toLocaleString()} total XP <span>·</span> {unlockedCount} of 9 badges unlocked</p>
         </div>
       </section>
@@ -124,27 +124,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-2xl bg-[#141916] p-3 border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Weight</div>
+            <div className="text-[0.625rem] text-[#84877F]">Weight</div>
             <div className="mt-0.5 font-heading text-sm font-bold text-[#F4F1EA]">
               {formatWeight(latestWeightKg, unit)}
             </div>
-            <div className="text-[10px] text-[#84877F]">{profile.heightCm} cm · {profile.age}y</div>
+            <div className="text-[0.625rem] text-[#84877F]">{profile.heightCm} cm · {profile.age}y</div>
           </div>
 
           <div className="rounded-2xl bg-[#141916] p-3 border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Current BMI</div>
+            <div className="text-[0.625rem] text-[#84877F]">Current BMI</div>
             <div className="mt-0.5 font-heading text-sm font-bold text-[#F4F1EA]">{bmiInfo.bmi}</div>
-            <div className="text-[10px] font-semibold" style={{ color: bmiInfo.color }}>
+            <div className="text-[0.625rem] font-semibold text-[#F4F1EA]">
               {profile.age >= 18 ? bmiInfo.category : 'Adult scale not applicable'}
             </div>
           </div>
 
           <div className="rounded-2xl bg-[#141916] p-3 border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Daily Target</div>
+            <div className="text-[0.625rem] text-[#84877F]">Daily Target</div>
             <div className="mt-0.5 font-heading text-sm font-bold text-[#7BB38F]">
               {macroTargets.calories} kcal
             </div>
-            <div className="text-[10px] text-[#84877F]">
+            <div className="text-[0.625rem] text-[#84877F]">
               {GOAL_CONFIG[profile.goal]?.label}
             </div>
           </div>
@@ -152,32 +152,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <div className="grid grid-cols-4 gap-2 pt-1">
           <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Protein</div>
+            <div className="text-[0.625rem] text-[#84877F]">Protein</div>
             <div className="font-heading text-xs font-bold text-[#7BB38F]">
               {macroTargets.proteinG}g
             </div>
           </div>
           <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Carbs</div>
+            <div className="text-[0.625rem] text-[#84877F]">Carbs</div>
             <div className="font-heading text-xs font-bold text-[#D8C39E]">
               {macroTargets.carbsG}g
             </div>
           </div>
           <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Fats</div>
+            <div className="text-[0.625rem] text-[#84877F]">Fats</div>
             <div className="font-heading text-xs font-bold text-[#E0B467]">
               {macroTargets.fatG}g
             </div>
           </div>
           <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
-            <div className="text-[10px] text-[#84877F]">Fiber</div>
+            <div className="text-[0.625rem] text-[#84877F]">Fiber</div>
             <div className="font-heading text-xs font-bold text-[#87B5AD]">
               {macroTargets.fiberG}g
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl bg-[#141916] px-3 py-2 text-[11px] text-[#84877F]">
+        <div className="flex items-center justify-between rounded-xl bg-[#141916] px-3 py-2 text-[0.6875rem] text-[#84877F]">
           <span>Activity: {ACTIVITY_MULTIPLIERS[profile.activityLevel]?.label}</span>
           <span>BMR {macroTargets.bmr} · TDEE {macroTargets.tdee} kcal</span>
         </div>
@@ -190,13 +190,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
               Achievement Badges ({unlockedCount}/9)
             </h3>
-            <p className="text-[11px] text-[#84877F]">
+            <p className="text-[0.6875rem] text-[#84877F]">
               Recomputed live from history · Tap any badge to celebrate
             </p>
           </div>
           <PressScale
             onClick={() => triggerManualCelebration(selectedBadge || undefined)}
-            className="inline-flex items-center gap-1 rounded-xl bg-[#213026] border border-[#3E634B] px-2.5 py-1 text-[11px] font-semibold text-[#7BB38F]"
+            className="inline-flex items-center gap-1 rounded-xl bg-[#213026] border border-[#3E634B] px-2.5 py-1 text-[0.6875rem] font-semibold text-[#7BB38F]"
           >
             <Sparkles className="h-3 w-3" />
             <span>Burst</span>
@@ -229,10 +229,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               >
                 {badge.icon}
               </div>
-              <span className="mt-1.5 font-heading text-[11px] font-semibold text-[#F4F1EA] line-clamp-1">
+              <span className="mt-1.5 font-heading text-[0.6875rem] font-semibold text-[#F4F1EA] line-clamp-1">
                 {badge.title}
               </span>
-              <span className="mt-0.5 text-[10px] font-medium text-[#7BB38F]">
+              <span className="mt-0.5 text-[0.625rem] font-medium text-[#7BB38F]">
                 {badge.currentValue}/{badge.targetValue}
               </span>
               <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[#121714]">
@@ -252,11 +252,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <div>
                 <div className="font-heading text-xs font-bold text-[#F4F1EA]">
                   {selectedBadge.title}{' '}
-                  <span className="text-[10px] font-normal text-[#7BB38F]">
+                  <span className="text-[0.625rem] font-normal text-[#7BB38F]">
                     ({selectedBadge.unlocked ? 'Unlocked' : 'In Progress'})
                   </span>
                 </div>
-                <p className="text-[11px] text-[#B8B5AD]">{selectedBadge.description}</p>
+                <p className="text-[0.6875rem] text-[#B8B5AD]">{selectedBadge.description}</p>
               </div>
             </div>
             <Award className="h-5 w-5 text-[#7BB38F] shrink-0" />

@@ -80,7 +80,7 @@ try {
   assert.equal((await cloudRows('alice')).length, 1, 'offline edit has not been falsely uploaded');
   await page.evaluate(() => localStorage.removeItem('__qa_offline'));
   await settings().click();
-  await page.getByRole('button', { name:'Sync now' }).click();
+  await page.getByRole('button', { name:/^(Sync now|Retry sync)$/ }).click();
   await waitCloudRows('alice', 2);
 
   // Editing the same logical meal must tombstone its exact previous content.
@@ -102,7 +102,7 @@ try {
   await editor.waitFor({ state:'hidden' });
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:alice') || '{}').deleted?.meals?.length === 1);
   await page.getByRole('button', { name:'Home', exact:true }).click(); await settings().click();
-  await page.getByRole('button', { name:'Sync now' }).click();
+  await page.getByRole('button', { name:/^(Sync now|Retry sync)$/ }).click();
   await page.waitForFunction(() => {
     const c = JSON.parse(localStorage.getItem('__qa_cloud') || '{}'); const raw = c.alice?.['a'.repeat(32)];
     if (!raw) return false; const p = JSON.parse(raw);
@@ -113,7 +113,7 @@ try {
   assert.equal(edited.filter(m => m.name === 'Alice private oats').length, 1);
   assert.equal(edited.find(m => m.name === 'Alice private oats').nutritionNote, 'Package label');
 
-  await page.getByRole('button', { name:'Sign out of Google' }).click();
+  await page.getByRole('button', { name:'Sign out' }).click();
   await page.waitForFunction(() => localStorage.getItem('fitlife_cloud_owner_v1') === '__fitlife_guest_v1__');
   assert.equal((await storage('fitlife_cloud_partition_v1:__fitlife_guest_v1__')).snapshot.meals.length, 0, 'sign-out must show an isolated guest rather than Alice');
   await page.evaluate(() => localStorage.setItem('__qa_next','bob'));
@@ -134,7 +134,7 @@ try {
   await settings().click();
   const before = await storage('fitlife_cloud_partition_v1:alice');
   await page.evaluate(() => { const cloud=JSON.parse(localStorage.getItem('__qa_cloud')); cloud.alice['a'.repeat(32)]='{invalid'; localStorage.setItem('__qa_cloud',JSON.stringify(cloud)); });
-  await page.getByRole('button', { name:'Sync now' }).click();
+  await page.getByRole('button', { name:/^(Sync now|Retry sync)$/ }).click();
   await page.getByText('Cloud data is invalid; nothing was overwritten.').waitFor();
   assert.deepEqual((await storage('fitlife_cloud_partition_v1:alice')).snapshot.meals, before.snapshot.meals, 'malformed cloud snapshot must not overwrite local data');
   assert.deepEqual(errors, []);

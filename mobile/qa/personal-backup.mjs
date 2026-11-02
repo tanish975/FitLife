@@ -1,0 +1,30 @@
+import { nativeApp, installNativeFixture } from './mock-native.mjs';
+import { chromium } from 'playwright';
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,acceptDownloads:true});
+const page=await context.newPage(); await installNativeFixture(page); const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const store=key=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),key);
+const openSettings=async()=>{await page.getByRole('button',{name:'Home',exact:true}).click();await page.getByRole('button',{name:'Open settings'}).first().click();await page.locator('.settings-fold > summary').filter({hasText:'Encrypted backup'}).click();};
+try {
+ await page.goto(nativeApp); await page.getByText("Today's overview").waitFor();
+ await page.getByRole('button',{name:'Meals',exact:true}).click();
+ await page.getByLabel('Describe a meal').fill('2 eggs'); await page.getByRole('button',{name:'Add (1)'}).click();
+ await page.locator('.meal-shortcut').first().getByRole('button',{name:/Add .* to favorite meals/}).click();
+ let favorite=(await store('fitlife_settings_v2')).savedMeals.find(x=>!x.deleted); assert(favorite);
+ await openSettings(); await page.getByRole('button',{name:'Create backup'}).click();
+ const pass='strong test backup phrase';await page.getByLabel('Backup passphrase',{exact:true}).fill(pass);await page.getByLabel('Confirm passphrase').fill(pass);
+ const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Encrypt and save'}).click()]);const bytes=await readFile(await download.path());
+ await page.getByRole('button',{name:'Meals',exact:true}).click(); await page.getByRole('button',{name:'Favorites',exact:true}).click();
+ await page.locator('.meal-shortcut').first().getByRole('button',{name:/Remove .* from favorite meals/}).click();
+ const removed=(await store('fitlife_settings_v2')).savedMeals.find(x=>x.id===favorite.id);assert(removed.deleted);
+ await openSettings();await page.getByRole('button',{name:'Import backup'}).click();
+ await page.locator('input[type=file]').setInputFiles({name:'backup.fitlife',mimeType:'application/octet-stream',buffer:bytes});
+ await page.getByLabel('Backup passphrase',{exact:true}).fill(pass);await page.getByRole('button',{name:'Decrypt and restore'}).click();
+ await page.getByText(/Activity, steps, favorite meals and plan merged/).waitFor();
+ favorite=(await store('fitlife_settings_v2')).savedMeals.find(x=>x.id===favorite.id);
+ assert.equal(favorite.deleted,false,'explicit backup import restores a previously removed favorite');assert(favorite.updatedAt>removed.updatedAt,'restored favorite supersedes its tombstone');
+ await page.waitForFunction(()=>{const c=JSON.parse(localStorage.getItem('__fixture_cloud')||'{}')['qa-user']?.['c'.repeat(32)];return c&&JSON.parse(c).snapshot.settings.savedMeals?.some(x=>!x.deleted);},null,{timeout:15000});
+ assert.deepEqual(errors,[]);console.log('PASS: encrypted backup revives a deleted favorite and its newer state reaches simulated account sync.');
+} finally {await context.close();await browser.close();}

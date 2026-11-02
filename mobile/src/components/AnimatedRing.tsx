@@ -84,7 +84,7 @@ export const AnimatedRing: React.FC<AnimatedRingProps> = ({
       ctx.restore();
     };
 
-    if (reducedMotion || Math.abs(targetVal - startVal) < 0.001) {
+    if (reducedMotion || document.documentElement.dataset.fitlifeInput === 'keyboard' || Math.abs(targetVal - startVal) < 0.001) {
       currentProgressRef.current = targetVal;
       render(targetVal);
       return;

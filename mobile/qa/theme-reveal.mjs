@@ -150,6 +150,7 @@ try {
 
     // Settings segments each originate at the actually activated segment.
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+    await page.locator('.settings-fold > summary').filter({hasText:'Appearance'}).click();
     await page.getByText('Appearance Mode', { exact: true }).waitFor();
     await startReveal(page, page.getByRole('button', { name: 'Nightfall', exact: true })); await finishReveal(page);
     assert.equal(await page.getByRole('button', { name: 'Nightfall', exact: true }).getAttribute('aria-pressed'), 'true');
@@ -222,6 +223,7 @@ try {
   {
     const { page, context } = await newApp({ fallback: true });
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+    await page.locator('.settings-fold > summary').filter({hasText:'Appearance'}).click();
     await startReveal(page, page.getByRole('button', { name: 'Nightfall', exact: true }), { expectedType: 'fallback' });
     const layer = page.locator('[data-fitlife-theme-fallback]');
     assert.equal(await layer.locator('[data-fitlife-theme-choice=light]').evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
@@ -249,7 +251,7 @@ try {
     assert.equal(await setting(page, 'themeMode'), 'dark');
     assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-fitlife-theme-reveal')), false);
     if (options.osReduced || options.inAppReduced) {
-      assert.equal(await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).transitionDuration)), 0.00001);
+      assert.equal(await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).transitionDuration)), 0, 'reduced motion switches instantly without an intermediate frame');
     }
     await context.close();
   }

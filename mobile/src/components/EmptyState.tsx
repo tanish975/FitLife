@@ -7,9 +7,7 @@ interface EmptyStateProps {
   onAction?: () => void;
 }
 
-/**
- * EmptyState — drawn, slowly-pulsing pulse-line mark with solid natural sage stroke.
- */
+/** A static pulse-line mark: an empty result can remain visible indefinitely. */
 export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   subtitle,
@@ -19,7 +17,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <div className="flex flex-col items-center justify-center rounded-[26px] border border-[#2F3A33] bg-[#1E2520] px-6 py-8 text-center">
       <div className="relative mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#151A17] border border-[#3B5946]">
-        <svg viewBox="0 0 108 108" className="h-11 w-11 relative z-10">
+        <svg viewBox="0 0 108 108" className="h-11 w-11 relative z-10" aria-hidden="true" focusable="false">
           <path
             d="M26,54 L40,54 L47,36 L54,74 L61,54 L82,54"
             fill="none"
@@ -27,7 +25,6 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             strokeWidth="7"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="animate-pulse-line"
           />
         </svg>
       </div>

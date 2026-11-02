@@ -85,7 +85,7 @@ export const EncryptedBackupPanel: React.FC = () => {
     try {
       const snapshot = await decryptBackup(encryptedFile, pass);
       await restoreBackupSnapshot(snapshot, restoreMode);
-      setPass(''); setEncryptedFile(''); setFileName(''); setStatus(restoreMode === 'merge' ? 'Activity merged. Your current profile, settings, and water remain unchanged.' : 'Backup restored to this device.');
+      setPass(''); setEncryptedFile(''); setFileName(''); setStatus(restoreMode === 'merge' ? 'Activity, steps, favorite meals and plan merged. Your profile, other preferences and water remain unchanged.' : 'Backup restored to this device.');
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Backup could not be restored.'); }
     setBusy(false);
   };
@@ -98,8 +98,8 @@ export const EncryptedBackupPanel: React.FC = () => {
         {fileName && <span className="backup-file-name">{fileName}</span>}</>}
       <label>Backup passphrase<input type="password" autoComplete={action === 'export' ? 'new-password' : 'off'} value={pass} onChange={event => setPass(event.target.value)} disabled={busy} /></label>
       {action === 'export' ? <label>Confirm passphrase<input type="password" autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} disabled={busy} /></label> : <fieldset><legend>How to restore</legend>
-        <label className="backup-option"><input type="radio" name="backup-mode" checked={restoreMode === 'merge'} onChange={() => { setRestoreMode('merge'); setConfirmedReplace(false); }} /> <span><b>Merge activity</b><small>Keep this device’s profile, settings, and water.</small></span></label>
-        <label className="backup-option"><input type="radio" name="backup-mode" checked={restoreMode === 'replace'} onChange={() => setRestoreMode('replace')} /> <span><b>Replace device data</b><small>Overwrites the current profile, settings and activity.</small></span></label>
+        <label className="backup-option"><input type="radio" name="backup-mode" checked={restoreMode === 'merge'} onChange={() => { setRestoreMode('merge'); setConfirmedReplace(false); }} /> <span><b>Merge activity</b><small>Includes steps, favorite meals and plan. Keeps your profile, other preferences and water.</small></span></label>
+        <label className="backup-option"><input type="radio" name="backup-mode" checked={restoreMode === 'replace'} onChange={() => setRestoreMode('replace')} /> <span><b>Replace device data</b><small>Overwrites this device. Synced steps, favorites and plan entries may reappear after sync.</small></span></label>
         {restoreMode === 'replace' && <label className="backup-option"><input type="checkbox" checked={confirmedReplace} onChange={event => setConfirmedReplace(event.target.checked)} /> <span>I understand this replaces my current data.</span></label>}
       </fieldset>}
       <button type="button" className="backup-primary" disabled={busy || !pass || (action === 'import' && (!encryptedFile || (restoreMode === 'replace' && !confirmedReplace)))} onClick={action === 'export' ? save : restore}>{busy ? 'Please wait…' : action === 'export' ? 'Encrypt and save' : 'Decrypt and restore'}</button>

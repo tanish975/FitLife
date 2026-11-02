@@ -79,7 +79,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
             14-entry Weight & Calorie Canvas analytics
           </p>
         </div>
-        <span className="rounded-full border border-[#3E634B] bg-[#213026] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
+        <span className="rounded-full border border-[#3E634B] bg-[#213026] px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
           {unit.toUpperCase()} Display
         </span>
       </div>
@@ -88,7 +88,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
       <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-xl" data-guide-target="progress-weight" aria-label="Weight check-in">
         <div className="relative z-10 flex items-start justify-between gap-3">
           <div>
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#7BB38F]">
+            <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
               <Sparkles className="h-3 w-3" /> Latest Logged Weight
             </span>
             {hasWeight ? <><div className="mt-1 flex items-baseline gap-1.5">
@@ -102,7 +102,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
 
             <div className="mt-1.5 flex items-center gap-2 text-xs">
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold ${
                   deltaKg <= 0
                     ? 'bg-[#151F19] text-[#7BB38F]'
                     : 'bg-[#2B271F] text-[#D8C39E]'
@@ -115,7 +115,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
                 )}
                 {deltaKg <= 0 ? `−${deltaDisplay}` : `+${deltaDisplay}`} {unit} (14d)
               </span>
-              <span className="text-[#B8B5AD] text-[11px]">
+              <span className="text-[#B8B5AD] text-[0.6875rem]">
                 Start: {formatWeight(startingWeightKg, unit)}
               </span>
             </div></> : <p className="mt-2 text-sm text-[#B8B5AD]">No weight logged yet.</p>}
@@ -137,7 +137,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
               placeholder={`Enter today's weight (${unit})`}
               className="w-full rounded-xl border border-[#355440] bg-[#151F19] px-3.5 py-2 text-xs font-semibold text-[#F4F1EA] outline-none focus:border-[#7BB38F]"
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#84877F]">
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[0.6875rem] font-bold text-[#84877F]">
               {unit}
             </span>
           </div>
@@ -158,7 +158,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Body Mass Index (BMI)</h2>
-            <p className="text-[11px] text-[#84877F]">
+            <p className="text-[0.6875rem] text-[#84877F]">
               {profile.age >= 18 ? <>Adult BMI reference range for {profile.heightCm} cm:{' '}
               <strong className="text-[#D8C39E]">{formatWeight(bmiResult.healthyRangeKg[0], unit)} – {formatWeight(bmiResult.healthyRangeKg[1], unit)}</strong></> : 'Adult BMI categories do not apply below age 18.'}
             </p>
@@ -166,7 +166,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
           <div className="text-right">
             <div className="font-heading text-xl font-extrabold text-[#F4F1EA]">{bmiResult.bmi}</div>
             {profile.age >= 18 && <span
-              className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+              className="inline-block rounded-full px-2.5 py-0.5 text-[0.625rem] font-bold"
               style={{
                 backgroundColor: bmiResult.badgeBg,
                 color: bmiResult.color,
@@ -205,7 +205,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
               Weight Trend (Last 14 Entries)
             </h2>
-            <p className="text-[11px] text-[#84877F]">
+            <p className="text-[0.6875rem] text-[#84877F]">
               Touch or drag across points to inspect daily check-ins
             </p>
           </div>
@@ -230,7 +230,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
               {profile.onboarded ? '14-Day Calorie Trend vs. Target' : '14-Day Calorie Trend'}
             </h2>
-            <p className="text-[11px] text-[#84877F]">
+            <p className="text-[0.6875rem] text-[#84877F]">
               {profile.onboarded ? `Dashed ochre line shows your ${macroTargets.calories} kcal daily target` : 'Logged food energy; add profile details to calculate a target.'}
             </p>
           </div>

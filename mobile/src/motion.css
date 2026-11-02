@@ -1,0 +1,140 @@
+/* FitLife motion: quick feedback, clear state changes, solid-color surfaces.
+   No scroll choreography, ambient effects or persistent GPU-layer hints. */
+:root {
+  --fit-motion-fast: 140ms;
+  --fit-motion-ui: 190ms;
+  --fit-motion-sheet: 230ms;
+  --fit-ease-out: cubic-bezier(.23, 1, .32, 1);
+  --fit-ease-move: cubic-bezier(.77, 0, .175, 1);
+}
+
+/* A tiny route arrival and moving nav highlight provide continuity. Sheets
+   live in portals so the brief transform cannot contain fixed-position UI. */
+@keyframes fitlife-route-arrive { from { transform: translateY(3px); } to { transform: translateY(0); } }
+.animate-tab-right, .animate-tab-left { animation: fitlife-route-arrive 150ms var(--fit-ease-out); }
+@media (max-width: 650px) {
+  .mobile-nav-selection { transition: transform 210ms var(--fit-ease-out); }
+  .mobile-nav-icon { transition: transform 180ms var(--fit-ease-out); }
+  /* A transition retargets on rapid tab changes; an icon keyframe cannot. */
+  .mobile-bottom-item.is-active .mobile-nav-icon { animation: none; }
+}
+
+/* Acknowledgement for touch/click. The independent scale property does not
+   replace transforms that position a control. Older WebViews simply omit it. */
+button:not(:disabled) { transition: scale var(--fit-motion-fast) var(--fit-ease-out); }
+@supports (scale: 1) {
+  button:not(:disabled):active { scale: .975; transition-duration: 85ms; }
+  html[data-fitlife-input="keyboard"] button:active { scale: 1; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .home-action > svg, .step-detail-link > svg, .home-workout-shortcut button > svg {
+    transition: transform var(--fit-motion-ui) var(--fit-ease-out);
+  }
+  .home-action:hover > svg, .step-detail-link:hover > svg, .home-workout-shortcut button:hover > svg {
+    transform: translateX(3px);
+  }
+}
+
+/* Sheets enter where they appear; the underlying content stays mounted.
+   Close actions remain immediate so focus and Back never wait for animation. */
+@keyframes fitlife-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fitlife-sheet-in { from { transform: translateY(14px); } to { transform: translateY(0); } }
+@keyframes fitlife-modal-in { from { transform: scale(.985); } to { transform: scale(1); } }
+/* Fade only the scrim, not its text-bearing children: their contrast remains
+   stable through the whole entrance rather than merely at the final frame. */
+.step-sheet-backdrop, .meal-editor-overlay { background: transparent; }
+.step-sheet-backdrop::before, .meal-editor-overlay::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  animation: fitlife-scrim-in 170ms var(--fit-ease-out);
+}
+.step-sheet-backdrop::before { background: rgba(14, 22, 17, .62); }
+.meal-editor-overlay::before { background: rgba(10, 18, 13, .62); }
+.step-sheet, .meal-editor { position: relative; animation: fitlife-sheet-in var(--fit-motion-sheet) var(--fit-ease-out); }
+.guided-sheet { animation: fitlife-sheet-in 210ms var(--fit-ease-out); }
+@media (min-width: 651px) {
+  .step-sheet, .meal-editor { animation-name: fitlife-modal-in; }
+}
+
+/* Work/rest/complete states are meaningful workout changes, not timer ticks.
+   Native details retain their instant layout, keyboard and screen-reader behavior. */
+@keyframes fitlife-content-in { from { transform: translateY(5px); } to { transform: translateY(0); } }
+.guided-phase, .guide-step-content { animation: fitlife-content-in var(--fit-motion-ui) var(--fit-ease-out); }
+.home-disclosure[open] > :not(summary),
+.training-disclosure[open] > section,
+.settings-fold[open] > .settings-fold-body,
+.weekly-planner[open] > .weekly-planner-body,
+.reminder-settings[open] > .reminder-body,
+.step-about[open] > p,
+.cloud-privacy[open] > p,
+.meal-about[open] > p {
+  animation: fitlife-content-in 170ms var(--fit-ease-out);
+}
+:where(.weekly-planner, .reminder-settings) > summary > svg,
+.settings-fold > summary > span:last-child,
+.training-disclosure > summary > span {
+  transition: transform var(--fit-motion-ui) var(--fit-ease-out);
+}
+.training-disclosure[open] > summary > span { transform: rotate(180deg); }
+.guide-dots i { transition: transform var(--fit-motion-ui) var(--fit-ease-out), background-color var(--fit-motion-ui) ease; }
+.guide-dots i.is-current { transform: scale(1.25); }
+
+/* Values arrive at their true position; future progress changes retarget the
+   transform instead of animating width and forcing layout. */
+.guided-progress-track > span, .planner-progress > i, .fitness-profile-progress > span {
+  width: 100%;
+  transform-origin: left center;
+  transition: transform 260ms var(--fit-ease-out);
+}
+.home-water-track > span { transition: transform 260ms var(--fit-ease-out); }
+.step-ring-fill, .rest-ring-progress { transition: stroke-dashoffset 260ms var(--fit-ease-out); }
+
+/* The history is an authored movement moment: bars reveal once on opening,
+   with a short bounded stagger. Empty bars remain empty and labels stay still. */
+@keyframes fitlife-step-bar-in { from { transform: scaleY(.14); opacity: .8; } to { transform: scaleY(1); opacity: 1; } }
+.step-bar-track > i { transform-origin: center bottom; animation: fitlife-step-bar-in 230ms var(--fit-ease-out) backwards; }
+.step-bar-day:nth-child(2) i { animation-delay: 10ms; }
+.step-bar-day:nth-child(3) i { animation-delay: 20ms; }
+.step-bar-day:nth-child(4) i { animation-delay: 30ms; }
+.step-bar-day:nth-child(5) i { animation-delay: 40ms; }
+.step-bar-day:nth-child(6) i { animation-delay: 50ms; }
+.step-bar-day:nth-child(7) i { animation-delay: 60ms; }
+
+/* Toggle feedback is interruptible. Never rely on motion alone to show state:
+   aria-pressed/checked, text and color remain present. */
+:where(.exercise-favorite, .favorite-filter, .meal-star, .meal-row-actions button[aria-pressed]) svg {
+  transition: transform 180ms var(--fit-ease-out);
+}
+:where(.exercise-favorite, .favorite-filter, .meal-star, .meal-row-actions button)[aria-pressed="true"] svg { transform: scale(1.1); }
+.accessibility-options { overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 20px; background: var(--bg-card); }
+.accessibility-options .accessibility-setting { border: 0; border-radius: 0; background: transparent; }
+.accessibility-options .accessibility-setting + .accessibility-setting { border-top: 1px solid var(--border-subtle); }
+.accessibility-setting > button > span { justify-content: flex-start; transition: background-color 160ms ease; }
+.accessibility-setting > button > span.is-on { justify-content: flex-start; }
+.accessibility-setting i { transition: transform 180ms var(--fit-ease-out); }
+.accessibility-setting .is-on i { transform: translateX(18px); }
+
+/* Keyboard-triggered actions are instant; preference changes and Android Back
+   remain synchronous. The existing global reduced-motion rules also cover
+   every new animation, including portal sheets and the loader. */
+/* Modality is captured per mounted entrance: a later pointerdown must not
+   restart a route or create a new stacking context beneath an open sheet. */
+.motion-instant.animate-tab-right, .motion-instant.animate-tab-left,
+.motion-instant.animate-slide-up, .motion-instant.guided-phase,
+.motion-instant.guide-step-content, .motion-instant.step-sheet-backdrop::before,
+.motion-instant.meal-editor-overlay::before, .motion-instant.step-sheet,
+.motion-instant.meal-editor, .motion-instant.guided-sheet,
+.motion-instant.legacy-screen > .animate-screen-enter,
+.motion-instant.legacy-screen :where(.animate-stagger-1, .animate-stagger-2, .animate-stagger-3, .animate-stagger-4, .animate-stagger-5),
+.motion-instant.step-sheet-backdrop .step-bar-track > i,
+details[data-fitlife-motion-instant] > :not(summary) { animation: none !important; }
+html[data-fitlife-input="keyboard"] :where(button, .mobile-nav-selection, .mobile-nav-icon, .accessibility-setting i, .guide-dots i, .guided-progress-track > span, .planner-progress > i, .fitness-profile-progress > span, .home-water-track > span, .step-ring-fill, .rest-ring-progress) { transition-duration: 0ms !important; }
+html[data-motion="reduced"] button:active { scale: 1; }
+html[data-motion="reduced"] .press-scale[role="button"]:active { transform: none !important; }
+html[data-motion="reduced"], html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
+  animation: none !important; animation-delay: 0ms !important; transition-duration: 0ms !important; transition-delay: 0ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  button:active { scale: 1; }
+  .press-scale[role="button"]:active { transform: none !important; }
+  html, *, *::before, *::after { animation: none !important; animation-delay: 0ms !important; transition-duration: 0ms !important; transition-delay: 0ms !important; }
+}

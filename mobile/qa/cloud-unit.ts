@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
 import { activatePartition, addDeleted, CLOUD_OWNER_KEY, CLOUD_SLOT_PREFIX, emptyDeletions, mergeCloud,
-  readActivePartition, readPartition, rowFingerprint, savePartition, validCloudPayload } from '../src/domain/CloudSync';
+  readActivePartition, readPartition, rowFingerprint, savePartition, validCloudPartition, validCloudPayload } from '../src/domain/CloudSync';
 if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
 
 const profile: any = { name: 'Athlete', email: 'athlete@example.test', sex: 'female', age: 30, heightCm: 170, weightKg: 65,
@@ -66,6 +66,9 @@ class MemoryStorage implements Storage {
 const storage = new MemoryStorage();
 const partA: any = { version: 1, snapshot: snap([a], 'Alice'), deleted: emptyDeletions() };
 const partB: any = { version: 1, snapshot: snap([b], 'Bob'), deleted: emptyDeletions() };
+assert(validCloudPartition({...partA,recovery:{settings:['motionStyle','largeText'],profile:['name'],water:true}}));
+assert(!validCloudPartition({...partA,recovery:{settings:['__proto__'],profile:[],water:false}}), 'unknown recovery fields fail closed');
+assert(!validCloudPartition({...partA,recovery:{settings:['largeText','largeText'],profile:[],water:false}}), 'duplicate recovery fields fail closed');
 activatePartition(storage, 'alice', partA);
 assert.equal(readActivePartition(storage).partition?.snapshot.profile.name, 'Alice');
 storage.failKey = CLOUD_OWNER_KEY;

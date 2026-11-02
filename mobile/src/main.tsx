@@ -4,6 +4,8 @@ import App from './App';
 import './index.css';
 import './shell.css';
 import './fitness-home.css';
+import './personal.css';
+import './motion.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

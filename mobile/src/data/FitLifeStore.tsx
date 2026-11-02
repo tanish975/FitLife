@@ -37,6 +37,9 @@ import { ParsedMealDraft } from '../domain/MealTextParser';
 import { applyThemeColorVariables } from '../domain/ThemeColorVariables';
 import { createThemeRevealController } from '../domain/ThemeReveal';
 import { BackupSnapshot, mergeBackupRows } from '../domain/EncryptedBackup';
+import { mergePersonalSettings, mergeStepObservations, validSavedMeal, validStepObservation, type StepObservation } from '../domain/PersonalFeatures';
+import { allRecoveryChanges, applyRecoveryChoices, emptyRecoveryJournal, noteRecoveryChanges, RECOVERY_PROFILE_KEYS, RECOVERY_SETTING_KEYS,
+  type RecoveryJournal, type RecoverySettingKey } from '../domain/RecoveryJournal';
 import { activatePartition, CLOUD_KINDS, CloudDeletions, CloudKind, CloudPartition, CloudPayload, emptyDeletions,
   GoogleAccount, GUEST_OWNER, hasNativeCloud, isDemoId, mergeCloud, nativeCloudRequest, readActivePartition, readPartition,
   RemoteSnapshot, rowFingerprint, savePartition, validCloudPayload } from '../domain/CloudSync';
@@ -87,6 +90,7 @@ interface FitLifeContextValue {
   triggerManualCelebration: (badge?: BadgeStatus) => void;
   updateProfile: (next: Partial<UserProfile>) => Promise<boolean>;
   setWeightUnit: (unit: WeightUnit) => void;
+  setLargeText: (enabled: boolean) => void;
   setHapticsEnabled: (enabled: boolean) => void;
   setThemeMode: (mode: ThemeMode, origin?: HTMLElement | null) => void;
   toggleThemeMode: (origin?: HTMLElement | null) => void;
@@ -98,6 +102,10 @@ interface FitLifeContextValue {
   setAutoStartRest: (enabled: boolean) => void;
   setWeeklyWorkoutGoal: (days: number) => void;
   toggleFavoriteExercise: (id: string) => void;
+  toggleSavedMeal: (meal: LoggedMeal) => void;
+  setPlannedDay: (weekday: number, sessionId: string) => void;
+  setStepGoal: (goal: number) => void;
+  recordStepObservations: (owner: string, records: StepObservation[]) => boolean;
   setNavStyle: (style: 'glass' | 'solid') => void;
   setWaterGoalMl: (ml: number) => void;
   toggleDashboardWidget: (key: keyof DashboardWidgetsConfig) => void;
@@ -106,7 +114,7 @@ interface FitLifeContextValue {
   logQuickAddMeals: (drafts: ParsedMealDraft[]) => void;
   editMeal: (id: string, draft: ParsedMealDraft) => Promise<boolean>;
   removeMeal: (id: string) => void;
-  logWorkout: (entry: Omit<LoggedWorkout, 'id' | 'dateKey' | 'timestamp'>) => void;
+  logWorkout: (entry: Omit<LoggedWorkout, 'id' | 'dateKey' | 'timestamp'>, eventId?: string) => void;
   removeWorkout: (id: string) => void;
   logWeight: (weightKg: number) => void;
   logMood: (moodId: MoodId) => void;
@@ -115,6 +123,8 @@ interface FitLifeContextValue {
   cloudAvailable: boolean;
   cloudAccount: GoogleAccount | null;
   cloudStatus: string;
+  lastSuccessfulSyncAt: number | null;
+  hasUnsyncedChanges: boolean;
   signInGoogle: () => Promise<boolean>;
   signOutGoogle: () => Promise<void>;
   syncNow: () => Promise<void>;
@@ -153,6 +163,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   navStyle: 'glass',
   waterGoalMl: 2500,
   guidesSeen: [],
+  largeText: false,
   dashboardWidgets: {
     showMacros: true,
     showHydration: true,
@@ -387,8 +398,14 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [cloudStatus, setCloudStatus] = useState(initialCloud.damaged
     ? 'Account data needs recovery; cloud sync is paused and existing data was not overwritten.'
     : 'Not connected.');
+  const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<number | null>(null);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
   const cloudBusyRef = useRef(false);
-  const needsRecoveryRef = useRef(false);
+  // This journal is stored only in the local account slot. A pending first
+  // cloud recovery must not undo accessibility or other choices made offline.
+  const needsRecoveryRef = useRef(!!initialCloud.partition?.recovery);
+  const recoveryJournalRef = useRef<RecoveryJournal>(initialCloud.partition?.recovery || emptyRecoveryJournal());
+  const applyingPartitionRef = useRef(false);
   const cloudAvailable = hasNativeCloud();
   const [authRestoring, setAuthRestoring] = useState(cloudAvailable);
   const [guidesReady, setGuidesReady] = useState(false);
@@ -504,10 +521,11 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       settings.motionStyle === 'reduced' ? '0ms' : settings.motionStyle === 'gentle' ? '220ms' : '320ms';
     root.style.setProperty('--motion-duration', motionScale);
 
-    const fontScale =
-      settings.densityStyle === 'compact' ? '14.5px' : settings.densityStyle === 'spacious' ? '16.8px' : '16px';
-    root.style.fontSize = fontScale;
-  }, [themeColors, settings.themeMode, settings.cornerStyle, settings.motionStyle, settings.densityStyle]);
+    const baseFont = settings.densityStyle === 'compact' ? 14.5 : settings.densityStyle === 'spacious' ? 16.8 : 16;
+    const multiplier = settings.largeText ? 1.2 : 1;
+    root.style.fontSize = `${baseFont * multiplier}px`;
+    root.style.setProperty('--fitlife-text-scale', String(multiplier));
+  }, [themeColors, settings.themeMode, settings.cornerStyle, settings.motionStyle, settings.densityStyle, settings.largeText]);
 
   useEffect(() => {
     try {
@@ -664,9 +682,22 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch { showToast('Could not safely record the deletion. Nothing was removed.'); return false; }
   };
 
+  const noteRecoverySettingIntent = (...keys: RecoverySettingKey[]) => {
+    if (!needsRecoveryRef.current) return;
+    const old = recoveryJournalRef.current;
+    recoveryJournalRef.current = { ...old, settings: RECOVERY_SETTING_KEYS.filter(key => old.settings.includes(key) || keys.includes(key)) };
+  };
+
   const updateProfile = async (next: Partial<UserProfile>) => {
     if (next.weightKg && next.weightKg > 0 && !(await markCloudDeletes({ weights: weights.filter(w => w.dateKey === todayKey) }))) return false;
     triggerHaptic('medium', settings.hapticsEnabled);
+    if (needsRecoveryRef.current) {
+      // Submitting a profile explicitly chooses all submitted values, even if
+      // one happens to match the hidden defaults of a new install.
+      const old = recoveryJournalRef.current;
+      recoveryJournalRef.current = { ...old, profile: RECOVERY_PROFILE_KEYS.filter(key =>
+        old.profile.includes(key) || Object.prototype.hasOwnProperty.call(next, key)) };
+    }
     setProfile((prev) => ({ ...prev, ...next }));
     if (next.weightKg && next.weightKg > 0) {
       setWeights((prev) => [
@@ -685,29 +716,43 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setWeightUnit = (unit: WeightUnit) => {
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('weightUnit');
     setSettings((prev) => ({ ...prev, weightUnit: unit }));
     showToast(`Weight unit switched to ${unit.toUpperCase()}`);
   };
 
+  const setLargeText = (enabled: boolean) => {
+    noteRecoverySettingIntent('largeText');
+    setSettings(prev => ({ ...prev, largeText: enabled }));
+  };
+
   const setHapticsEnabled = (enabled: boolean) => {
     if (enabled) triggerHaptic('medium', true);
+    noteRecoverySettingIntent('hapticsEnabled');
     setSettings((prev) => ({ ...prev, hapticsEnabled: enabled }));
     showToast(`Haptic feedback ${enabled ? 'enabled' : 'disabled'}`);
   };
 
   const setThemeMode = (themeMode: ThemeMode, origin?: HTMLElement | null) => {
-    if (requestedThemeRef.current === themeMode) return;
+    if (requestedThemeRef.current === themeMode) {
+      if (needsRecoveryRef.current) { noteRecoverySettingIntent('themeMode'); setSettings(prev => ({ ...prev })); }
+      return;
+    }
     requestedThemeRef.current = themeMode;
     triggerHaptic('light', settings.hapticsEnabled);
     themeRevealRef.current?.cancel();
     // A very fast second tap may request the already-visible mode. Cancel the
     // unfinished first reveal rather than replaying the same appearance.
-    if (appliedThemeRef.current === themeMode) return;
+    if (appliedThemeRef.current === themeMode) {
+      if (needsRecoveryRef.current) { noteRecoverySettingIntent('themeMode'); setSettings(prev => ({ ...prev, themeMode })); }
+      return;
+    }
     const palette = NATURAL_PALETTES[settings.paletteId] || NATURAL_PALETTES.matcha_oat;
     const colors = themeMode === 'light' ? palette.light : palette.dark;
     const apply = () => {
       if (requestedThemeRef.current !== themeMode) return;
       appliedThemeRef.current = themeMode;
+      noteRecoverySettingIntent('themeMode');
       flushSync(() => {
         setSettings((prev) => ({ ...prev, themeMode }));
         showToast(themeMode === 'light' ? '☀️ Daylight theme active' : '🌙 Nightfall theme active');
@@ -723,6 +768,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setPaletteId = (paletteId: PaletteId) => {
     themeRevealRef.current?.finish();
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('paletteId');
     setSettings((prev) => ({ ...prev, paletteId }));
     const name = NATURAL_PALETTES[paletteId]?.name || 'Custom';
     showToast(`Palette switched to ${name}`);
@@ -731,6 +777,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setCornerStyle = (cornerStyle: CornerStyle) => {
     themeRevealRef.current?.finish();
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('cornerStyle');
     setSettings((prev) => ({ ...prev, cornerStyle }));
     showToast(`Corner style: ${CORNER_RADIUS_MAP[cornerStyle].label}`);
   };
@@ -738,54 +785,120 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setMotionStyle = (motionStyle: MotionStyle) => {
     themeRevealRef.current?.finish();
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('motionStyle');
     setSettings((prev) => ({ ...prev, motionStyle }));
-    showToast(`Motion intensity: ${motionStyle}`);
+    showToast(motionStyle === 'reduced' ? 'Reduced motion on' : 'Motion on');
   };
 
   const setDensityStyle = (densityStyle: DensityStyle) => {
     themeRevealRef.current?.finish();
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('densityStyle');
     setSettings((prev) => ({ ...prev, densityStyle }));
     showToast(`Layout density: ${densityStyle}`);
   };
 
   const setDefaultRestSeconds = (defaultRestSeconds: number) => {
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('defaultRestSeconds');
     setSettings((prev) => ({ ...prev, defaultRestSeconds }));
     showToast(`Default workout rest set to ${defaultRestSeconds}s`);
   };
 
   const setAutoStartRest = (autoStartRest: boolean) => {
+    noteRecoverySettingIntent('autoStartRest');
     setSettings((prev) => ({ ...prev, autoStartRest }));
     showToast(autoStartRest ? 'Rest timer will start after logging' : 'Automatic rest timer off');
   };
 
   const setWeeklyWorkoutGoal = (days: number) => {
     const weeklyWorkoutGoal = Math.max(1, Math.min(7, Math.round(days)));
+    noteRecoverySettingIntent('weeklyWorkoutGoal');
     setSettings((prev) => ({ ...prev, weeklyWorkoutGoal }));
     showToast(`Weekly goal: ${weeklyWorkoutGoal} workout days`);
   };
 
   const toggleFavoriteExercise = (id: string) => {
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('favoriteExerciseIds');
     setSettings((prev) => ({ ...prev, favoriteExerciseIds: prev.favoriteExerciseIds.includes(id)
       ? prev.favoriteExerciseIds.filter((item) => item !== id)
       : [...prev.favoriteExerciseIds, id] }));
   };
 
+  const toggleSavedMeal = (meal: LoggedMeal) => {
+    if (!validSavedMeal({ id:'favorite-check', updatedAt:Date.now(), deleted:false, meal })) { showToast('This meal needs valid nutrition details before it can be saved.'); return; }
+    const current = settings.savedMeals || [];
+    if (!current.some(item => item.meal.id === meal.id) && current.length >= 500) { showToast('Favorite meal limit reached. Keep an encrypted backup.'); return; }
+    setSettings(previous => {
+      const items = previous.savedMeals || [];
+      const existing = items.find(item => item.meal.id === meal.id);
+      if (!existing && items.length >= 500) return previous;
+      const updatedAt = Math.max(Date.now(), (existing?.updatedAt || 0) + 1);
+      // The same logged meal favorited on two devices gets the same key, so
+      // syncing cannot create two independent copies of that favorite.
+      const stableId = /^[A-Za-z0-9_-]{1,100}$/.test(meal.id) ? `favorite-${meal.id}` : `favorite-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+      const item = existing ? { ...existing, deleted: !existing.deleted, updatedAt, meal } : {
+        id: stableId, updatedAt, deleted: false, meal,
+      };
+      return { ...previous, savedMeals: [...items.filter(x => x.id !== item.id), item] };
+    });
+  };
+
+  const setPlannedDay = (weekday: number, sessionId: string) => {
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !/^[a-z0-9-]{0,80}$/.test(sessionId)) return;
+    setSettings(previous => {
+      const entries = previous.weeklyPlan || [], old = entries.find(x => x.weekday === weekday);
+      const next = { weekday, sessionId, updatedAt: Math.max(Date.now(), (old?.updatedAt || 0) + 1) };
+      return { ...previous, weeklyPlan: [...entries.filter(x => x.weekday !== weekday), next] };
+    });
+  };
+
+  const setStepGoal = (goal: number) => {
+    if (!Number.isFinite(goal)) return;
+    noteRecoverySettingIntent('stepGoal');
+    setSettings(previous => ({ ...previous, stepGoal: Math.max(100, Math.min(100000, Math.round(goal))) }));
+  };
+
+  const recordStepObservations = (owner: string, records: StepObservation[]): boolean => {
+    if (!owner || ownerRef.current !== owner || !records.every(validStepObservation)) return false;
+    const id = (row: StepObservation) => `${row.dateKey}:${row.deviceId}:${row.source}`;
+    const keys = new Set((settings.stepHistory || []).map(id));
+    for (const row of records) keys.add(id(row));
+    if (keys.size > 4000) return false; // Surface the limit; never silently prune old data.
+    setSettings(previous => {
+      if (ownerRef.current !== owner) return previous;
+      const before = previous.stepHistory || [], existing = new Map(before.map(row => [id(row),row]));
+      // Do not rewrite timestamps or trigger uploads for unchanged observations.
+      const changed = records.flatMap(row => {
+        const old = existing.get(id(row));
+        if (old && old.count === row.count && old.partial === row.partial) return [];
+        return [{ ...row, updatedAt: Math.max(row.updatedAt, (old?.updatedAt || 0) + 1) }];
+      });
+      if (!changed.length) return previous;
+      const next = mergeStepObservations([...before, ...changed]);
+      if (next.length > 4000) return previous;
+      return { ...previous, stepHistory: next };
+    });
+    return true;
+  };
+
   const setNavStyle = (navStyle: 'glass' | 'solid') => {
+    noteRecoverySettingIntent('navStyle');
     setSettings((prev) => ({ ...prev, navStyle }));
     showToast(navStyle === 'glass' ? 'Glass navigation selected' : 'Solid navigation selected');
   };
 
   const setWaterGoalMl = (waterGoalMl: number) => {
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('waterGoalMl');
     setSettings((prev) => ({ ...prev, waterGoalMl }));
     showToast(`Daily hydration target set to ${(waterGoalMl / 1000).toFixed(1)}L`);
   };
 
   const toggleDashboardWidget = (key: keyof DashboardWidgetsConfig) => {
     triggerHaptic('light', settings.hapticsEnabled);
+    noteRecoverySettingIntent('dashboardWidgets');
     setSettings((prev) => ({
       ...prev,
       dashboardWidgets: {
@@ -861,6 +974,11 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Sample entries are never uploaded; an edited sample becomes a real row.
     if (isDemoId(original.id)) updated.id = `meal-edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setMeals((previous) => previous.map((meal) => meal.id === id ? updated : meal));
+    if (!isDemoId(original.id)) setSettings(previous => {
+      const saved = previous.savedMeals || [];
+      if (!saved.some(item => item.meal.id === id && !item.deleted)) return previous;
+      return { ...previous, savedMeals: saved.map(item => item.meal.id === id && !item.deleted ? { ...item, meal:updated, updatedAt:Math.max(Date.now(),item.updatedAt+1) } : item) };
+    });
     showToast('Meal details updated.');
     return true;
   };
@@ -872,15 +990,17 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast('Meal removed');
   };
 
-  const logWorkout = (entry: Omit<LoggedWorkout, 'id' | 'dateKey' | 'timestamp'>) => {
+  const logWorkout = (entry: Omit<LoggedWorkout, 'id' | 'dateKey' | 'timestamp'>, eventId?: string) => {
     triggerHaptic('success', settings.hapticsEnabled);
     const newWorkout: LoggedWorkout = {
       ...entry,
-      id: `wk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: eventId && /^guided-[a-z0-9-]{1,100}$/.test(eventId) ? eventId : `wk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       dateKey: todayKey,
       timestamp: Date.now(),
     };
-    setWorkouts((prev) => [newWorkout, ...prev]);
+    // A resumed guided set uses a stable event ID. Replaying it must not add
+    // another workout if the prior log was already saved.
+    setWorkouts((prev) => prev.some(w => w.id === newWorkout.id) ? prev : [newWorkout, ...prev]);
     showToast(`Logged ${entry.exerciseName} (+20 XP)`);
   };
 
@@ -968,12 +1088,21 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const backupRevisionRef = useRef(0);
   const backupDataRef = useRef({ profile, settings, meals, workouts, weights, moods, water: waterRecord });
   useLayoutEffect(() => {
-    backupDataRef.current = { profile, settings, meals, workouts, weights, moods, water: waterRecord };
+    const nextData = { profile, settings, meals, workouts, weights, moods, water: waterRecord };
+    if (needsRecoveryRef.current && !applyingPartitionRef.current) {
+      recoveryJournalRef.current = noteRecoveryChanges(recoveryJournalRef.current, backupDataRef.current, nextData);
+    }
+    backupDataRef.current = nextData;
     cloudDeletedRef.current = cloudDeleted;
     backupRevisionRef.current++;
     if (ownerRef.current && !storageBlockedRef.current) {
       try {
-        savePartition(localStorage, ownerRef.current, { version: 1, snapshot: { schema: 1, createdAt: 0, ...backupDataRef.current }, deleted: cloudDeleted });
+        savePartition(localStorage, ownerRef.current, { version: 1, snapshot: { schema: 1, createdAt: 0, ...backupDataRef.current }, deleted: cloudDeleted,
+          ...(needsRecoveryRef.current ? { recovery: recoveryJournalRef.current } : {}) });
+        if (ownerRef.current !== GUEST_OWNER) {
+          localStorage.setItem(`fitlife_sync_pending_v1:${ownerRef.current}`, '1');
+          setHasUnsyncedChanges(true);
+        }
       } catch {
         setCloudStatus('Device storage is full or unavailable. Changes may not persist; create an encrypted backup.');
       }
@@ -998,10 +1127,15 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     themeRevealRef.current?.cancel();
     requestedThemeRef.current = next.settings.themeMode;
     appliedThemeRef.current = next.settings.themeMode;
-    flushSync(() => {
-      setProfile(next.profile); setSettings({ ...DEFAULT_SETTINGS, ...next.settings, guidesSeen: next.settings.guidesSeen === undefined && next.profile.onboarded ? [...GUIDE_IDS] : normalizeGuides(next.settings.guidesSeen) }); setMeals(next.meals); setWorkouts(next.workouts);
-      setWeights(next.weights); setMoods(next.moods); setWaterRecord(next.water); setCloudDeleted(part.deleted);
-    });
+    // Switching/recovering an account is not a user edit. flushSync makes the
+    // guarded layout-effect save complete before the guard is released.
+    applyingPartitionRef.current = true;
+    try {
+      flushSync(() => {
+        setProfile(next.profile); setSettings({ ...DEFAULT_SETTINGS, ...next.settings, guidesSeen: next.settings.guidesSeen === undefined && next.profile.onboarded ? [...GUIDE_IDS] : normalizeGuides(next.settings.guidesSeen) }); setMeals(next.meals); setWorkouts(next.workouts);
+        setWeights(next.weights); setMoods(next.moods); setWaterRecord(next.water); setCloudDeleted(part.deleted);
+      });
+    } finally { applyingPartitionRef.current = false; }
   };
   const freshPartition = (account: GoogleAccount): CloudPartition => ({
     version: 1,
@@ -1016,13 +1150,15 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (storageBlockedRef.current) throw new Error('Local data needs recovery.');
     // Store the account first. The separate guest slot is activated only after
     // it exists, so a crash cannot expose account A as the guest or account B.
-    const previous: CloudPartition = { version: 1, snapshot: makeBackupSnapshot(), deleted: cloudDeletedRef.current };
+    const previous: CloudPartition = { version: 1, snapshot: makeBackupSnapshot(), deleted: cloudDeletedRef.current,
+      ...(needsRecoveryRef.current ? { recovery: recoveryJournalRef.current } : {}) };
     savePartition(localStorage, owner, previous);
     const existing = readPartition(localStorage, GUEST_OWNER);
     const guest = existing || freshPartition({ signedIn: true, uid: GUEST_OWNER, name: 'FitLife Athlete', email: '' });
     activatePartition(localStorage, GUEST_OWNER, guest);
     ownerRef.current = GUEST_OWNER; setLocalOwnerId(GUEST_OWNER);
     needsRecoveryRef.current = false;
+    recoveryJournalRef.current = emptyRecoveryJournal();
     applyPartition(guest);
   };
   const isUntouchedDemo = (snapshot: BackupSnapshot) =>
@@ -1032,18 +1168,19 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const activateGoogleAccount = (account: GoogleAccount, openApp: boolean) => {
     if (storageBlockedRef.current) throw new Error('The local account data needs recovery. Nothing was switched or uploaded.');
     const previousOwner = ownerRef.current;
-    const previous: CloudPartition = { version: 1, snapshot: makeBackupSnapshot(), deleted: cloudDeletedRef.current };
+    const previous: CloudPartition = { version: 1, snapshot: makeBackupSnapshot(), deleted: cloudDeletedRef.current,
+      ...(needsRecoveryRef.current ? { recovery: recoveryJournalRef.current } : {}) };
     let next: CloudPartition;
     let recoverProfile = false;
     if (previousOwner === account.uid) {
       next = previous;
-      recoverProfile = !previous.snapshot.profile.onboarded && [previous.snapshot.meals, previous.snapshot.workouts, previous.snapshot.weights, previous.snapshot.moods].every(rows => rows.length === 0);
+      recoverProfile = !!previous.recovery || (!previous.snapshot.profile.onboarded && [previous.snapshot.meals, previous.snapshot.workouts, previous.snapshot.weights, previous.snapshot.moods].every(rows => rows.length === 0));
     } else if (previousOwner) {
       // Saving A is mandatory before B becomes active. An error aborts the switch.
       savePartition(localStorage, previousOwner, previous);
       const existing = readPartition(localStorage, account.uid);
       next = existing || freshPartition(account);
-      recoverProfile = !existing;
+      recoverProfile = !existing || !!existing.recovery;
     } else {
       // Only the first claimed account inherits the previously unclaimed data.
       // Replace demo defaults only when this install was provably fresh before
@@ -1065,6 +1202,12 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // display name a legacy user may have deliberately chosen.
       email: account.email || next.snapshot.profile.email, uid: account.uid };
     next = { ...next, snapshot: { ...next.snapshot, profile: identityProfile } };
+    if (recoverProfile && !next.recovery) {
+      // A theme or accessibility preference may have been selected before
+      // the first sign-in (or by an older version before this journal existed).
+      const baseline = { ...next.snapshot, settings: DEFAULT_SETTINGS };
+      next = { ...next, recovery: noteRecoveryChanges(emptyRecoveryJournal(), baseline, next.snapshot) };
+    }
     // A first claim also retains the existing local rest timer in that account.
     // Later accounts never inherit another person's timer.
     if (!previousOwner) {
@@ -1080,7 +1223,13 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     ownerRef.current = account.uid;
     setLocalOwnerId(account.uid);
+    try {
+      const last = Number(localStorage.getItem(`fitlife_last_sync_v1:${account.uid}`));
+      setLastSuccessfulSyncAt(Number.isFinite(last) && last > 0 ? last : null);
+      setHasUnsyncedChanges(localStorage.getItem(`fitlife_sync_pending_v1:${account.uid}`) === '1');
+    } catch { setLastSuccessfulSyncAt(null); setHasUnsyncedChanges(true); }
     needsRecoveryRef.current = recoverProfile;
+    recoveryJournalRef.current = next.recovery || emptyRecoveryJournal();
     cloudAccountRef.current = account;
     setGuidesReady(false);
     setCloudAccount(account);
@@ -1114,6 +1263,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await nativeCloudRequest('signOut');
     } catch (error) { setCloudStatus(error instanceof Error ? error.message : 'Could not sign out.'); return; }
     cloudAccountRef.current = null; setCloudAccount(null);
+    setLastSuccessfulSyncAt(null); setHasUnsyncedChanges(false);
     setIsAuthenticated(false); setGuidesReady(false);
     try {
       switchToLocalGuest();
@@ -1150,8 +1300,16 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Otherwise those values are device-local and are never silently merged.
       if (needsRecoveryRef.current && remotes.length > 0) {
         const recovered = remotes[0].snapshot;
-        snapshot = { ...snapshot, profile: { ...recovered.profile, email: account.email || recovered.profile.email, uid: account.uid },
-          settings: recovered.settings, water: recovered.water };
+        // A user may have connected steps, planned a week, saved a meal or
+        // recorded water while the first cloud read was offline. Recover the
+        // other-device preferences without replacing those local additions.
+        const journal = recoveryJournalRef.current;
+        let combinedSettings = mergePersonalSettings(recovered.settings, [snapshot.settings, recovered.settings]);
+        combinedSettings = applyRecoveryChoices(combinedSettings, snapshot.settings, journal.settings);
+        combinedSettings.guidesSeen = normalizeGuides([...(snapshot.settings.guidesSeen || []), ...(recovered.settings.guidesSeen || [])]);
+        const combinedProfile = applyRecoveryChoices(recovered.profile, snapshot.profile, journal.profile);
+        snapshot = { ...snapshot, profile: { ...combinedProfile, email: account.email || combinedProfile.email, uid: account.uid },
+          settings: combinedSettings, water: journal.water || snapshot.water.amountMl > 0 ? snapshot.water : recovered.water };
       }
       const merged = await mergeCloud({ schema: 1, snapshot, deleted: cloudDeletedRef.current }, remotes);
       if (cloudAccountRef.current?.uid !== account.uid || ownerRef.current !== account.uid) throw new Error('Account changed; sync was stopped.');
@@ -1161,6 +1319,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Demo records are intentionally excluded from cloud payloads, but that
       // must not silently delete an existing user's local sample history.
       const localSnapshot = { ...merged.snapshot };
+      const localSampleFavorites = (snapshot.settings.savedMeals || []).filter(item => isDemoId(item.meal.id));
+      if (localSampleFavorites.length) localSnapshot.settings = { ...localSnapshot.settings, savedMeals: [...localSampleFavorites, ...(localSnapshot.settings.savedMeals || [])] };
       for (const kind of CLOUD_KINDS) {
         const localSamples = snapshot[kind].filter(row => isDemoId(row.id));
         (localSnapshot as any)[kind] = [...localSamples, ...merged.snapshot[kind]];
@@ -1168,10 +1328,14 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const part: CloudPartition = { version: 1, snapshot: localSnapshot, deleted: merged.deleted };
       // Fail before modifying visible data if the local atomic slot cannot be saved.
       savePartition(localStorage, account.uid, part);
+      // The recovered snapshot is now durable in the account slot. Clear the
+      // pending journal before applying it, so its layout-effect save cannot
+      // accidentally put an already-completed recovery back into the slot.
+      needsRecoveryRef.current = false;
+      recoveryJournalRef.current = emptyRecoveryJournal();
       const currentComparable = JSON.stringify({ ...makeBackupSnapshot(), createdAt: 0 });
       const nextComparable = JSON.stringify(localSnapshot);
       if (currentComparable !== nextComparable || JSON.stringify(cloudDeletedRef.current) !== JSON.stringify(merged.deleted)) applyPartition(part);
-      needsRecoveryRef.current = false;
       const mergedRevision = backupRevisionRef.current;
       if (ownPayload !== payload) {
         setCloudStatus('Saving merged activity to your Google account…');
@@ -1179,7 +1343,13 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (saved.uid !== account.uid || cloudAccountRef.current?.uid !== account.uid || ownerRef.current !== account.uid) throw new Error('Account changed; sync was stopped.');
       }
       if (mergedRevision !== backupRevisionRef.current) { syncAgainRef.current = true; setCloudStatus('Changes saved locally; syncing again…'); }
-      else setCloudStatus('Activity synced. Profile, settings and today’s water are device-specific.');
+      else {
+        const at = Date.now();
+        let recorded = true;
+        try { localStorage.setItem(`fitlife_last_sync_v1:${account.uid}`, String(at)); localStorage.removeItem(`fitlife_sync_pending_v1:${account.uid}`); } catch { recorded = false; }
+        setLastSuccessfulSyncAt(at); setHasUnsyncedChanges(!recorded);
+        setCloudStatus(recorded ? 'Up to date.' : 'Cloud sync completed, but its status could not be saved on this device.');
+      }
     } catch (error) {
       if (cloudAccountRef.current?.uid === account.uid) setCloudStatus(error instanceof Error ? error.message : 'Cloud sync is unavailable. Data stays on this device.');
     } finally {
@@ -1255,8 +1425,15 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         (imported as any)[kind] = rows;
       }
     }
+    // Importing an older backup is an explicit restore: revive favorites that
+    // were subsequently removed rather than letting their tombstones hide them.
+    const importedSettings = { ...imported.settings, savedMeals: (imported.settings.savedMeals || []).map(item => {
+      const existing = (current.settings.savedMeals || []).find(saved => saved.id === item.id);
+      return !item.deleted && existing?.deleted ? { ...item, updatedAt: Math.max(Date.now(), existing.updatedAt + 1) } : item;
+    }) };
     const next: BackupSnapshot = mode === 'merge' ? {
       ...current,
+      settings: mergePersonalSettings(current.settings, [current.settings, importedSettings]),
       meals: await mergeBackupRows(current.meals, imported.meals),
       workouts: await mergeBackupRows(current.workouts, imported.workouts),
       weights: await mergeBackupRows(current.weights, imported.weights),
@@ -1284,12 +1461,15 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const changes: [string, unknown][] = [[STORAGE_KEYS.PROFILE, next.profile], [STORAGE_KEYS.SETTINGS, next.settings],
       [STORAGE_KEYS.MEALS, next.meals], [STORAGE_KEYS.WORKOUTS, next.workouts], [STORAGE_KEYS.WEIGHTS, next.weights],
       [STORAGE_KEYS.MOODS, next.moods], [STORAGE_KEYS.WATER, next.water]];
+    const recovery = needsRecoveryRef.current
+      ? (mode === 'replace' ? allRecoveryChanges() : noteRecoveryChanges(recoveryJournalRef.current, current, next)) : null;
     // Write all values before changing React state. On quota or storage failure,
     // restore the earlier values when possible and report failure, never pretend.
     let written = 0;
     try {
       for (const [key, value] of changes) { localStorage.setItem(key, JSON.stringify(value)); written++; }
-      if (ownerRef.current) savePartition(localStorage, ownerRef.current, { version: 1, snapshot: next, deleted: nextDeleted });
+      if (ownerRef.current) savePartition(localStorage, ownerRef.current, { version: 1, snapshot: next, deleted: nextDeleted,
+        ...(recovery ? { recovery } : {}) });
     } catch {
       // Free changed entries first: restoring them one-by-one can itself hit
       // quota if an earlier replacement was larger than its original value.
@@ -1299,6 +1479,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       throw new Error('Could not complete the restore. Check available device storage and try again.');
     }
+    if (recovery) recoveryJournalRef.current = recovery;
     setProfile(next.profile); setSettings(next.settings); setMeals(next.meals); setWorkouts(next.workouts);
     setWeights(next.weights); setMoods(next.moods); setWaterRecord(next.water); setCloudDeleted(nextDeleted);
     showToast(mode === 'merge' ? 'Backup activity merged' : 'Backup restored');
@@ -1347,6 +1528,7 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         triggerManualCelebration,
         updateProfile,
         setWeightUnit,
+        setLargeText,
         setHapticsEnabled,
         setThemeMode,
         toggleThemeMode,
@@ -1358,6 +1540,10 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setAutoStartRest,
         setWeeklyWorkoutGoal,
         toggleFavoriteExercise,
+        toggleSavedMeal,
+        setPlannedDay,
+        setStepGoal,
+        recordStepObservations,
         setNavStyle,
         setWaterGoalMl,
         toggleDashboardWidget,
@@ -1375,6 +1561,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         cloudAvailable,
         cloudAccount,
         cloudStatus,
+        lastSuccessfulSyncAt,
+        hasUnsyncedChanges,
         signInGoogle,
         signOutGoogle,
         syncNow,

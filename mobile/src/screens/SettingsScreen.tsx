@@ -30,6 +30,7 @@ import { PressScale } from '../components/PressScale';
 import { FITLIFE_RELEASES_URL, getNativeUpdateBridge } from '../domain/Updates';
 import { EncryptedBackupPanel } from '../components/EncryptedBackupPanel';
 import { CloudAccountPanel } from '../components/CloudAccountPanel';
+import { LocalReminders } from '../components/LocalReminders';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -49,6 +50,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
     profile,
     settings,
     setWeightUnit,
+    setLargeText,
+    setMotionStyle,
     setHapticsEnabled,
     setThemeMode,
     setPaletteId,
@@ -59,7 +62,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
     toggleDashboardWidget,
     seedDemoHistory,
     clearAllHistory,
-    signOut,
   } = useFitLife();
   const updateBridge = getNativeUpdateBridge();
   const [automaticUpdateChecks, setAutomaticUpdateChecks] = useState(() => {
@@ -90,17 +92,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
           </PressScale>
           <div>
             <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">
-              Studio & Customization
+              Settings
             </h1>
             <p className="text-xs text-[#84877F]">
-              Natural palettes, Daylight/Nightfall theme & units
+              Your app, your pace
             </p>
           </div>
         </div>
       </div>
 
+      <div data-guide-target="settings-data" aria-label="Account and encrypted backups" className="settings-data-area"><CloudAccountPanel />
+        <details className="settings-fold"><summary><span><strong>Encrypted backup</strong><small>Save or restore a protected file</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body"><EncryptedBackupPanel /></div></details>
+      </div>
+
+      <LocalReminders />
+      <div className="accessibility-options" role="group" aria-label="Accessibility options">
+        <div className="accessibility-setting"><div><strong>Larger text</strong><small>Increase text size throughout FitLife</small></div><button type="button" role="switch" aria-label="Larger text" data-guide-target="settings-accessibility" aria-checked={!!settings.largeText} onClick={() => setLargeText(!settings.largeText)}><span className={settings.largeText ? 'is-on' : ''}><i/></span></button></div>
+        <div className="accessibility-setting"><div><strong>Reduce motion</strong><small>Keep transitions still; device preferences also apply</small></div><button type="button" role="switch" aria-label="Reduce motion" aria-checked={settings.motionStyle === 'reduced'} onClick={() => setMotionStyle(settings.motionStyle === 'reduced' ? 'spring' : 'reduced')}><span className={settings.motionStyle === 'reduced' ? 'is-on' : ''}><i/></span></button></div>
+      </div>
+
+      <details className="settings-fold"><summary data-guide-target="settings-appearance"><span><strong>Appearance</strong><small>Colors & day/night mode</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body">
       {/* 1. THEME MODE TOGGLE (Daylight Light vs Nightfall Dark) */}
-      <div className="rounded-[26px] border border-[#3E634B] bg-[#213026] p-4 space-y-3" data-guide-target="settings-appearance" aria-label="Appearance settings">
+      <div className="rounded-[26px] border border-[#3E634B] bg-[#213026] p-4 space-y-3" aria-label="Appearance settings">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#528B67] text-[#F4F1EA]">
@@ -143,54 +156,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         </div>
       </section>
 
-      {/* 4. DASHBOARD WIDGET CUSTOMIZER */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">
-            <LayoutGrid className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Dashboard Widgets
-            </h3>
-            <p className="text-xs text-[#84877F]">
-              Choose which cards appear on your home and daily dashboard
-            </p>
-          </div>
-        </div>
+      </div></details>
 
-        <div className="space-y-2">
-          {WIDGET_ITEMS.map((item) => {
-            const enabled = settings.dashboardWidgets[item.key];
-            return (
-              <div
-                key={item.key}
-                className="flex items-center justify-between rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5"
-              >
-                <div className="pr-3">
-                  <div className="font-heading text-xs font-semibold text-[#F4F1EA]">
-                    {item.label}
-                  </div>
-                  <div className="text-[11px] text-[#84877F]">{item.desc}</div>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-label={item.label}
-                  aria-checked={enabled}
-                  onClick={() => toggleDashboardWidget(item.key)}
-                  className="relative inline-flex h-11 w-11 shrink-0 items-center"
-                >
-                  <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${enabled ? 'bg-[#528B67]' : 'bg-[#2F3A33]'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
+      <details className="settings-fold"><summary><span><strong>Goals & rest</strong><small>Water, weekly goal & timer</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body">
       {/* 5. HYDRATION TARGET & WORKOUT REST PREFERENCES */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4">
         <div className="flex items-center justify-between">
@@ -257,6 +225,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         </div>
       </div>
 
+      </div></details>
+
+      <details className="settings-fold"><summary><span><strong>Units & haptics</strong><small>Weight units & feedback</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body">
       {/* 6. WEIGHT UNIT (kg / lb) & HAPTICS */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
         <div className="flex items-start gap-3">
@@ -291,7 +262,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
               <h4 className="font-heading text-xs font-semibold text-[#F4F1EA]">
                 Haptic Feedback
               </h4>
-              <p className="text-[11px] text-[#84877F]">
+              <p className="text-[0.6875rem] text-[#84877F]">
                 Tactile response on meals, workouts & mood check-ins
               </p>
             </div>
@@ -312,14 +283,69 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         </div>
       </div>
 
+      </div></details>
+
+      <details className="settings-fold"><summary><span><strong>Home cards</strong><small>Choose what appears on Home</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body">
+      {/* 4. DASHBOARD WIDGET CUSTOMIZER */}
+      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">
+            <LayoutGrid className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
+              Dashboard Widgets
+            </h3>
+            <p className="text-xs text-[#84877F]">
+              Choose which cards appear on your home and daily dashboard
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {WIDGET_ITEMS.map((item) => {
+            const enabled = settings.dashboardWidgets[item.key];
+            return (
+              <div
+                key={item.key}
+                className="flex items-center justify-between rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5"
+              >
+                <div className="pr-3">
+                  <div className="font-heading text-xs font-semibold text-[#F4F1EA]">
+                    {item.label}
+                  </div>
+                  <div className="text-[0.6875rem] text-[#84877F]">{item.desc}</div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label={item.label}
+                  aria-checked={enabled}
+                  onClick={() => toggleDashboardWidget(item.key)}
+                  className="relative inline-flex h-11 w-11 shrink-0 items-center"
+                >
+                  <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${enabled ? 'bg-[#528B67]' : 'bg-[#2F3A33]'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      </div></details>
+
       <section className="guide-replay" aria-label="App tips">
         <div><strong>Need a refresher?</strong><p>Review a short guide whenever you choose.</p></div>
-        <button type="button" aria-expanded={showGuideChoices} aria-controls="guide-choices" onClick={() => setShowGuideChoices(value => !value)}>{showGuideChoices ? 'Hide tips' : 'Review app tips'}</button>
+        <button type="button" data-guide-target="settings-guide-replay" aria-expanded={showGuideChoices} aria-controls="guide-choices" onClick={() => setShowGuideChoices(value => !value)}>{showGuideChoices ? 'Hide tips' : 'Review app tips'}</button>
         {showGuideChoices && <div id="guide-choices" className="guide-choice-grid">{GUIDE_IDS.map(id => <button key={id} type="button" onClick={() => onReviewGuide(id)}>{GUIDES[id].area} guide</button>)}</div>}
       </section>
 
+
+      <details className="settings-fold"><summary data-guide-target="settings-updates"><span><strong>App updates</strong><small>Version & update checks</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body">
       {/* Release updates: GitHub is checked without sending fitness data. */}
-      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3" data-guide-target="settings-updates" aria-label="App updates">
+      <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3" aria-label="App updates">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#213026] border border-[#3E634B] text-[#7BB38F]">
             <RefreshCw className="h-5 w-5" />
@@ -335,7 +361,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         {updateBridge ? (
           <>
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2F3A33] bg-[#141916] px-3 py-2">
-              <div><p className="text-xs font-semibold text-[#F4F1EA]">Automatic update checks</p><p className="text-[11px] text-[#84877F]">Contacts GitHub periodically; no fitness data is sent.</p></div>
+              <div><p className="text-xs font-semibold text-[#F4F1EA]">Automatic update checks</p><p className="text-[0.6875rem] text-[#84877F]">Contacts GitHub periodically; no fitness data is sent.</p></div>
               <button type="button" role="switch" aria-label="Automatic update checks" aria-checked={automaticUpdateChecks}
                 onClick={() => { const next = !automaticUpdateChecks; try { updateBridge.setAutomaticUpdateChecks(next); setAutomaticUpdateChecks(next); } catch { /* Keep the displayed setting unchanged. */ } }}
                 className="relative inline-flex h-11 w-11 shrink-0 items-center">
@@ -355,9 +381,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         )}
       </div>
 
-      <div data-guide-target="settings-data" aria-label="Account and encrypted backups"><CloudAccountPanel />
-      <EncryptedBackupPanel /></div>
+      </div></details>
 
+      <details className="settings-fold"><summary><span><strong>Data controls</strong><small>Demo data & clear activity</small></span><span aria-hidden="true">⌄</span></summary><div className="settings-fold-body">
       {/* 8. LOCAL DATA MANAGEMENT */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -367,10 +393,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
               Local data & activity
             </h3>
           </div>
-          <span className="text-[11px] text-[#84877F]">{profile.email}</span>
+          <span className="text-[0.6875rem] text-[#84877F]">{profile.email}</span>
         </div>
 
-        <p className="text-[11px] text-[#84877F]">FitLife keeps this profile on your device. Your device or browser may also include it in backups. Google sync, when connected above, only covers the activity described there.</p>
+        <p className="text-[0.6875rem] text-[#84877F]">FitLife keeps this profile on your device. Your device or browser may also include it in backups. Google sync, when connected above, only covers the activity described there.</p>
         <div className="grid grid-cols-2 gap-2">
           <PressScale
             onClick={() => setPendingDataAction('restore')}
@@ -385,7 +411,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
             className="flex items-center justify-center gap-1.5 rounded-xl border border-[#6E4433] bg-[#33241E] py-2.5 text-xs font-semibold text-[#DE9473]"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            <span>Clear All Logs</span>
+            <span>Clear activity logs</span>
           </PressScale>
         </div>
 
@@ -393,8 +419,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
           <div role="alert" className="rounded-2xl border border-[#6E4433] bg-[#33241E] p-3.5">
             <p className="text-xs leading-relaxed text-[#F4F1EA]">
               {pendingDataAction === 'clear'
-                ? 'Clear all meals, workouts, mood and weight history on this device? Your profile is kept. This cannot be undone.'
-                : 'Replace your profile and all activity on this device with the 14-day demo? This cannot be undone.'}
+                ? 'Clear meals, workouts, mood and weight history across your synced devices? Your profile, steps, saved meals and weekly plan are kept. This cannot be undone.'
+                : 'Replace your profile and activity with the 14-day demo? Existing meals, workouts, mood and weight history will also be deleted from synced devices. This cannot be undone.'}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => setPendingDataAction(null)} className="min-h-[44px] rounded-xl border border-[#2F3A33] bg-[#1E2520] px-4 text-xs font-semibold text-[#F4F1EA]">Cancel</button>
@@ -403,16 +429,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
           </div>
         )}
 
-        <PressScale
-          onClick={() => {
-            signOut();
-            onBack();
-          }}
-          className="flex w-full items-center justify-center rounded-xl border border-[#2F3A33] bg-[#141916] py-2.5 text-xs font-semibold text-[#B8B5AD] hover:text-[#F4F1EA]"
-        >
-          Sign out
-        </PressScale>
-      </div>
+
+      </div>      </div></details>
+
+
     </div>
   );
 };

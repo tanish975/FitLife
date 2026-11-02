@@ -5,8 +5,8 @@ import { WORKOUT_SESSION_IDEAS } from '../src/data/WorkoutSessions';
 import { estimateWorkoutCalories, getWorkoutPrescription } from '../src/domain/AdaptiveWorkoutEngine';
 
 const parse = (text: string) => parseMealFreeText(text, 'Lunch');
-assert.equal(EXERCISE_CATALOG.length, 90);
-assert.equal(new Set(EXERCISE_CATALOG.map(ex => ex.id)).size, 90, 'exercise IDs are stable and unique');
+assert.equal(EXERCISE_CATALOG.length, 91);
+assert.equal(new Set(EXERCISE_CATALOG.map(ex => ex.id)).size, 91, 'exercise IDs are stable and unique');
 const addedHome = EXERCISE_CATALOG.filter(ex => ex.id.startsWith('ex-home-'));
 assert.equal(addedHome.length, 30, '30 additional home exercises');
 assert(addedHome.every(ex => ex.equipment === 'Bodyweight' && ex.isBodyweight && ex.defaultWeightKg === 0), 'no weights, bands or furniture required');
@@ -34,4 +34,4 @@ for (const phrase of ['2 mystery soup', '1 cup oats', '100 ml chicken', '150g co
   assert.equal(item.calories, 0, `${phrase} cannot silently fabricate energy`);
 }
 assert.equal(parse('1 cup oats')[0].servingLabel, '1 cup');
-console.log('PASS: 90 unique exercises, 30 no-equipment additions, home sessions and cardio; exact food portions and safe review');
+console.log('PASS: 91 unique exercises, 30 no-equipment additions, home sessions and cardio; exact food portions and safe review');

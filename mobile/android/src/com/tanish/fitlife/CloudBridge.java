@@ -96,13 +96,17 @@ final class CloudBridge {
     }
     @JavascriptInterface public void session(String request) {
         if (!validRequest(request)) return;
-        try { emit(request, true, describe(FirebaseAuth.getInstance().getCurrentUser()), null); }
-        catch (Exception e) { emit(request, false, null, "Could not restore the Google session."); }
+        try {
+            JSONObject account = describe(FirebaseAuth.getInstance().getCurrentUser());
+            if (account.optBoolean("signedIn", false)) ReminderScheduler.restoreCurrent(activity);
+            emit(request, true, account, null);
+        } catch (Exception e) { emit(request, false, null, "Could not restore the Google session."); }
     }
     @JavascriptInterface public void signIn(String request) {
         if (!validRequest(request)) return;
         activity.runOnUiThread(() -> {
             if (destroyed || authBusy) { emit(request, false, null, "Sign-in is already in progress."); return; }
+            if (FirebaseAuth.getInstance().getCurrentUser() != null) { emit(request, false, null, "Sign out before switching accounts."); return; }
             authBusy = true;
             try {
                 GetSignInWithGoogleOption google = new GetSignInWithGoogleOption.Builder(
@@ -122,8 +126,11 @@ final class CloudBridge {
                                         if (!task.isSuccessful() || task.getResult() == null) {
                                             emit(request, false, null, "Google sign-in could not be verified. Check your connection and try again."); return;
                                         }
-                                        try { emit(request, true, describe(task.getResult().getUser()), null); }
-                                        catch (Exception e) { FirebaseAuth.getInstance().signOut(); emit(request, false, null, "Could not use this account."); }
+                                        try {
+                                            JSONObject account = describe(task.getResult().getUser());
+                                            ReminderScheduler.restoreCurrent(activity);
+                                            emit(request, true, account, null);
+                                        } catch (Exception e) { FirebaseAuth.getInstance().signOut(); emit(request, false, null, "Could not use this account."); }
                                     });
                         } catch (Exception e) { authBusy = false; emit(request, false, null, "Google sign-in could not be completed. Please try again."); }
                     }
@@ -139,6 +146,10 @@ final class CloudBridge {
         if (!validRequest(request)) return;
         activity.runOnUiThread(() -> {
             if (authBusy) { emit(request, false, null, "Wait for sign-in to finish first."); return; }
+            FirebaseUser old = FirebaseAuth.getInstance().getCurrentUser();
+            try {
+                if (old != null && activity instanceof MainActivity) ((MainActivity) activity).stopTrackingForSignOut(old.getUid());
+            } catch (Exception e) { emit(request, false, null, "Tracking settings could not be saved safely. Restart FitLife and try again."); return; }
             FirebaseAuth.getInstance().signOut();
             try {
                 credentialManager.clearCredentialStateAsync(new ClearCredentialStateRequest(), null, command -> activity.runOnUiThread(command),
@@ -150,7 +161,7 @@ final class CloudBridge {
             emit(request, true, new JSONObject(), null);
         });
     }
-    private synchronized String deviceId() throws Exception {
+    synchronized String deviceId() throws Exception {
         if (installationId != null) return installationId;
         // Excluded from Android's auto-backup: cloning a backup must not create
         // two devices writing the same Firestore document.

@@ -1,3 +1,5 @@
+import type { StepObservation, SavedMeal, PlannedDay } from '../domain/PersonalFeatures';
+
 import {
   CornerStyle,
   DensityStyle,
@@ -177,8 +179,13 @@ export interface AppSettings {
   navStyle: 'glass' | 'solid';
   waterGoalMl: number;
   dashboardWidgets: DashboardWidgetsConfig;
-  /** Optional for backward-compatible backups made before guides existed. */
+  /** Optional for backward-compatible backups made before these features existed. */
   guidesSeen?: GuideId[];
+  largeText?: boolean;
+  stepGoal?: number;
+  stepHistory?: StepObservation[];
+  savedMeals?: SavedMeal[];
+  weeklyPlan?: PlannedDay[];
 }
 
 export interface BadgeStatus {

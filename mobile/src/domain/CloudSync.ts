@@ -1,5 +1,7 @@
 import { BackupSnapshot, validSnapshot } from './EncryptedBackup';
 import { GUIDE_IDS, normalizeGuides } from '../data/types';
+import { mergePersonalSettings } from './PersonalFeatures';
+import { validRecoveryJournal, type RecoveryJournal } from './RecoveryJournal';
 
 export const GUEST_OWNER = '__fitlife_guest_v1__';
 export const CLOUD_OWNER_KEY = 'fitlife_cloud_owner_v1';
@@ -8,7 +10,7 @@ export const CLOUD_KINDS = ['meals', 'workouts', 'weights', 'moods'] as const;
 export type CloudKind = typeof CLOUD_KINDS[number];
 export type CloudDeletions = Record<CloudKind, string[]>;
 export interface CloudPayload { schema: 1; snapshot: BackupSnapshot; deleted: CloudDeletions }
-export interface CloudPartition { version: 1; snapshot: BackupSnapshot; deleted: CloudDeletions }
+export interface CloudPartition { version: 1; snapshot: BackupSnapshot; deleted: CloudDeletions; recovery?: RecoveryJournal }
 export interface GoogleAccount { signedIn: true; uid: string; name: string; email: string }
 export interface RemoteSnapshot { deviceId: string; payload: string }
 
@@ -22,7 +24,8 @@ export function validCloudPayload(value: unknown): value is CloudPayload {
   return isRecord(value) && value.schema === 1 && validSnapshot(value.snapshot) && validDeleted(value.deleted);
 }
 export function validCloudPartition(value: unknown): value is CloudPartition {
-  return isRecord(value) && value.version === 1 && validSnapshot(value.snapshot) && validDeleted(value.deleted);
+  return isRecord(value) && value.version === 1 && validSnapshot(value.snapshot) && validDeleted(value.deleted) &&
+    (value.recovery === undefined || validRecoveryJournal(value.recovery));
 }
 export function readActivePartition(storage: Storage): { uid: string | null; partition: CloudPartition | null; damaged: boolean } {
   try {
@@ -74,6 +77,7 @@ export async function addDeleted(current: CloudDeletions, kind: CloudKind, rows:
 }
 function cloudCopy(snapshot: BackupSnapshot): BackupSnapshot {
   return { ...snapshot, createdAt: 0,
+    settings: { ...snapshot.settings, ...(snapshot.settings.savedMeals ? { savedMeals: snapshot.settings.savedMeals.filter(row => !isDemoId(row.meal.id)) } : {}) },
     meals: snapshot.meals.filter(row => !isDemoId(row.id)), workouts: snapshot.workouts.filter(row => !isDemoId(row.id)),
     weights: snapshot.weights.filter(row => !isDemoId(row.id)), moods: snapshot.moods.filter(row => !isDemoId(row.id)) };
 }
@@ -94,7 +98,7 @@ export async function mergeCloud(local: CloudPayload, remotes: CloudPayload[]): 
   // user, so do not interrupt them with first-run tips after an upgrade.
   const wasLegacyAccount = sources.some(source => source.settings.guidesSeen === undefined && source.profile.onboarded);
   const completed = wasLegacyAccount ? [...GUIDE_IDS] : normalizeGuides(sources.flatMap(source => source.settings.guidesSeen || []));
-  const snapshot = { ...sources[0], settings: { ...sources[0].settings, guidesSeen: completed } };
+  const snapshot = { ...sources[0], settings: { ...mergePersonalSettings(sources[0].settings, sources.map(s => s.settings)), guidesSeen: completed } };
   for (const kind of CLOUD_KINDS) {
     const tombstones = new Set(deleted[kind]);
     const all = sources.flatMap(source => source[kind] as { id: string }[]);

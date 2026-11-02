@@ -15,9 +15,9 @@ To update later, download the new APK and confirm **Update** over the existing a
 
 [All versions and release notes](https://github.com/tanish975/FitLife/releases) · [Standalone HTML download](https://github.com/tanish975/FitLife/releases/latest/download/FitLife-App.html)
 
-> **Current limitations:** Google sign-in, production cloud access and the Android wrapper have not yet been verified on a physical phone. Cloud sync covers meals, workouts, weights and moods when properly configured; it is not end-to-end encrypted. Use encrypted manual backups as well. Calorie estimates are not medical advice. The browser/standalone build cannot perform the required native Android Google sign-in; old browser data does not automatically transfer to Android.
+> **Current limitations:** Google sign-in, production cloud access, sensors, Health Connect, reminders and the Android wrapper have not yet been verified on a physical phone. Cloud sync covers meals, workouts, weights, moods, step observations, favorite meals and weekly plans when properly configured; it is not end-to-end encrypted. Use encrypted manual backups as well. Calorie estimates are not medical advice. The browser/standalone build cannot perform the required native Android Google sign-in; old browser data does not automatically transfer to Android.
 
-Short, skippable guides appear when you first visit Home and each other area. You can review them later in **Settings → Review app tips**.
+Short, skippable guides appear when you first visit Home and each other area. You can review them later in **Settings → Review app tips**. FitLife uses short, purposeful transitions; **Settings → Reduce motion** makes them immediate and **Larger text** improves readability.
 
 ## For maintainers
 

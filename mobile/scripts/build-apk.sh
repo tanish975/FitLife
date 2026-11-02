@@ -20,6 +20,15 @@ ACTUAL="$(openssl x509 -in "$CERT" -outform DER | sha256sum | cut -d' ' -f1)"
 [[ "$EXPECTED" == "$ACTUAL" ]] || { echo 'Signing certificate does not match android/signing-cert.sha256; aborting to protect in-place updates.' >&2; exit 1; }
 [[ -f "$ROOT/android/google-services.json" ]] || { echo 'Firebase Android configuration is missing.' >&2; exit 1; }
 
+# Health Connect requires compileSdk 36. Some CI images only preinstall SDK 35;
+# use the existing, free Android command-line SDK manager if 36 is missing.
+SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+if [[ -n "$SDK" && ! -f "$SDK/platforms/android-36/android.jar" ]]; then
+  MANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+  if [[ ! -x "$MANAGER" ]]; then echo 'Android SDK platform 36 is required; install it with sdkmanager.' >&2; exit 1; fi
+  "$MANAGER" --sdk_root="$SDK" 'platforms;android-36'
+fi
+
 # Retain the exact file:///android_asset/index.html origin used by older APKs.
 mkdir -p "$ROOT/android/build/generated-fitlife-assets"
 cp "$STANDALONE" "$ROOT/android/build/generated-fitlife-assets/index.html"
