@@ -1,10 +1,11 @@
 import { nativeApp, installNativeFixture } from './mock-native.mjs';
+import { reloadSimulatedNative } from './native-reload.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const base = nativeApp;
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--enable-aggressive-domstorage-flushing'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, acceptDownloads: true });
 const page = await context.newPage();
 await installNativeFixture(page);
@@ -33,8 +34,17 @@ try {
   await page.getByRole('button', { name: /Favorites \(1\)/ }).click();
   assert.equal(await list.locator('.exercise-row').count(), 1);
   assert.ok(await list.getByText(exerciseName, { exact: true }).count());
-  await page.reload({ waitUntil: 'networkidle' }); await workout().click();
+  const beforeReload = await storage('fitlife_cloud_partition_v1:qa-user');
+  assert.equal(beforeReload.snapshot.settings.favoriteExerciseIds.length, 1, 'the account slot must contain the favorite before reload');
+  await reloadSimulatedNative(page, '__fixture_', { waitUntil: 'networkidle' });
+  const beforeApp = await page.evaluate(() => window.__qaBeforeFixtureReload);
+  assert.equal(beforeApp?.owner, 'qa-user', 'the account owner must survive before application startup');
+  assert.deepEqual(beforeApp.partition?.snapshot.settings.favoriteExerciseIds, beforeReload.snapshot.settings.favoriteExerciseIds,
+    'the app-owned favorite must survive before application startup');
+  await workout().click();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_settings_v2') || '{}').favoriteExerciseIds?.length === 1);
   assert.equal((await storage('fitlife_settings_v2')).favoriteExerciseIds.length, 1, 'favorite should persist');
+  assert.equal((await storage('fitlife_cloud_partition_v1:qa-user')).snapshot.settings.favoriteExerciseIds.length, 1, 'favorite remains in the active account');
   await page.locator('.training-disclosure > summary').filter({hasText:'Rest timer'}).click();
   const timer = page.getByRole('region', { name: 'Rest timer' });
   await timer.getByRole('button', { name: 'Start', exact: true }).click();
@@ -44,7 +54,7 @@ try {
   assert((await storage('fitlife_rest_timer_v1:qa-user')).remainingMs > state.remainingMs);
   await timer.getByRole('button', { name: 'Resume', exact: true }).click();
   await page.evaluate(() => { const t=JSON.parse(localStorage.getItem('fitlife_rest_timer_v1:qa-user')); t.endAt=Date.now()-10000; localStorage.setItem('fitlife_rest_timer_v1:qa-user', JSON.stringify(t)); });
-  await page.reload({ waitUntil: 'networkidle' }); await workout().click();
+  await reloadSimulatedNative(page, '__fixture_', { waitUntil: 'networkidle' }); await workout().click();
   await page.locator('.training-disclosure > summary').filter({hasText:'Rest timer'}).click();
   await page.getByText('Rest complete').waitFor();
   assert.equal((await storage('fitlife_rest_timer_v1:qa-user')).status, 'complete', 'deadline should finish across app close');
@@ -98,7 +108,7 @@ try {
   await page.getByRole('button', { name: 'Close backup' }).click();
   // Same-ID, different content: preserve both and do not duplicate on reimport.
   await page.evaluate(() => { const w=JSON.parse(localStorage.getItem('fitlife_workouts_v1')); w[0].reps += 1; localStorage.setItem('fitlife_workouts_v1', JSON.stringify(w)); const key=`fitlife_cloud_partition_v1:${localStorage.getItem('fitlife_cloud_owner_v1')}`; const part=JSON.parse(localStorage.getItem(key)); part.snapshot.workouts=w; localStorage.setItem(key,JSON.stringify(part)); });
-  await page.reload({ waitUntil: 'networkidle' }); await settings().click();
+  await reloadSimulatedNative(page, '__fixture_', { waitUntil: 'networkidle' }); await settings().click();
   await page.locator('.settings-fold > summary').filter({hasText:'Encrypted backup'}).click();
   for (let i=0; i<2; i++) {
     await page.getByRole('button', { name: 'Import backup', exact: true }).click();

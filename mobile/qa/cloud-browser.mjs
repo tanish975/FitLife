@@ -1,15 +1,30 @@
 import { chromium } from 'playwright';
+import { reloadSimulatedNative } from './native-reload.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Simulates only the native boundary. It does not claim to test Credential Manager,
 // Firebase authentication, Android WebView, or the deployed Firestore rules.
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--enable-aggressive-domstorage-flushing'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const page = await context.newPage();
 const errors = []; page.on('pageerror', error => errors.push(error.message));
 await page.addInitScript(() => {
+  // Recover only fake native session/cloud keys. Capture the app-owned account
+  // slot first so this test still fails if its actual persisted data is lost.
+  const marker='__fitlife_qa_native_v1:';
+  if (window.name.startsWith(marker)) {
+    const saved=JSON.parse(window.name.slice(marker.length)); window.name='';
+    if (saved.prefix === '__qa_') {
+      const owner=localStorage.getItem('fitlife_cloud_owner_v1');
+      const raw=localStorage.getItem('fitlife_cloud_partition_v1:alice');
+      window.__qaBeforeReload={owner,alice:raw ? JSON.parse(raw) : null};
+      for (const [key,value] of Object.entries(saved.fake || {})) {
+        if (key.startsWith('__qa_') && typeof value === 'string') localStorage.setItem(key,value);
+      }
+    }
+  }
   const account = uid => ({ signedIn: true, uid, name: uid === 'alice' ? 'Alice Athlete' : 'Bob Athlete', email: uid + '@example.test' });
   if (!localStorage.getItem('__qa_seeded')) {
     const now = new Date(), key = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')].join('-');
@@ -74,7 +89,10 @@ try {
   await page.getByPlaceholder('Try "2 eggs and a banana" or "150g chicken & rice"').fill('2 eggs');
   await page.getByRole('button', { name:'Add (1)' }).click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:alice') || '{}').snapshot?.meals.length === 2);
-  await page.reload();
+  await reloadSimulatedNative(page, '__qa_');
+  const beforeApp = await page.evaluate(() => window.__qaBeforeReload);
+  assert.equal(beforeApp?.owner, 'alice', 'the owner survives before application startup');
+  assert.equal(beforeApp.alice?.snapshot.meals.length, 2, 'the offline edit survives before application startup');
   await page.getByText("Today's overview").waitFor();
   assert.equal((await storage('fitlife_cloud_partition_v1:alice')).snapshot.meals.length, 2, 'offline edit survives restart');
   assert.equal((await cloudRows('alice')).length, 1, 'offline edit has not been falsely uploaded');
@@ -127,7 +145,10 @@ try {
   assert.equal((await storage('fitlife_cloud_partition_v1:alice')).snapshot.meals.length, 2, 'Alice data remains recoverable on device');
 
   await page.evaluate(() => localStorage.setItem('__qa_current','alice'));
-  await page.reload();
+  await reloadSimulatedNative(page, '__qa_');
+  const beforeReturn = await page.evaluate(() => window.__qaBeforeReload);
+  assert.equal(beforeReturn?.owner, 'bob', 'the prior account survives before application startup');
+  assert.equal(beforeReturn.alice?.snapshot.meals.length, 2, 'Alice’s separate account slot survives before application startup');
   await page.waitForFunction(() => localStorage.getItem('fitlife_cloud_owner_v1') === 'alice');
   await page.getByText("Today's overview").waitFor();
   assert.equal((await storage('fitlife_cloud_partition_v1:alice')).snapshot.meals.length, 2, 'returning account restores its own partition');

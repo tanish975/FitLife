@@ -8,6 +8,20 @@ export const nativeApp = process.env.FITLIFE_NATIVE_URL || pathToFileURL(resolve
 export async function installNativeFixture(page, options = {}) {
   const opts = { signedIn: true, demo: true, uid: 'qa-user', name: 'Tanish Patel', email: 'tanish@fitlife.app', ...options };
   await page.addInitScript(opts => {
+    // The reload helper carries only simulated native state in window.name.
+    // Capture application-owned storage first; it is never restored by QA.
+    const marker='__fitlife_qa_native_v1:';
+    if (window.name.startsWith(marker)) {
+      const saved=JSON.parse(window.name.slice(marker.length)); window.name='';
+      if (saved.prefix === '__fixture_') {
+        const owner=localStorage.getItem('fitlife_cloud_owner_v1');
+        const raw=owner && localStorage.getItem(`fitlife_cloud_partition_v1:${owner}`);
+        window.__qaBeforeFixtureReload={owner,partition:raw ? JSON.parse(raw) : null};
+        for (const [key,value] of Object.entries(saved.fake || {})) {
+          if (key.startsWith('__fixture_') && typeof value === 'string') localStorage.setItem(key,value);
+        }
+      }
+    }
     const ids = ['dashboard','meals','workouts','progress','profile','settings','daily','onboarding'];
     // A native Firebase session and remote database live outside WebView
     // storage. Some restart tests can restore ONLY these simulated bridge
