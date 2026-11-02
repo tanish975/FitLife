@@ -4,13 +4,14 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 // Two isolated simulated Android devices with a mock native session/Firestore.
 // Device B uses a disk-backed profile; only fake bridge state is seeded by QA.
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const first=await browser.newContext({viewport:{width:390,height:844}}), a=await first.newPage();
 await installNativeFixture(a,{uid:'qa-user',demo:true});
 const profileDir=await mkdtemp(join(tmpdir(),'fitlife-recovery-'));
-const options={headless:true,args:['--no-sandbox'],viewport:{width:390,height:844}};
+const options={headless:true,args:['--no-sandbox','--enable-aggressive-domstorage-flushing'],viewport:{width:390,height:844}};
 let second=await chromium.launchPersistentContext(profileDir,options), b=await second.newPage();
 const openSettings=page=>page.getByRole('button',{name:'Open settings'}).first().click();
 try {
@@ -66,15 +67,47 @@ try {
  await b.getByRole('button',{name:'Sign in with Google',exact:true}).click();
  await b.getByText("Today's overview").waitFor();
  part=await b.evaluate(()=>JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:qa-user')));
- assert.equal(part.snapshot.settings.motionStyle,'reduced'); assert(part.recovery.settings.includes('autoStartRest'));
+ assert.equal(part.snapshot.settings.motionStyle,'reduced');
+ assert(part.recovery.settings.includes('autoStartRest') && part.recovery.settings.includes('motionStyle') && part.recovery.settings.includes('largeText'), `account-switch recovery journal: ${JSON.stringify(part.recovery)}`);
+ const beforeRestartRecovery=part.recovery;
 
- // Also survive a full browser restart while cloud is offline. Application
- // preferences and account partitions are not repopulated by the fixture.
+ // Also survive a full browser restart while cloud is offline. The fixture
+ // never restores application data. A test-only sentinel distinguishes a
+ // Chromium profile-relaunch/storage-service race from an app regression.
+ const sentinel=randomUUID();
+ await b.evaluate(async value=>{
+   const frame=document.createElement('iframe'); frame.style.display='none'; document.body.appendChild(frame);
+   let listener, timer;
+   try {
+     const acknowledgement=new Promise((resolve,reject)=>{
+       listener=event=>{if(event.key==='__qa_restart_sentinel'&&event.newValue===value)resolve();};
+       window.addEventListener('storage',listener); timer=setTimeout(()=>reject(new Error('Storage acknowledgement timed out')),5000);
+     });
+     frame.contentWindow.localStorage.setItem('__qa_restart_sentinel',value);
+     await acknowledgement;
+   } finally { clearTimeout(timer); window.removeEventListener('storage',listener); frame.remove(); }
+ },sentinel);
  await second.close(); second=undefined;
- second=await chromium.launchPersistentContext(profileDir,options); b=await second.newPage();
- await installB(b); await b.goto(nativeApp); await b.getByText("Today's overview").waitFor();
+ // A too-fast relaunch can find the entire file: origin empty before any app
+ // code runs. Retry only that browser startup, without recreating app data.
+ // If the sentinel exists but the account data does not, fail immediately.
+ let startup, cdp;
+ for(let attempt=0;attempt<3;attempt++){
+   await new Promise(resolve=>setTimeout(resolve,1000));
+   second=await chromium.launchPersistentContext(profileDir,options); b=await second.newPage();
+   cdp=await second.newCDPSession(b); await cdp.send('Emulation.setScriptExecutionDisabled',{value:true});
+   await b.goto(nativeApp,{waitUntil:'domcontentloaded'});
+   startup=await b.evaluate(()=>{const slot=JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:qa-user')||'null');return {sentinel:localStorage.getItem('__qa_restart_sentinel'),owner:localStorage.getItem('fitlife_cloud_owner_v1'),recovery:slot?.recovery};});
+   if(startup.sentinel===sentinel) break;
+   await second.close(); second=undefined;
+ }
+ assert.equal(startup?.sentinel,sentinel,'Chromium did not reopen the test storage sentinel before application startup');
+ assert.equal(startup.owner,'qa-user',`account slot must survive before app startup: ${JSON.stringify(startup)}`);
+ assert.deepEqual(startup.recovery,beforeRestartRecovery,'the app-owned recovery journal survives a full browser restart before app startup');
+ await cdp.send('Emulation.setScriptExecutionDisabled',{value:false}); await cdp.detach();
+ await installB(b); await b.reload({waitUntil:'domcontentloaded'}); await b.getByText("Today's overview").waitFor();
  part=await b.evaluate(()=>JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:qa-user')));
- assert(part.recovery.settings.includes('motionStyle') && part.recovery.settings.includes('largeText'));
+ assert(part.recovery.settings.includes('motionStyle') && part.recovery.settings.includes('largeText'), `restart journal: ${JSON.stringify(part.recovery)}; pre-app state: ${JSON.stringify(startup)}`);
  assert.equal(part.snapshot.settings.motionStyle,'reduced'); assert.equal(part.snapshot.settings.largeText,true);
  await openSettings(b); await b.evaluate(()=>localStorage.removeItem('__fixture_offline'));
  await b.getByRole('button',{name:/^(Retry sync|Sync now)$/}).click();
