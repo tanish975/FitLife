@@ -32,7 +32,14 @@ fi
 # Retain the exact file:///android_asset/index.html origin used by older APKs.
 mkdir -p "$ROOT/android/build/generated-fitlife-assets"
 cp "$STANDALONE" "$ROOT/android/build/generated-fitlife-assets/index.html"
-(cd "$ROOT/android" && ./gradlew --no-daemon -PfitlifeVersionCode="$VERSION_CODE" -PfitlifeVersionName="$VERSION_NAME" assembleRelease)
+# Keep the small local default for memory-constrained development machines, but
+# give GitHub-hosted runners enough heap and metaspace for Android 36 lint.
+# A single quoted system-property argument overrides android/gradle.properties.
+GRADLE_JVM_ARGS=()
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  GRADLE_JVM_ARGS+=('-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8')
+fi
+(cd "$ROOT/android" && ./gradlew --no-daemon "${GRADLE_JVM_ARGS[@]}" -PfitlifeVersionCode="$VERSION_CODE" -PfitlifeVersionName="$VERSION_NAME" assembleRelease)
 UNSIGNED="$ROOT/android/build/outputs/apk/release/FitLife-release-unsigned.apk"
 [[ -f "$UNSIGNED" ]] || { echo "Gradle did not create $UNSIGNED" >&2; exit 1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
