@@ -3,15 +3,20 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { installNativeFixture, nativeApp } from './mock-native.mjs';
 import { reloadSimulatedNative } from './native-reload.mjs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
-const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+// Isolated disk-backed Chromium profiles for restart checks; not real Android.
+const contexts=new Set(), profiles=[];
 const errors=[];
 const store=(page,key)=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),key);
 const legacy={workout:{enabled:false,hour:8,minute:0},water:{enabled:true,hour:13,minute:15}};
 async function make(reduced='reduce',seed=true){
-  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block',reducedMotion:reduced,timezoneId:'Asia/Kolkata'});
+  const dir=await mkdtemp(join(tmpdir(),'fitlife-motion-water-'));profiles.push(dir);
+  const context=await chromium.launchPersistentContext(dir,{headless:true,args:['--no-sandbox','--enable-aggressive-domstorage-flushing'],viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block',reducedMotion:reduced,timezoneId:'Asia/Kolkata'});contexts.add(context);
   await context.route(/^https?:\/\//,r=>r.abort());
-  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+  const page=context.pages()[0] || await context.newPage();page.on('pageerror',e=>errors.push(e.message));
   await installNativeFixture(page,{steps:true,reminders:true});
   if(seed) await page.addInitScript(legacy=>{if(!localStorage.getItem('__water_seeded')){localStorage.setItem('__water_seeded','1');localStorage.setItem('__fixture_reminders_qa-user',JSON.stringify(legacy));}},legacy);
   await page.goto(nativeApp,{waitUntil:'domcontentloaded'});await page.getByText("Today's overview").first().waitFor({timeout:20000});
@@ -113,4 +118,7 @@ try {
   } finally {await context.close();}
   assert.deepEqual(errors,[],`no uncaught browser errors: ${errors.join('; ')}`);
   console.log('PASS browser: legacy migration, custom and interval schedules, permissions, account isolation, restart, accessible movement controls, guided demos and offline responsive widths (native doubles).');
-} finally {await browser.close();}
+} finally {
+  for(const context of contexts) await context.close().catch(()=>{});
+  for(const dir of profiles) await rm(dir,{recursive:true,force:true});
+}

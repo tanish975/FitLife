@@ -3,9 +3,14 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { nativeApp, installNativeFixture } from './mock-native.mjs';
 import { reloadSimulatedNative } from './native-reload.mjs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const prod=process.env.FITLIFE_PROD_URL || 'http://127.0.0.1:4173/';
-const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+// This test-only persistent profile and flush flag do not prove Android WebView durability.
+const browser=await chromium.launch({headless:true,args:['--no-sandbox','--enable-aggressive-domstorage-flushing']});
+let native=null, nativeProfile=null;
 try {
   // A storage-blocked standalone must fail closed and explain the real limit.
   const blocked=await browser.newContext({viewport:{width:320,height:700},reducedMotion:'reduce'});
@@ -20,8 +25,9 @@ try {
 
   // A previously authenticated native session is restored locally and saved
   // activity remains usable while the simulated cloud is unavailable.
-  const native=await browser.newContext({viewport:{width:320,height:700},reducedMotion:'reduce'});
-  const filePage=await native.newPage(); await installNativeFixture(filePage,{signedIn:true});
+  nativeProfile=await mkdtemp(join(tmpdir(),'fitlife-offline-'));
+  native=await chromium.launchPersistentContext(nativeProfile,{headless:true,args:['--no-sandbox','--enable-aggressive-domstorage-flushing'],viewport:{width:320,height:700},reducedMotion:'reduce'});
+  const filePage=native.pages()[0] || await native.newPage(); await installNativeFixture(filePage,{signedIn:true});
   const fileErrors=[]; filePage.on('pageerror',e=>fileErrors.push(e.message));
   await filePage.goto(nativeApp); await filePage.getByText("Today's overview").waitFor();
   await filePage.evaluate(()=>localStorage.setItem('__fixture_offline','1'));
@@ -34,7 +40,11 @@ try {
     const part=JSON.parse(localStorage.getItem(`fitlife_cloud_partition_v1:${uid}`)||'null');
     return part?.snapshot?.water?.amountMl===250;
   });
-  await reloadSimulatedNative(filePage,'__fixture_'); await filePage.getByText("Today's overview").waitFor();
+  await reloadSimulatedNative(filePage,'__fixture_');
+  const beforeApp=await filePage.evaluate(()=>window.__qaBeforeFixtureReload);
+  assert.equal(beforeApp?.owner,'qa-user','account owner must survive before app startup');
+  assert.equal(beforeApp?.partition?.snapshot?.water?.amountMl,250,'stored water must survive before app startup');
+  await filePage.getByText("Today's overview").waitFor();
   assert.equal(await filePage.getByRole('progressbar',{name:'Water towards daily goal'}).getAttribute('aria-valuenow'),'250');
   assert.equal(await filePage.locator('.home-training-feature img').evaluate(img=>img.complete && img.naturalWidth>0),true);
   assert.deepEqual(fileErrors,[]); await native.close();
@@ -54,4 +64,8 @@ try {
   assert.equal(await page.getByText('Available in the Android app').count(),1);
   assert.deepEqual(webErrors,[]); await pwa.close();
   console.log('PASS: blocked storage fails closed; simulated native session restores offline; PWA caches the honest Android-only entry offline.');
-} finally {await browser.close();}
+} finally {
+  if(native) await native.close().catch(()=>{});
+  if(nativeProfile) await rm(nativeProfile,{recursive:true,force:true});
+  await browser.close();
+}
