@@ -24,7 +24,7 @@ export function computeGamification(
   workouts: LoggedWorkout[],
   moods: MoodEntry[],
   weights: WeightEntry[],
-  calorieTarget: number
+  calorieTarget: number | null
 ): GamificationSummary {
   const totalXp =
     meals.length * XP_PER_MEAL +
@@ -96,7 +96,7 @@ export function computeGamification(
   }
   let targetHitDays = 0;
   for (const cals of dailyCals.values()) {
-    if (calorieTarget > 0 && Math.abs(cals - calorieTarget) <= calorieTarget * 0.1) {
+    if (calorieTarget !== null && calorieTarget > 0 && Math.abs(cals - calorieTarget) <= calorieTarget * 0.1) {
       targetHitDays++;
     }
   }
@@ -172,13 +172,13 @@ export function computeGamification(
     },
     {
       id: 'badge_macro_sniper',
-      title: 'Calorie Sniper',
-      description: 'Finish 3 days within ±10% of your daily calorie target',
+      title: calorieTarget === null ? 'Meal Rhythm' : 'Calorie Sniper',
+      description: calorieTarget === null ? 'Log a meal on 3 different days' : 'Finish 3 days within ±10% of your daily calorie target',
       icon: '🎯',
-      unlocked: targetHitDays >= 3,
-      currentValue: Math.min(3, targetHitDays),
+      unlocked: (calorieTarget === null ? dailyCals.size : targetHitDays) >= 3,
+      currentValue: Math.min(3, calorieTarget === null ? dailyCals.size : targetHitDays),
       targetValue: 3,
-      progress: Math.min(1, targetHitDays / 3),
+      progress: Math.min(1, (calorieTarget === null ? dailyCals.size : targetHitDays) / 3),
       category: 'nutrition',
     },
     {

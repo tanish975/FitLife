@@ -13,6 +13,7 @@ import { MuscleGroup } from '../data/types';
 import { MOOD_OPTIONS, generateAiCoachMessage } from '../domain/AiCoach';
 import { calculateHealthScore } from '../domain/HealthScoreCalculator';
 import { formatWeight } from '../domain/WeightConverter';
+import { loggedWorkoutUnit } from '../domain/ExerciseDiscovery';
 import partnerTraining from '../assets/partner-training.jpg';
 import maleTraining from '../assets/male-strength.jpg';
 import femaleTraining from '../assets/female-strength.jpg';
@@ -41,27 +42,27 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
     fiberG: sum.fiberG + meal.fiberG,
   }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 }), [todayMeals]);
 
-  const caloriesRemaining = macroTargets.calories - totals.calories;
-  const caloriePercent = Math.max(0, Math.min(100, Math.round(totals.calories / Math.max(1, macroTargets.calories) * 100)));
+  const caloriesRemaining = macroTargets ? macroTargets.calories - totals.calories : 0;
+  const caloriePercent = macroTargets ? Math.max(0, Math.min(100, Math.round(totals.calories / Math.max(1, macroTargets.calories) * 100))) : 0;
   const burnedToday = todayWorkouts.reduce((sum, workout) => sum + workout.caloriesBurned, 0);
   const burnUnavailable = todayWorkouts.some(workout => workout.energyEstimateAvailable === false);
   const workoutSets = todayWorkouts.reduce((sum, workout) => sum + workout.sets, 0);
-  const health = calculateHealthScore({
+  const health = macroTargets ? calculateHealthScore({
     caloriesConsumed: totals.calories, calorieTarget: macroTargets.calories,
     proteinConsumed: totals.proteinG, proteinTarget: macroTargets.proteinG,
     workedOutToday: todayWorkouts.length > 0, workoutSetsToday: workoutSets,
     moodLoggedToday: todayMood !== null,
-  });
+  }) : null;
   const coach = generateAiCoachMessage({
-    healthScore: health.score, moodId: todayMood, goal: profile.goal,
-    caloriesRemaining, proteinRemainingG: Math.max(0, Math.round(macroTargets.proteinG - totals.proteinG)),
+    healthScore: health?.score ?? null, moodId: todayMood, goal: profile.goal,
+    caloriesRemaining: macroTargets ? caloriesRemaining : null, proteinRemainingG: macroTargets ? Math.max(0, Math.round(macroTargets.proteinG - totals.proteinG)) : null,
     workedOutToday: todayWorkouts.length > 0, streakDays: gamification.currentStreak,
   });
   const macros = [
-    { label: 'Protein', amount: totals.proteinG, target: macroTargets.proteinG, color: themeColors.accentPrimary },
-    { label: 'Carbs', amount: totals.carbsG, target: macroTargets.carbsG, color: themeColors.accentWarm },
-    { label: 'Fat', amount: totals.fatG, target: macroTargets.fatG, color: themeColors.accentSecondary },
-    { label: 'Fiber', amount: totals.fiberG, target: macroTargets.fiberG, color: themeColors.accentCool },
+    { label: 'Protein', amount: totals.proteinG, target: macroTargets?.proteinG ?? 0, color: themeColors.accentPrimary },
+    { label: 'Carbs', amount: totals.carbsG, target: macroTargets?.carbsG ?? 0, color: themeColors.accentWarm },
+    { label: 'Fat', amount: totals.fatG, target: macroTargets?.fatG ?? 0, color: themeColors.accentSecondary },
+    { label: 'Fiber', amount: totals.fiberG, target: macroTargets?.fiberG ?? 0, color: themeColors.accentCool },
   ];
   const waterPercent = Math.min(100, Math.round(waterTodayMl / Math.max(1, settings.waterGoalMl) * 100));
   const firstName = profile.name.trim().split(/\s+/)[0] || 'there';
@@ -76,7 +77,7 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
     })),
     ...todayWorkouts.map(workout => ({
       id: workout.id, timestamp: workout.timestamp, type: 'workout' as const, title: workout.exerciseName,
-      detail: `${workout.sets} sets · ${workout.reps} reps${workout.weightKg > 0 ? ` · ${formatWeight(workout.weightKg, settings.weightUnit)}` : ''}`,
+      detail: `${workout.sets} sets · ${workout.reps} ${loggedWorkoutUnit(workout)}${workout.weightKg > 0 ? ` · ${formatWeight(workout.weightKg, settings.weightUnit)}` : ''}`,
     })),
   ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 3), [todayMeals, todayWorkouts, settings.weightUnit]);
 
@@ -109,27 +110,27 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
 
         <section className="home-overview" data-guide-target="home-overview" aria-labelledby="overview-title">
           <div className="home-card-heading"><div><h2 id="overview-title">Today's overview</h2>{usingDemoData && <span className="home-demo-label">Demo data</span>}</div><button onClick={onOpenDaily}>Details <ArrowRight size={15} /></button></div>
-          {profile.onboarded ? <div className="overview-main">
+          {macroTargets ? <div className="overview-main">
             <div className="overview-primary"><span>{caloriesRemaining >= 0 ? 'Calories remaining' : 'Calories over target'}</span><div><strong>{number(Math.abs(caloriesRemaining))}</strong><small>kcal</small></div><p>Daily target: {number(macroTargets.calories)} kcal</p></div>
             <div className="overview-ring" aria-label={`${caloriePercent}% of your daily calorie target logged`}>
               <AnimatedRing progress={totals.calories / Math.max(1, macroTargets.calories)} size={104} strokeWidth={8} startColor={themeColors.accentPrimary}>
                 <strong>{caloriePercent}%</strong><span>of target</span>
               </AnimatedRing>
             </div>
-          </div> : <div className="profile-needed"><div><strong>See your estimates</strong><p>Add profile details whenever you’re ready.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></div>}
+          </div> : profile.onboarded ? <div className="profile-needed"><div><strong>Personal targets unavailable</strong><p>Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance.</p></div></div> : <div className="profile-needed"><div><strong>See your estimates</strong><p>Add profile details whenever you’re ready.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></div>}
           <div className="overview-stats">
-            <div><span>Eaten</span><strong>{number(totals.calories)} <small>kcal</small></strong></div>
+            <div><span>Food logged</span><strong>{todayMeals.length ? number(totals.calories) : '—'} <small>{todayMeals.length ? 'kcal' : 'not logged'}</small></strong></div>
             <div><span>Est. burned</span><strong>{burnUnavailable ? '—' : number(burnedToday)} <small>{burnUnavailable ? 'not estimated' : 'kcal'}</small></strong></div>
             <div><span>Exercise logs</span><strong>{todayWorkouts.length} <small>today</small></strong></div>
           </div>
-          <p className="overview-note">{profile.onboarded ? 'Targets are estimates; exercise calories are separate.' : 'Add profile details for personal estimates.'}</p>
+          <p className="overview-note">{macroTargets ? 'Based on logged food; targets are estimates and exercise calories are separate.' : profile.onboarded ? 'Food and exercise values are estimates.' : 'Add profile details for personal estimates.'}</p>
         </section>
 
         {settings.dashboardWidgets.showMacros && <details className="home-disclosure"><summary><span>Nutrition breakdown</span><ChevronRight size={18} /></summary>
         {settings.dashboardWidgets.showMacros && <section className="home-section" aria-labelledby="macros-title">
-          <div className="home-section-heading"><div><h2 id="macros-title">Your nutrition</h2><p>{profile.onboarded ? "Today's progress towards your targets." : "Today's logged nutrition."}</p></div><button onClick={() => onNavigateTab('meals')}>Log meal <Plus size={16} /></button></div>
+          <div className="home-section-heading"><div><h2 id="macros-title">Your nutrition</h2><p>{macroTargets ? "Today's progress towards your targets." : "Today's logged nutrition."}</p></div><button onClick={() => onNavigateTab('meals')}>Log meal <Plus size={16} /></button></div>
           <div className="home-macro-grid">{macros.map(macro => {
-            if (!profile.onboarded) return <button key={macro.label} className="home-macro" onClick={() => onNavigateTab('meals')} aria-label={`${macro.label}, ${number(macro.amount)} grams logged. Open meals.`}><strong>{number(macro.amount)} g</strong><span>{macro.label}</span><small>logged today</small></button>;
+            if (!macroTargets) return <button key={macro.label} className="home-macro" onClick={() => onNavigateTab('meals')} aria-label={`${macro.label}, ${number(macro.amount)} grams logged. Open meals.`}><strong>{number(macro.amount)} g</strong><span>{macro.label}</span><small>logged today</small></button>;
             const fraction = macro.amount / Math.max(1, macro.target);
             const pct = Math.min(100, Math.round(fraction * 100));
             return <button key={macro.label} className="home-macro" onClick={() => onNavigateTab('meals')} aria-label={`${macro.label}, ${number(macro.amount)} of ${macro.target} grams. Open meals.`}>

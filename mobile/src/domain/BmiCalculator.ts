@@ -1,18 +1,25 @@
+import { canUseAdultBmiCategories } from './AgeSafety';
+
 export type BmiCategory = 'Underweight' | 'Normal' | 'Overweight' | 'Obese';
 
 export interface BmiResult {
   bmi: number;
-  category: BmiCategory;
+  category: BmiCategory | null;
   color: string;
   badgeBg: string;
-  healthyRangeKg: [number, number];
+  healthyRangeKg: [number, number] | null;
   summary: string;
 }
 
-export function calculateBmi(weightKg: number, heightCm: number): BmiResult {
+export function calculateBmi(weightKg: number, heightCm: number, age: number): BmiResult {
   const heightM = Math.max(1.0, heightCm / 100);
   const rawBmi = weightKg / (heightM * heightM);
   const bmi = Math.round(rawBmi * 10) / 10;
+
+  if (!canUseAdultBmiCategories(age)) {
+    return { bmi, category: null, color: '#B8B5AD', badgeBg: '#1E2520', healthyRangeKg: null,
+      summary: 'Adult BMI categories are not used below age 20. BMI is a screening measure, not a diagnosis. Ask a qualified health professional for age-appropriate advice.' };
+  }
 
   const minHealthyKg = Math.round(18.5 * heightM * heightM * 10) / 10;
   const maxHealthyKg = Math.round(24.9 * heightM * heightM * 10) / 10;

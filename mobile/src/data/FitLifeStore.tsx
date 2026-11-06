@@ -30,6 +30,7 @@ import {
   ThemeMode,
 } from '../domain/ThemePalettes';
 import { calculateMacroTargets } from '../domain/CalorieCalculator';
+import { canUseAdultNutritionTargets } from '../domain/AgeSafety';
 import { getDateKeyDaysAgo } from '../domain/ProgressAggregator';
 import { computeGamification } from '../domain/GamificationEngine';
 import { triggerHaptic } from '../domain/Haptics';
@@ -41,7 +42,7 @@ import { mergePersonalSettings, mergeStepObservations, validSavedMeal, validStep
 import { allRecoveryChanges, applyRecoveryChoices, emptyRecoveryJournal, noteRecoveryChanges, RECOVERY_PROFILE_KEYS, RECOVERY_SETTING_KEYS,
   type RecoveryJournal, type RecoverySettingKey } from '../domain/RecoveryJournal';
 import { activatePartition, CLOUD_KINDS, CloudDeletions, CloudKind, CloudPartition, CloudPayload, emptyDeletions,
-  GoogleAccount, GUEST_OWNER, hasNativeCloud, isDemoId, mergeCloud, nativeCloudRequest, readActivePartition, readPartition,
+  GoogleAccount, GUEST_OWNER, CLOUD_DEVICE_LIMIT, canWriteDeviceSnapshot, hasNativeCloud, isDemoId, mergeCloud, nativeCloudRequest, readActivePartition, readPartition,
   RemoteSnapshot, rowFingerprint, savePartition, validCloudPayload } from '../domain/CloudSync';
 
 const STORAGE_KEYS = {
@@ -82,7 +83,7 @@ interface FitLifeContextValue {
   todayMood: MoodId | null;
   latestWeightKg: number;
   startingWeightKg: number;
-  macroTargets: MacroTargets;
+  macroTargets: MacroTargets | null;
   gamification: GamificationSummary;
   celebration: CelebrationPayload | null;
   toastMessage: string | null;
@@ -589,20 +590,20 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const macroTargets = useMemo(
     () =>
-      calculateMacroTargets({
+      profile.onboarded ? calculateMacroTargets({
         sex: profile.sex,
         age: profile.age,
         heightCm: profile.heightCm,
         weightKg: latestWeightKg,
         goal: profile.goal,
         activityLevel: profile.activityLevel,
-      }),
-    [profile.sex, profile.age, profile.heightCm, latestWeightKg, profile.goal, profile.activityLevel]
+      }) : null,
+    [profile.onboarded, profile.sex, profile.age, profile.heightCm, latestWeightKg, profile.goal, profile.activityLevel]
   );
 
   const gamification = useMemo(
-    () => computeGamification(meals, workouts, moods, weights, profile.onboarded ? macroTargets.calories : 0),
-    [meals, workouts, moods, weights, macroTargets.calories, profile.onboarded]
+    () => computeGamification(meals, workouts, moods, weights, macroTargets?.calories ?? null),
+    [meals, workouts, moods, weights, macroTargets]
   );
 
   const prevUnlockedRef = useRef<Set<string> | null>(null);
@@ -688,8 +689,23 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     recoveryJournalRef.current = { ...old, settings: RECOVERY_SETTING_KEYS.filter(key => old.settings.includes(key) || keys.includes(key)) };
   };
 
+  const appendWeight = (weightKg: number) => {
+    setWeights(previous => {
+      // Keep multiple check-ins. Make a new check-in later than any already
+      // recorded for today, even on a very fast repeat tap.
+      const latestToday = previous.reduce((latest, row) => row.dateKey === todayKey ? Math.max(latest, row.timestamp) : latest, 0);
+      const timestamp = Math.max(Date.now(), latestToday + 1);
+      return [...previous, { id: `wt-${timestamp}-${Math.random().toString(36).slice(2, 8)}`, dateKey: todayKey, timestamp, weightKg }];
+    });
+  };
+
   const updateProfile = async (next: Partial<UserProfile>) => {
-    if (next.weightKg && next.weightKg > 0 && !(await markCloudDeletes({ weights: weights.filter(w => w.dateKey === todayKey) }))) return false;
+    if (storageBlockedRef.current) { showToast('Account data needs recovery before changes.'); return false; }
+    const suppliedWeight = next.weightKg;
+    // Editing age or another field must not delete or replace today's check-in.
+    // A genuinely changed weight is an additional check-in, not a destructive rewrite.
+    const addWeight = suppliedWeight !== undefined && Number.isFinite(suppliedWeight) && suppliedWeight > 0 &&
+      ((!profile.onboarded && weights.length === 0) || Math.abs(suppliedWeight - latestWeightKg) >= 0.05);
     triggerHaptic('medium', settings.hapticsEnabled);
     if (needsRecoveryRef.current) {
       // Submitting a profile explicitly chooses all submitted values, even if
@@ -699,18 +715,8 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         old.profile.includes(key) || Object.prototype.hasOwnProperty.call(next, key)) };
     }
     setProfile((prev) => ({ ...prev, ...next }));
-    if (next.weightKg && next.weightKg > 0) {
-      setWeights((prev) => [
-        ...prev.filter((w) => w.dateKey !== todayKey),
-        {
-          id: `wt-${Date.now()}`,
-          dateKey: todayKey,
-          timestamp: Date.now(),
-          weightKg: next.weightKg!,
-        },
-      ]);
-    }
-    showToast('Profile & targets updated');
+    if (addWeight) appendWeight(suppliedWeight!);
+    showToast(canUseAdultNutritionTargets(next.age ?? profile.age) ? 'Profile & estimates updated' : 'Profile updated');
     return true;
   };
 
@@ -1012,18 +1018,10 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const logWeight = async (weightKg: number) => {
-    if (!(await markCloudDeletes({ weights: weights.filter(row => row.dateKey === todayKey) }))) return;
+    if (storageBlockedRef.current) { showToast('Account data needs recovery before changes.'); return; }
     triggerHaptic('medium', settings.hapticsEnabled);
     const rounded = Math.round(weightKg * 10) / 10;
-    setWeights((prev) => [
-      ...prev.filter((w) => w.dateKey !== todayKey),
-      {
-        id: `wt-${Date.now()}`,
-        dateKey: todayKey,
-        timestamp: Date.now(),
-        weightKg: rounded,
-      },
-    ]);
+    appendWeight(rounded);
     setProfile((prev) => ({ ...prev, weightKg: rounded }));
     showToast(profile.onboarded ? 'Weight logged & BMI updated' : 'Weight logged');
   };
@@ -1284,15 +1282,25 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const response = await nativeCloudRequest<{ uid: string; deviceId: string; snapshots: RemoteSnapshot[] }>('pull', undefined, account.uid);
       if (cloudAccountRef.current?.uid !== account.uid || ownerRef.current !== account.uid || response.uid !== account.uid)
         throw new Error('Account changed; sync was stopped.');
-      if (!/^[a-f0-9]{32}$/.test(response.deviceId) || !Array.isArray(response.snapshots) || response.snapshots.length > 10)
+      if (!/^[a-f0-9]{32}$/.test(response.deviceId) || !Array.isArray(response.snapshots) || response.snapshots.length > CLOUD_DEVICE_LIMIT)
         throw new Error('Cloud data could not be verified; nothing was overwritten.');
       const remotes: CloudPayload[] = [];
+      const deviceIds = new Set<string>();
       let ownPayload: string | null = null;
       for (const item of response.snapshots) {
-        if (!item || !/^[a-f0-9]{32}$/.test(item.deviceId) || typeof item.payload !== 'string') throw new Error('Cloud data is invalid; nothing was overwritten.');
+        if (!item || !/^[a-f0-9]{32}$/.test(item.deviceId) || typeof item.payload !== 'string' || deviceIds.has(item.deviceId)) throw new Error('Cloud data is invalid; nothing was overwritten.');
+        deviceIds.add(item.deviceId);
         let parsed: unknown; try { parsed = JSON.parse(item.payload); } catch { throw new Error('Cloud data is invalid; nothing was overwritten.'); }
         if (!validCloudPayload(parsed)) throw new Error('Cloud data is invalid; nothing was overwritten.');
         remotes.push(parsed); if (item.deviceId === response.deviceId) ownPayload = item.payload;
+      }
+      // Do not create an 11th document. Do not retire or delete any existing
+      // device: it may hold unique, unmerged activity. This sequential client
+      // guard cannot prevent races with another or an older client.
+      if (!canWriteDeviceSnapshot(response.deviceId, [...deviceIds])) {
+        try { localStorage.setItem(`fitlife_sync_pending_v1:${account.uid}`, '1'); } catch { /* keep the visible warning */ }
+        setHasUnsyncedChanges(true);
+        throw new Error('Cloud sync paused: 10 device snapshots already exist. No snapshots were deleted or merged; data on this phone is unchanged. Create an encrypted backup in Settings. Device retirement is not yet available.');
       }
       const revision = backupRevisionRef.current;
       let snapshot = makeBackupSnapshot();

@@ -1,4 +1,5 @@
 import { ActivityLevel, BiologicalSex, FitnessGoal, MacroTargets, UserProfile } from '../data/types';
+import { canUseAdultNutritionTargets } from './AgeSafety';
 
 export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, { multiplier: number; label: string; subtitle: string }> = {
   sedentary: {
@@ -77,7 +78,9 @@ export const GOAL_CONFIG: Record<
  * Mifflin-St Jeor BMR -> TDEE -> Calorie & Macro Targets
  * The 1200 kcal calculation floor is not a safety guarantee; individual needs vary.
  */
-export function calculateMacroTargets(profile: Pick<UserProfile, 'sex' | 'age' | 'heightCm' | 'weightKg' | 'goal' | 'activityLevel'>): MacroTargets {
+export function calculateMacroTargets(profile: Pick<UserProfile, 'sex' | 'age' | 'heightCm' | 'weightKg' | 'goal' | 'activityLevel'>): MacroTargets | null {
+  // These adult-derived formulas must never run for a minor or an unknown age.
+  if (!canUseAdultNutritionTargets(profile.age) || !Number.isFinite(profile.heightCm) || !Number.isFinite(profile.weightKg) || profile.heightCm <= 0 || profile.weightKg <= 0) return null;
   const weight = Math.max(30, profile.weightKg);
   const height = Math.max(120, profile.heightCm);
   const age = Math.max(14, Math.min(100, profile.age));

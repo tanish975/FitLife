@@ -313,7 +313,7 @@ try {
   assert.equal(await desktop.page.locator('.desktop-navigation').count(), 1);
   assert.equal(await desktop.page.locator('.wellness-aside').count(), 1);
   await desktop.page.locator('.desktop-navigation').getByRole('button', { name: 'Progress', exact: true }).click();
-  await desktop.page.getByText('Weight Trend (Last 14 Entries)').waitFor();
+  await desktop.page.getByText('Weight Trend (Last 14 Check-in Days)').waitFor();
   const chart = desktop.page.locator('canvas').first();
   await desktop.page.waitForFunction(() => {
     const c = document.querySelector('canvas');

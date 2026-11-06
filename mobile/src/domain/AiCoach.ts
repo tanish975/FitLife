@@ -15,11 +15,11 @@ export const MOOD_OPTIONS: MoodOption[] = [
 ];
 
 export interface AiCoachContext {
-  healthScore: number;
+  healthScore: number | null;
   moodId: MoodId | null;
   goal: FitnessGoal;
-  caloriesRemaining: number;
-  proteinRemainingG: number;
+  caloriesRemaining: number | null;
+  proteinRemainingG: number | null;
   workedOutToday: boolean;
   streakDays: number;
 }
@@ -67,7 +67,7 @@ export function generateAiCoachMessage(ctx: AiCoachContext): AiCoachMessage {
   if (ctx.workedOutToday) {
     return {
       headline: 'Movement logged today',
-      body: ctx.proteinRemainingG > 15
+      body: ctx.proteinRemainingG !== null && ctx.proteinRemainingG > 15
         ? `You've logged a workout. Your estimated daily protein target has ${ctx.proteinRemainingG} g remaining; consider it as you plan your meals.`
         : 'You have logged movement today. Remember to allow time for recovery and drink according to your needs.',
       actionTag: 'Plan your day',

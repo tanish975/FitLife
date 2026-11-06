@@ -86,7 +86,7 @@ try {
 
   await page.evaluate(() => localStorage.setItem('__qa_offline','1'));
   await page.getByRole('button', { name:'Meals', exact:true }).click();
-  await page.getByPlaceholder('Try "2 eggs and a banana" or "150g chicken & rice"').fill('2 eggs');
+  await page.getByPlaceholder('Try "2 boiled eggs and a banana"').fill('2 boiled eggs');
   await page.getByRole('button', { name:'Add (1)' }).click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('fitlife_cloud_partition_v1:alice') || '{}').snapshot?.meals.length === 2);
   await reloadSimulatedNative(page, '__qa_');

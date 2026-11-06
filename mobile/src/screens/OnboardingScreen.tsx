@@ -9,6 +9,7 @@ import {
 } from '../domain/CalorieCalculator';
 import { displayWeight, parseInputToKg } from '../domain/WeightConverter';
 import { calculateBmi } from '../domain/BmiCalculator';
+import { canUseAdultNutritionTargets } from '../domain/AgeSafety';
 import { SegmentedSelector } from '../components/SegmentedSelector';
 import { PressScale } from '../components/PressScale';
 import { EntryActionBar } from '../components/EntryActionBar';
@@ -39,7 +40,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
   const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(profile.onboarded ? profile.activityLevel : null);
   const [fieldError, setFieldError] = useState<{ field: ProfileField; message: string } | null>(null);
 
-  const age = numberOr(ageInput, profile.age);
+  // An unknown age must not fall back to the adult sample profile.
+  const age = numberOr(ageInput, Number.NaN);
+  const ageReady = ageInput.trim() !== '' && Number.isInteger(age) && age >= 14 && age <= 99;
+  const isMinor = ageReady && age < 18;
   const heightCm = numberOr(heightInput, profile.heightCm);
   const weightKg = useMemo(
     () => parseInputToKg(numberOr(weightInput, 0), unit) || profile.weightKg,
@@ -60,8 +64,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
   );
 
   const previewBmi = useMemo(
-    () => calculateBmi(weightKg, heightCm),
-    [weightKg, heightCm]
+    () => calculateBmi(weightKg, heightCm, age),
+    [weightKg, heightCm, age]
   );
 
   const previewReady = !!sex && !!goal && !!activityLevel && Number.isInteger(Number(ageInput)) && Number(ageInput) >= 14 && Number(ageInput) <= 99 &&
@@ -96,7 +100,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       showFieldError('weight', `Enter a weight from ${minWeight} to ${maxWeight} ${unit}.`);
       return;
     }
-    if (!goal) { showFieldError('goal', 'Choose a fitness goal.'); return; }
+    if (parsedAge >= 18 && !goal) { showFieldError('goal', 'Choose a fitness goal.'); return; }
     if (!activityLevel) { showFieldError('activity', 'Choose your usual activity level.'); return; }
     setFieldError(null);
     const saved = await updateProfile({
@@ -105,7 +109,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       age: parsedAge,
       heightCm: parsedHeight,
       weightKg: Math.max(30, Math.min(250, parseInputToKg(parsedWeight, unit))),
-      goal,
+      // Preserve an existing goal, but do not use it for minor targets or workouts.
+      goal: goal || 'maintain',
       activityLevel,
       onboarded: true,
     });
@@ -130,7 +135,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
           <div>
             <h1 className="font-heading text-lg font-bold text-[#F4F1EA]">Complete your profile</h1>
             <p className="text-xs text-[#84877F]">
-              Body & Goal Calibration · BMR → TDEE → Personalized Macros
+              Your details and optional estimates
             </p>
           </div>
         </div>
@@ -140,7 +145,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       </div>
 
       {/* Live preview only uses values explicitly entered by this person. */}
-      {previewReady ? <div className="relative overflow-hidden rounded-[26px] bg-[#213026] p-4 shadow-xl border border-[#3E634B]" data-guide-target="onboarding-preview" aria-label="Estimated targets preview">
+      {previewReady && previewTargets ? <div className="relative overflow-hidden rounded-[26px] bg-[#213026] p-4 shadow-xl border border-[#3E634B]" data-guide-target="onboarding-preview" aria-label="Estimated targets preview">
         <div className="flex items-center justify-between">
           <div>
             <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-[#7BB38F]">
@@ -153,7 +158,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             <p className="mt-0.5 text-[0.6875rem] text-[#B8B5AD]">
               BMR: <strong>{previewTargets.bmr}</strong> kcal · TDEE: <strong>{previewTargets.tdee}</strong> kcal · BMI:{' '}
               <strong style={{ color: previewBmi.color }}>
-                {previewBmi.bmi} {age < 18 ? '(adult categories do not apply)' : `(${previewBmi.category})`}
+                {previewBmi.bmi} {previewBmi.category ? `(${previewBmi.category})` : '(adult categories are not used below age 20)'}
               </strong>
             </p>
           </div>
@@ -162,7 +167,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
           </div>
         </div>
 
-        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">{age < 18 ? 'These adult formulas and calorie targets are not appropriate guidance for people under 18. Ask a qualified health professional for individual advice.' : 'Calorie and macro targets are estimates, not medical advice. Individual needs vary; the calculation floor is not a safety guarantee.'}</p>
+        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">Calorie and macro targets are estimates, not medical advice. Individual needs vary; the calculation floor is not a safety guarantee.</p>
         <div className="mt-3.5 grid grid-cols-4 gap-2 pt-3 border-t border-[#344A3C] text-center">
           <div className="rounded-xl bg-[#151A17] p-2">
             <div className="text-[0.625rem] text-[#84877F]">Protein</div>
@@ -189,7 +194,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             </div>
           </div>
         </div>
-      </div> : <section className="profile-needed profile-needed-card" data-guide-target="onboarding-preview" aria-label="Estimated targets preview"><div><strong>Estimates will appear here</strong><p>Choose a sex, enter your own measurements, and pick a goal and activity level to preview them.</p></div></section>}
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="onboarding-preview" aria-label="Estimated targets preview"><div><strong>{isMinor ? "Adult targets are unavailable" : "Estimates will appear here"}</strong><p>{isMinor ? "Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance." : "Choose a sex, enter your own measurements, and pick a goal and activity level to preview them."}</p></div></section>}
 
       {/* Biometrics Card */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4" data-guide-target="onboarding-details" aria-label="Profile details">
@@ -271,7 +276,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
       <div id="onboarding-goal" tabIndex={-1} className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-2.5">
         <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">Primary Fitness Goal</h3>
         {fieldError?.field === 'goal' && <p className="onboarding-error" role="alert">{fieldError.message}</p>}
-        <div className="grid grid-cols-1 gap-2">
+        {ageReady && canUseAdultNutritionTargets(age) ? <div className="grid grid-cols-1 gap-2">
           {(Object.keys(GOAL_CONFIG) as FitnessGoal[]).map((gKey) => {
             const cfg = GOAL_CONFIG[gKey];
             const isSelected = goal === gKey;
@@ -307,7 +312,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               </PressScale>
             );
           })}
-        </div>
+        </div> : <p className="text-xs leading-relaxed text-[#B8B5AD]">{isMinor ? "Adult weight-loss and calorie goals are not offered under 18. Choose movement you enjoy and seek qualified guidance when needed." : "Enter your age to see the available goal choices."}</p>}
       </div>
 
       {/* Activity Level Selection */}

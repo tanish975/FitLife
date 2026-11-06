@@ -2,6 +2,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { nativeApp, installNativeFixture } from './mock-native.mjs';
+import { reloadSimulatedNative } from './native-reload.mjs';
 
 const prod=process.env.FITLIFE_PROD_URL || 'http://127.0.0.1:4173/';
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
@@ -25,7 +26,15 @@ try {
   await filePage.goto(nativeApp); await filePage.getByText("Today's overview").waitFor();
   await filePage.evaluate(()=>localStorage.setItem('__fixture_offline','1'));
   await filePage.getByRole('button',{name:'Add 250 ml of water'}).click();
-  await filePage.reload(); await filePage.getByText("Today's overview").waitFor();
+  // Observe the actual account partition write before navigating. The helper
+  // carries only simulated native-bridge keys, never FitLife data.
+  await filePage.waitForFunction(()=>{
+    const uid=localStorage.getItem('fitlife_cloud_owner_v1');
+    if (!uid) return false;
+    const part=JSON.parse(localStorage.getItem(`fitlife_cloud_partition_v1:${uid}`)||'null');
+    return part?.snapshot?.water?.amountMl===250;
+  });
+  await reloadSimulatedNative(filePage,'__fixture_'); await filePage.getByText("Today's overview").waitFor();
   assert.equal(await filePage.getByRole('progressbar',{name:'Water towards daily goal'}).getAttribute('aria-valuenow'),'250');
   assert.equal(await filePage.locator('.home-training-feature img').evaluate(img=>img.complete && img.naturalWidth>0),true);
   assert.deepEqual(fileErrors,[]); await native.close();

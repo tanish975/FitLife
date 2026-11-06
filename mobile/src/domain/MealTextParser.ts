@@ -32,7 +32,7 @@ const NUMBER_WORDS: Record<string, number> = {
 };
 
 /**
- * Splits free text like "2 eggs and a banana" or "150g grilled chicken, 1 cup brown rice & avocado"
+ * Splits free text like "2 boiled eggs and a banana" or "150g grilled chicken breast"
  * into multiple logged meal items at once.
  */
 export function parseMealFreeText(rawText: string, defaultCategory: MealCategory): ParsedMealDraft[] {
@@ -91,8 +91,12 @@ export function parseMealFreeText(rawText: string, defaultCategory: MealCategory
       const matchingMeasure = !!measure && !!servingMeasure && servingMeasure[2].toLowerCase() === measure.unit;
       const labelUnit = matched.servingLabel.match(/(\d+(?:\.\d+)?)\s*(cups?|bowls?|slices?|pieces?|scoops?|plates?|tbsp|tsp)\b/i);
       const unitMatches = !quantityUnit || quantityUnit === 'serving' || (!!labelUnit && labelUnit[2].toLowerCase().replace(/s$/, '') === quantityUnit);
-      const conflictingPreparation = /\b(dry|uncooked|raw)\b/i.test(matched.servingLabel) && /\b(cooked|boiled|steamed)\b/i.test(segment);
-      const requiresReview = !match.exact || (!!measure && (!matchingMeasure || conflictingPreparation)) || !unitMatches;
+      // A measured amount of a dish whose label contains a dry ingredient
+      // cannot be assumed to be the dry amount. Likewise, a count of an item
+      // cannot automatically mean that many multi-item combo servings.
+      const dryBasisUnclear = !!measure && /\b(dry|uncooked|raw)\b/i.test(matched.servingLabel);
+      const compositeCount = !measure && !quantityUnit && multiplier !== 1 && /[+&]/.test(matched.servingLabel);
+      const requiresReview = !match.exact || (!!measure && (!matchingMeasure || dryBasisUnclear)) || !unitMatches || compositeCount;
       const effectiveMultiplier = measure
         ? measure.amount / (matchingMeasure ? parseFloat(servingMeasure![1]) : 100)
         : quantityUnit && quantityUnit !== 'serving' && unitMatches ? multiplier / parseFloat(labelUnit![1]) : multiplier;
@@ -118,7 +122,9 @@ export function parseMealFreeText(rawText: string, defaultCategory: MealCategory
       const titleCase = queryPart.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
       results.push({
         name: `${measure ? `${measure.amount} ${measure.unit} ` : multiplier !== 1 ? `${formatMultiplier(multiplier)} ` : ''}${titleCase}`,
-        servingLabel: measure ? `${measure.amount} ${measure.unit}` : `${Math.round(multiplier * 10) / 10} ${quantityUnit || 'serving'}${multiplier !== 1 && !['tbsp', 'tsp'].includes(quantityUnit || '') ? 's' : ''}`,
+        servingLabel: measure ? `${measure.amount} ${measure.unit}` : quantityUnit
+          ? `${Number(multiplier.toPrecision(6))} ${quantityUnit}${multiplier !== 1 && !['tbsp', 'tsp'].includes(quantityUnit) ? 's' : ''}`
+          : `${Number(multiplier.toPrecision(6))} × ${titleCase}`,
         calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0,
         category: defaultCategory, requiresReview: true, source: 'unknown',
       });
@@ -132,40 +138,22 @@ function formatMultiplier(n: number): string {
   return `${Number(n.toPrecision(6))}×`;
 }
 
+/** Only explicitly reviewed aliases for simple entries may auto-fill values.
+ * Search tags are discovery terms, not proof that two foods are equivalent.
+ * All other phrases stay user-entered and require nutrition details. */
 function findBestFoodMatch(query: string): { item: FoodItem; exact: boolean } | null {
-  const normalized = query.toLowerCase().replace(/s\b/g, '').trim();
+  const normalize = (value: string) => value.toLowerCase().replace(/s\b/g, '').replace(/\s+/g, ' ').trim();
+  const normalized = normalize(query);
   if (!normalized) return null;
-
-  const ambiguous = new Set(['protein','breakfast','lunch','dinner','snack','indian','fruit','vegetarian','vegan','meat','fish','seafood','salad','bread','wheat','rice','carbs','healthy','bowl','shake','omega','curry','nuts','chocolate','omelette','preworkout','paneer','moong','sambar','broccoli']);
-  const exactTagCount = FOOD_CATALOG.filter(item => item.tags.some(tag => tag.toLowerCase().replace(/s\b/g, '') === normalized)).length;
-  let bestScore = 0;
-  let bestItem: FoodItem | null = null;
-
-  for (const item of FOOD_CATALOG) {
-    const itemName = item.name.toLowerCase().replace(/s\b/g, '');
-    const tags = item.tags.map((t) => t.toLowerCase().replace(/s\b/g, ''));
-
-    let score = 0;
-    if (itemName === normalized || tags.includes(normalized)) {
-      score = 100;
-    } else if (itemName.includes(normalized) || normalized.includes(itemName)) {
-      score = 75;
-    } else {
-      const words = normalized.split(/\s+/);
-      for (const w of words) {
-        if (w.length < 2) continue;
-        if ( tags.some((t) => t === w) ) score += 45;
-        else if (itemName.includes(w) || tags.some((t) => t.includes(w))) score += 30;
-      }
-    }
-
-    if (!(itemName === normalized || tags.includes(normalized))) score = Math.min(90, score);
-    if (score > bestScore) {
-      bestScore = score;
-      bestItem = item;
-    }
-  }
-
-  const exactName = bestItem?.name.toLowerCase().replace(/s\b/g, '') === normalized;
-  return bestItem && bestScore >= 25 ? { item: bestItem, exact: bestScore === 100 && (exactName || (!ambiguous.has(normalized) && exactTagCount === 1)) } : null;
+  const safeAliases: Record<string, string[]> = {
+    'food-eggs': ['boiled egg'],
+    'food-banana': ['banana'],
+    'food-peanut-butter': ['peanut butter'],
+    'food-chicken-breast': ['grilled chicken breast'],
+    'food-roti': ['roti', 'chapati', 'phulka'],
+    'food-apple': ['apple'],
+  };
+  const matches = FOOD_CATALOG.filter(item => normalize(item.name) === normalized ||
+    (safeAliases[item.id] || []).some(alias => normalize(alias) === normalized));
+  return matches.length === 1 ? { item: matches[0], exact: true } : null;
 }

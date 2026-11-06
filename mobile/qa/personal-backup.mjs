@@ -10,7 +10,7 @@ const openSettings=async()=>{await page.getByRole('button',{name:'Home',exact:tr
 try {
  await page.goto(nativeApp); await page.getByText("Today's overview").waitFor();
  await page.getByRole('button',{name:'Meals',exact:true}).click();
- await page.getByLabel('Describe a meal').fill('2 eggs'); await page.getByRole('button',{name:'Add (1)'}).click();
+ await page.getByLabel('Describe a meal').fill('2 boiled eggs'); await page.getByRole('button',{name:'Add (1)'}).click();
  await page.locator('.meal-shortcut').first().getByRole('button',{name:/Add .* to favorite meals/}).click();
  let favorite=(await store('fitlife_settings_v2')).savedMeals.find(x=>!x.deleted); assert(favorite);
  await openSettings(); await page.getByRole('button',{name:'Create backup'}).click();

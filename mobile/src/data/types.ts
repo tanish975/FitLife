@@ -37,6 +37,13 @@ export type MuscleGroup =
   | 'Cardio'
   | 'Full Body';
 
+/** Detailed catalog-only filters; persisted workouts keep the legacy broad muscleGroup. */
+export type ExerciseTarget =
+  | 'Neck' | 'Traps' | 'Shoulders' | 'Chest' | 'Back'
+  | 'Biceps' | 'Triceps' | 'Forearms' | 'Core'
+  | 'Quadriceps' | 'Hamstrings' | 'Glutes' | 'Calves' | 'Shins'
+  | 'Rotator cuff' | 'Hip stabilizers' | 'Stabilizers' | 'Cardio' | 'Full body';
+
 export type MoodId =
   | 'energized'
   | 'focused'
@@ -123,6 +130,12 @@ export interface ExerciseItem {
   defaultWeightKg: number;
   caloriesPerSet: number;
   tip: string;
+  /** Optional catalog-only metadata; no changes to legacy exercise IDs. */
+  targetAreas?: ExerciseTarget[];
+  aliases?: string[];
+  caution?: string;
+  logUnit?: 'seconds';
+  energyEstimateUnavailable?: boolean;
 }
 
 export interface LoggedWorkout {
@@ -138,6 +151,8 @@ export interface LoggedWorkout {
   caloriesBurned: number;
   /** False when the inputs needed for an estimate have not been provided. */
   energyEstimateAvailable?: boolean;
+  /** Added only to new timed exercises; legacy rows still represent reps/minutes. */
+  measurementUnit?: 'seconds';
   restSeconds: number;
 }
 

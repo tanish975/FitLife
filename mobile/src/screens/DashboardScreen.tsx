@@ -24,6 +24,7 @@ import { PressScale } from '../components/PressScale';
 import { EmptyState } from '../components/EmptyState';
 import { MainTabId } from '../components/GlassBottomNav';
 import { formatWeight } from '../domain/WeightConverter';
+import { loggedWorkoutUnit } from '../domain/ExerciseDiscovery';
 
 interface DashboardScreenProps {
   onNavigateTab: (tab: MainTabId) => void;
@@ -77,11 +78,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     [todayWorkouts]
   );
 
-  const caloriesRemaining = macroTargets.calories - totals.calories;
+  const caloriesRemaining = macroTargets ? macroTargets.calories - totals.calories : 0;
 
   const healthBreakdown = useMemo(
     () =>
-      calculateHealthScore({
+      macroTargets ? calculateHealthScore({
         caloriesConsumed: totals.calories,
         calorieTarget: macroTargets.calories,
         proteinConsumed: totals.proteinG,
@@ -89,12 +90,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         workedOutToday: todayWorkouts.length > 0,
         workoutSetsToday,
         moodLoggedToday: todayMood !== null,
-      }),
+      }) : null,
     [
       totals.calories,
       totals.proteinG,
-      macroTargets.calories,
-      macroTargets.proteinG,
+      macroTargets,
       todayWorkouts.length,
       workoutSetsToday,
       todayMood,
@@ -104,20 +104,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const coachMessage = useMemo(
     () =>
       generateAiCoachMessage({
-        healthScore: healthBreakdown.score,
+        healthScore: healthBreakdown?.score ?? null,
         moodId: todayMood,
         goal: profile.goal,
-        caloriesRemaining,
-        proteinRemainingG: Math.max(0, Math.round(macroTargets.proteinG - totals.proteinG)),
+        caloriesRemaining: macroTargets ? caloriesRemaining : null,
+        proteinRemainingG: macroTargets ? Math.max(0, Math.round(macroTargets.proteinG - totals.proteinG)) : null,
         workedOutToday: todayWorkouts.length > 0,
         streakDays: gamification.currentStreak,
       }),
     [
-      healthBreakdown.score,
+      healthBreakdown?.score,
       todayMood,
       profile.goal,
       caloriesRemaining,
-      macroTargets.proteinG,
+      macroTargets,
       totals.proteinG,
       todayWorkouts.length,
       gamification.currentStreak,
@@ -129,28 +129,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     {
       label: 'Protein',
       consumed: Math.round(totals.proteinG),
-      target: macroTargets.proteinG,
+      target: macroTargets?.proteinG ?? 0,
       unit: 'g',
       color: themeColors.accentPrimary,
     },
     {
       label: 'Carbs',
       consumed: Math.round(totals.carbsG),
-      target: macroTargets.carbsG,
+      target: macroTargets?.carbsG ?? 0,
       unit: 'g',
       color: themeColors.accentWarm,
     },
     {
       label: 'Fats',
       consumed: Math.round(totals.fatG),
-      target: macroTargets.fatG,
+      target: macroTargets?.fatG ?? 0,
       unit: 'g',
       color: themeColors.accentSecondary,
     },
     {
       label: 'Fiber',
       consumed: Math.round(totals.fiberG),
-      target: macroTargets.fiberG,
+      target: macroTargets?.fiberG ?? 0,
       unit: 'g',
       color: themeColors.accentCool,
     },
@@ -185,8 +185,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         id: w.id,
         type: 'workout',
         title: w.exerciseName,
-        subtitle: `${w.muscleGroup} · ${w.sets} sets × ${w.reps} reps ${
-          w.weightKg > 0 ? `@ ${formatWeight(w.weightKg, settings.weightUnit)}` : '(Bodyweight)'
+        subtitle: `${w.muscleGroup} · ${w.sets} sets × ${w.reps} ${loggedWorkoutUnit(w)} ${
+          w.weightKg > 0 ? `@ ${formatWeight(w.weightKg, settings.weightUnit)}` : '(No added load)'
         }`,
         xp: 20,
         timestamp: w.timestamp,
@@ -267,7 +267,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       </div>
 
       {/* Personalized numbers are only shown after the user supplies details. */}
-      {profile.onboarded ? <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-md animate-stagger-2" data-guide-target="daily-overview" aria-label="Daily overview">
+      {macroTargets && healthBreakdown ? <div className="relative overflow-hidden rounded-[26px] border border-[#3E634B] bg-[#213026] p-5 shadow-md animate-stagger-2" data-guide-target="daily-overview" aria-label="Daily overview">
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex-1 space-y-2">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[#151F19] border border-[#355440] px-2.5 py-1 text-[0.625rem] font-semibold uppercase tracking-wider text-[#7BB38F]">
@@ -319,9 +319,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </div>
               </div>
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
-                <div className="text-[0.625rem] text-[#84877F]">Eaten</div>
+                <div className="text-[0.625rem] text-[#84877F]">Food logged</div>
                 <div className="font-heading text-xs font-bold text-[#7BB38F]">
-                  <AnimatedCounter value={totals.calories} />
+                  {todayMeals.length ? <AnimatedCounter value={totals.calories} /> : 'Not logged'}
                 </div>
               </div>
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
@@ -331,10 +331,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </div>
               </div>
             </div>
-      </div> : <section className="profile-needed profile-needed-card" data-guide-target="daily-overview" aria-label="Daily overview"><div><strong>{Math.round(totals.calories)} kcal logged today</strong><p>Add your own profile details to see estimated targets. It is optional.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></section>}
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="daily-overview" aria-label="Daily overview"><div><strong>{Math.round(totals.calories)} kcal logged today</strong><p>{profile.onboarded ? "Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance." : "Add your own profile details to see estimated targets. It is optional."}</p></div>{!profile.onboarded && <button type="button" onClick={onEditProfile}>Add profile details</button>}</section>}
 
       {/* FOUR ANIMATED MACRO RINGS (Customizable Visibility) */}
-      {settings.dashboardWidgets.showMacros && profile.onboarded && (
+      {settings.dashboardWidgets.showMacros && macroTargets && (
         <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 animate-stagger-3">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Macro Rings</h2>

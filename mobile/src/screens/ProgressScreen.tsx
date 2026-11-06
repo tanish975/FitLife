@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Flame, Scale, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
-import { aggregateDailyCalories, aggregateWeightTrend } from '../domain/ProgressAggregator';
+import { aggregateDailyCalories, aggregateWeightTrend, weightLogComparison } from '../domain/ProgressAggregator';
 import { calculateBmi } from '../domain/BmiCalculator';
 import { displayWeight, formatWeight, parseInputToKg } from '../domain/WeightConverter';
 import { LineChart, LineChartDatum } from '../components/LineChart';
@@ -15,7 +15,6 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
     meals,
     weights,
     latestWeightKg,
-    startingWeightKg,
     macroTargets,
     logWeight,
   } = useFitLife();
@@ -32,28 +31,31 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
   }, [latestWeightKg, unit, hasWeight]);
 
   const bmiResult = useMemo(
-    () => calculateBmi(latestWeightKg, profile.heightCm),
-    [latestWeightKg, profile.heightCm]
+    () => calculateBmi(latestWeightKg, profile.heightCm, profile.age),
+    [latestWeightKg, profile.heightCm, profile.age]
   );
 
-  const deltaKg = latestWeightKg - startingWeightKg;
+  const comparison = useMemo(() => weightLogComparison(weights), [weights]);
+  const deltaKg = comparison ? comparison.latest.weightKg - comparison.first.weightKg : 0;
   const deltaDisplay = displayWeight(Math.abs(deltaKg), unit, 1);
 
   const weightChartData: LineChartDatum[] = useMemo(() => {
     const pts = aggregateWeightTrend(weights, 14);
     return pts.map((p) => ({
+      dateKey: p.dateKey,
       label: p.label,
       value: displayWeight(p.weightKg, unit, 1),
-      sublabel: `${p.label} (${p.dateKey})`,
+      sublabel: p.dateKey,
     }));
   }, [weights, unit]);
 
   const calorieChartData: LineChartDatum[] = useMemo(() => {
     const pts = aggregateDailyCalories(meals, 14);
     return pts.map((p) => ({
+      dateKey: p.dateKey,
       label: p.label,
       value: p.calories,
-      sublabel: `${p.shortDay}, ${p.label}`,
+      sublabel: `${p.shortDay}, ${p.dateKey}`,
     }));
   }, [meals]);
 
@@ -76,7 +78,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div>
           <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Progress & Trends</h1>
           <p className="text-xs text-[#84877F]">
-            14-entry Weight & Calorie Canvas analytics
+            Weight check-ins and 14 days of food logs
           </p>
         </div>
         <span className="rounded-full border border-[#3E634B] bg-[#213026] px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
@@ -89,7 +91,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="relative z-10 flex items-start justify-between gap-3">
           <div>
             <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
-              <Sparkles className="h-3 w-3" /> Latest Logged Weight
+              <Sparkles className="h-3 w-3" /> {weights.length ? "Latest Logged Weight" : "Profile Weight"}
             </span>
             {hasWeight ? <><div className="mt-1 flex items-baseline gap-1.5">
               <AnimatedCounter
@@ -100,25 +102,13 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
               <span className="font-heading text-sm font-bold text-[#7BB38F]">{unit}</span>
             </div>
 
-            <div className="mt-1.5 flex items-center gap-2 text-xs">
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold ${
-                  deltaKg <= 0
-                    ? 'bg-[#151F19] text-[#7BB38F]'
-                    : 'bg-[#2B271F] text-[#D8C39E]'
-                }`}
-              >
-                {deltaKg <= 0 ? (
-                  <TrendingDown className="h-3.5 w-3.5" />
-                ) : (
-                  <TrendingUp className="h-3.5 w-3.5" />
-                )}
-                {deltaKg <= 0 ? `−${deltaDisplay}` : `+${deltaDisplay}`} {unit} (14d)
+            {comparison ? <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#151F19] px-2 py-0.5 text-[0.6875rem] font-semibold text-[#7BB38F]">
+                {deltaKg < 0 ? <TrendingDown className="h-3.5 w-3.5" aria-hidden="true" /> : deltaKg > 0 ? <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                {deltaKg < 0 ? `−${deltaDisplay}` : deltaKg > 0 ? `+${deltaDisplay}` : '0'} {unit} since first log
               </span>
-              <span className="text-[#B8B5AD] text-[0.6875rem]">
-                Start: {formatWeight(startingWeightKg, unit)}
-              </span>
-            </div></> : <p className="mt-2 text-sm text-[#B8B5AD]">No weight logged yet.</p>}
+              <span className="text-[#B8B5AD] text-[0.6875rem]">{comparison.first.dateKey} → {comparison.latest.dateKey} · Start: {formatWeight(comparison.first.weightKg, unit)}</span>
+            </div> : <p className="mt-1.5 text-xs text-[#B8B5AD]">{weights.length ? 'One check-in so far; another is needed for a change.' : 'No weight check-ins logged yet.'}</p>}</> : <p className="mt-2 text-sm text-[#B8B5AD]">No weight logged yet.</p>}
           </div>
 
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#151F19] border border-[#355440] text-[#7BB38F]">
@@ -131,6 +121,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
           <div className="relative flex-1">
             <input
               type="number"
+              aria-label={`Today's weight in ${unit}`}
               step="0.1"
               value={weightInput}
               onChange={(e) => setWeightInput(e.target.value)}
@@ -159,13 +150,13 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Body Mass Index (BMI)</h2>
             <p className="text-[0.6875rem] text-[#84877F]">
-              {profile.age >= 18 ? <>Adult BMI reference range for {profile.heightCm} cm:{' '}
-              <strong className="text-[#D8C39E]">{formatWeight(bmiResult.healthyRangeKg[0], unit)} – {formatWeight(bmiResult.healthyRangeKg[1], unit)}</strong></> : 'Adult BMI categories do not apply below age 18.'}
+              {bmiResult.healthyRangeKg ? <>Adult BMI reference range for {profile.heightCm} cm:{' '}
+              <strong className="text-[#D8C39E]">{formatWeight(bmiResult.healthyRangeKg[0], unit)} – {formatWeight(bmiResult.healthyRangeKg[1], unit)}</strong></> : 'BMI needs an age-appropriate assessment below age 20.'}
             </p>
           </div>
           <div className="text-right">
             <div className="font-heading text-xl font-extrabold text-[#F4F1EA]">{bmiResult.bmi}</div>
-            {profile.age >= 18 && <span
+            {bmiResult.category && <span
               className="inline-block rounded-full px-2.5 py-0.5 text-[0.625rem] font-bold"
               style={{
                 backgroundColor: bmiResult.badgeBg,
@@ -178,7 +169,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         </div>
 
         {/* Natural Earthy Spectrum Bar */}
-        {profile.age >= 18 && <div className="mt-3 relative">
+        {bmiResult.category && <div className="mt-3 relative">
           <div className="h-2.5 w-full rounded-full overflow-hidden flex">
             <div className="w-[17.5%] bg-[#5F8D85]" />
             <div className="w-[32.5%] bg-[#6BA37E]" />
@@ -195,7 +186,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
           </div>
         </div>}
 
-        <p className="mt-2.5 text-xs leading-relaxed text-[#B8B5AD]">{profile.age >= 18 ? bmiResult.summary : 'BMI is a screening measure, not an assessment of individual health. Ask a qualified health professional for age-appropriate advice.'}</p>
+        <p className="mt-2.5 text-xs leading-relaxed text-[#B8B5AD]">{bmiResult.summary}</p>
       </div> : <section className="profile-needed profile-needed-card" data-guide-target="progress-bmi" aria-label="Body mass index"><div><strong>BMI is not available yet</strong><p>Add your own profile details if you want a BMI estimate. It is a screening measure, not a diagnosis.</p></div><button type="button" onClick={onEditProfile}>Add profile details</button></section>}
 
       {/* WEIGHT TREND CHART (Last 14 Entries on Canvas) */}
@@ -203,10 +194,10 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Weight Trend (Last 14 Entries)
+              Weight Trend (Last 14 Check-in Days)
             </h2>
             <p className="text-[0.6875rem] text-[#84877F]">
-              Touch or drag across points to inspect daily check-ins
+              Dates are spaced by time. Open the table for every value.
             </p>
           </div>
           <span className="text-xs font-semibold text-[#7BB38F]">
@@ -215,6 +206,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         </div>
 
         <LineChart
+          name="Weight trend"
           data={weightChartData}
           height={185}
           lineColor="#6BA37E"
@@ -228,23 +220,24 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              {profile.onboarded ? '14-Day Calorie Trend vs. Target' : '14-Day Calorie Trend'}
+              14-Day Food Energy
             </h2>
             <p className="text-[0.6875rem] text-[#84877F]">
-              {profile.onboarded ? `Dashed ochre line shows your ${macroTargets.calories} kcal daily target` : 'Logged food energy; add profile details to calculate a target.'}
+              {macroTargets ? 'Dashed line is your current target, for reference only; past targets may have differed. Unlogged days are gaps.' : 'Logged food energy. Unlogged days are gaps, not zero intake.'}
             </p>
           </div>
-          {profile.onboarded && <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D8C39E]">
-            <Flame className="h-3.5 w-3.5" /> {macroTargets.calories} kcal
+          {macroTargets && <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D8C39E]">
+            <Flame className="h-3.5 w-3.5" /> Current: {macroTargets.calories} kcal
           </span>}
         </div>
 
         <LineChart
+          name="Food energy"
           data={calorieChartData}
           height={185}
           lineColor="#C2A878"
-          targetValue={profile.onboarded ? macroTargets.calories : undefined}
-          targetLabel={profile.onboarded ? `Target ${macroTargets.calories}` : undefined}
+          targetValue={macroTargets?.calories}
+          targetLabel={macroTargets ? `Current ${macroTargets.calories}` : undefined}
           unitSuffix=" kcal"
           yDecimals={0}
         />

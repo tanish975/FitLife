@@ -84,9 +84,9 @@ try {
   assert.ok((await storage('fitlife_workouts_v1')).some(w => w.exerciseName === 'Barbell Back Squat' && w.id.startsWith('wk-')), 'workout saved locally');
 
   await click('Meals'); await page.getByRole('heading', { name:'Meals', exact:true }).waitFor();
-  const quickMeal = page.getByPlaceholder('Try "2 eggs and a banana" or "150g chicken & rice"');
+  const quickMeal = page.getByPlaceholder('Try "2 boiled eggs and a banana"');
   assert.equal(await quickMeal.evaluate(e => getComputedStyle(e).fontSize), '16px', 'mobile input is at least 16px');
-  await quickMeal.fill('150g grilled chicken and 2 eggs');
+  await quickMeal.fill('150g grilled chicken breast and 2 boiled eggs');
   await waitText('248 kcal'); await waitText('144 kcal');
   await page.getByRole('button', { name: 'Add (2)' }).click();
   await page.waitForTimeout(200); await closeCelebration();

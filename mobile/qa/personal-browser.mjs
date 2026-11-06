@@ -62,7 +62,7 @@ try {
   await guide.getByRole('button',{name:'End session',exact:true}).click(); await guide.getByRole('button',{name:'End session',exact:true}).last().click(); await guide.waitFor({state:'detached'});
 
   await page.getByRole('button',{name:'Meals',exact:true}).click();
-  await page.getByLabel('Describe a meal').fill('2 eggs'); await page.getByRole('button',{name:'Add (1)'}).click();
+  await page.getByLabel('Describe a meal').fill('2 boiled eggs'); await page.getByRole('button',{name:'Add (1)'}).click();
   const shortcut=page.locator('.meal-shortcut').filter({hasText:'Egg'}).first(); await shortcut.waitFor();
   const favorite=shortcut.getByRole('button',{name:/Add .* to favorite meals/}); await favorite.click();
   await page.getByRole('button',{name:'Favorites',exact:true}).click();

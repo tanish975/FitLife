@@ -79,14 +79,26 @@ export async function installNativeFixture(page, options = {}) {
       };
     }
     if (opts.reminders) {
-      const emitReminder=(requestId,ok,result,error)=>setTimeout(()=>window.dispatchEvent(new CustomEvent('fitlife-reminder-result',{detail:{requestId,ok,result,error}})),0);
+      const emitReminder=(requestId,ok,result,error,delay=0)=>setTimeout(()=>window.dispatchEvent(new CustomEvent('fitlife-reminder-result',{detail:{requestId,ok,result,error}})),delay);
       const get=uid=>JSON.parse(localStorage.getItem(`__fixture_reminders_${uid}`)||'{"workout":{"enabled":false,"hour":8,"minute":0},"water":{"enabled":false,"hour":12,"minute":0}}');
       const allowedReminder=(id,uid)=>{if(current()!==uid){emitReminder(id,false,null,'Account changed.');return false;}return true;};
-      const snapshot=uid=>({...get(uid),notificationsEnabled:localStorage.getItem('__fixture_notifications_denied')!=='1'});
+      const normalized=water=>water.mode ? water : {...water,mode:'times',times:[water.hour*60+water.minute],startMinute:540,endMinute:1140,intervalMinutes:120};
+      const snapshot=uid=>{const s=get(uid); return {...s,water:opts.legacyReminders?s.water:normalized(s.water),notificationsEnabled:localStorage.getItem('__fixture_notifications_denied')!=='1'};};
       window.FitLifeReminders={
-        snapshot(id,uid){if(allowedReminder(id,uid))emitReminder(id,true,snapshot(uid));},
+        snapshot(id,uid){if(allowedReminder(id,uid))emitReminder(id,true,snapshot(uid),undefined,Number(localStorage.getItem('__fixture_reminder_snapshot_delay')||0));},
         configure(id,uid,kind,enabled,hour,minute){if(!allowedReminder(id,uid))return;if(enabled&&localStorage.getItem('__fixture_notifications_denied')==='1'){emitReminder(id,false,null,'Notification permission was not granted.');return;}const s=get(uid);s[kind]={enabled,hour,minute};localStorage.setItem(`__fixture_reminders_${uid}`,JSON.stringify(s));emitReminder(id,true,snapshot(uid));},
         openSettings(id,uid){if(allowedReminder(id,uid))emitReminder(id,true,{});},
+      };
+      if(!opts.legacyReminders) window.FitLifeReminders.configureWater=(id,uid,json)=>{
+        if(!allowedReminder(id,uid))return;
+        localStorage.setItem('__fixture_water_configures',String(Number(localStorage.getItem('__fixture_water_configures')||0)+1));
+        try {
+          const p=JSON.parse(json);
+          if(p.enabled&&localStorage.getItem('__fixture_notifications_denied')==='1'){emitReminder(id,false,null,'Notification permission was not granted.');return;}
+          if(typeof p.enabled!=='boolean'||!['times','interval'].includes(p.mode)||!Array.isArray(p.times)||p.times.length<1||p.times.length>12||new Set(p.times).size!==p.times.length||p.times.some(v=>!Number.isInteger(v)||v<0||v>1439)||!Number.isInteger(p.startMinute)||!Number.isInteger(p.endMinute)||p.startMinute<0||p.endMinute>1439||p.startMinute>p.endMinute||![60,120].includes(p.intervalMinutes))throw new Error('invalid');
+          p.times.sort((a,b)=>a-b); const first=p.mode==='times'?p.times[0]:p.startMinute; p.hour=Math.floor(first/60);p.minute=first%60;
+          const s=get(uid);s.water=p;localStorage.setItem(`__fixture_reminders_${uid}`,JSON.stringify(s));emitReminder(id,true,snapshot(uid));
+        }catch{emitReminder(id,false,null,'Invalid water schedule.');}
       };
     }
     window.FitLifeCloud = {

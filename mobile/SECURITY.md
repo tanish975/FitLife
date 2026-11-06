@@ -12,6 +12,10 @@
 - **Encrypted manual backup:** optional file exports use AES-256-GCM, a random salt and IV, and PBKDF2-HMAC-SHA-256 with 600,000 iterations. Passphrases are not intentionally saved; losing one makes that file unrecoverable. Android's document picker handles only encrypted envelopes and asks for no broad storage permission. Import authenticates before writing. Merge keeps the current profile, other preferences and water while merging activity, steps, favorites and plan; same-ID activity conflicts are preserved; replace needs explicit confirmation. Browser storage is not a transactional database, so a failed storage rollback cannot be guaranteed in every failure mode.
 - **App boundary:** standalone JavaScript is pinned with a CSP SHA-256 hash; production disallows arbitrary inline scripts, eval, frames, objects and cross-origin script loading. External HTTPS navigation leaves the WebView. The existing `file:///android_asset/index.html` origin and signing identity are retained. GitHub update checks are optional and share ordinary network metadata, not fitness data.
 
+## Device snapshot limit
+
+A sequential sync from a new installation stops before creating an eleventh cloud snapshot. It preserves local and remote data and points to encrypted export. Updating an existing slot remains possible. Device retirement or deletion is not implemented. This is a client-side guard, **not** a transaction or server-enforced quota: two concurrent new installations or older clients could still exceed the limit. An account already over the limit needs a separately designed, verified recovery procedure; do not delete an old snapshot blindly. No production rules were changed for this guard.
+
 ## Deployment and verification still required
 
 The uploaded public Firebase configuration is for project `fitlife-b038b` and package `com.tanish.fitlife`. Its Android OAuth client matches the existing release signer SHA-1; a web OAuth client exists and a public provider probe returned a Google sign-in URI. This does **not** prove an actual Android sign-in succeeds, the Spark plan is selected, the database is present, or production rules are secure.

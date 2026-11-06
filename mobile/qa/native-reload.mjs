@@ -21,7 +21,15 @@ export async function reloadSimulatedNative(page, prefix, options = {}) {
       const ack=new Promise((resolve,reject)=>{
         listener=event=>{if(event.key==='__fitlife_qa_storage_fence'&&event.newValue===value)resolve();};
         window.addEventListener('storage',listener);
-        timer=setTimeout(()=>reject(new Error('Storage acknowledgement timed out')),5000);
+        timer=setTimeout(()=>{
+          // Some Chromium file: contexts do not dispatch a storage event for
+          // this about:blank child even though both documents can read the
+          // committed fence. Verify both views rather than restoring app data.
+          try {
+            if (localStorage.getItem('__fitlife_qa_storage_fence')===value && frame.contentWindow.localStorage.getItem('__fitlife_qa_storage_fence')===value) resolve();
+            else reject(new Error('Storage acknowledgement timed out'));
+          } catch { reject(new Error('Storage acknowledgement timed out')); }
+        },5000);
       });
       frame.contentWindow.localStorage.setItem('__fitlife_qa_storage_fence',value);
       await ack;

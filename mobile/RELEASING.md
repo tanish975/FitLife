@@ -4,7 +4,7 @@
 
 1. Changes to `mobile/` are committed and pushed to the **main** branch of `tanish975/FitLife`.
 2. The **Build and release FitLife Android** GitHub Actions workflow builds from source, checks the signing certificate, runs the tests, and publishes a GitHub Release with `FitLife.apk`, `FitLife-App.html`, and `SHA256SUMS.txt`.
-3. Users download the APK from [the latest release](https://github.com/tanish975/FitLife/releases/latest). The built-in Android update check can notify them about newer releases; they choose whether to open GitHub, download the APK, and confirm installation.
+3. Users download the APK from [the latest release](https://github.com/tanish975/FitLife/releases/latest). The built-in Android update check can notify them about newer releases; they choose whether to open GitHub, download the APK, and confirm installation. The release highlights and testing limitations appended to the GitHub release body are maintained in `RELEASE-HIGHLIGHTS.md`; update that file when coverage or verification changes.
 
 Android does **not** silently install APKs. Users must approve the update and, if Android asks, allow the browser to install apps. They should install **over** the existing FitLife installation; uninstalling can erase local fitness data.
 
@@ -12,9 +12,9 @@ Every successful push to `main` (including documentation changes) creates a new 
 
 ## Version numbers
 
-The workflow uses `versionCode = github.run_number + 2`, `versionName = 1.0.<versionCode>`, and tag `v<versionName>`. The current locally shared APK is versionCode 2, so the first workflow release is normally `v1.0.3` / versionCode 3 and can be detected as an update to it. The Android updater compares the numeric versionCode encoded in the final tag component and accepts only a stable release with a fully uploaded, non-empty `FitLife.apk`.
+The local Phase 0A candidate used versionCode **12**, the exercise expansion candidate used **13**, and the movement/water candidate used **14**. These were not published GitHub releases. The workflow calculates `versionCode = github.run_number + 5` and refuses codes 14 or below; public releases must use **15 or higher** so the latest candidate can detect them as updates. The name is `1.0.<versionCode>` and the tag is `v<versionName>`. The Android updater compares the numeric versionCode encoded in the final tag component and accepts only a stable release with a fully uploaded, non-empty `FitLife.apk`.
 
-Do not delete or rename the workflow without planning how to keep the versionCode increasing. The monotonicity guard checks all published stable tags that follow the FitLife version format, and fails closed if it cannot query GitHub. If an APK was released under another tag format or outside GitHub, compare its versionCode yourself. Adjust the offset (`+ 2`) in the workflow so its **next** run code is higher than every previously distributed APK. Rerunning a successful release does not replace an existing tag; push another commit instead.
+Do not delete or rename the workflow without planning how to keep the versionCode increasing. The monotonicity guard checks all published stable tags that follow the FitLife version format, and fails closed if it cannot query GitHub. If an APK was released under another tag format or outside GitHub, compare its versionCode yourself. Adjust the offset (`+ 5`) in the workflow if necessary so its **next** run code is higher than every previously distributed APK, including local test candidates. Rerunning a successful release does not replace an existing tag; push another commit instead.
 
 ## Keep the signing key safe
 

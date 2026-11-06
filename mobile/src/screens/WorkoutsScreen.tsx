@@ -17,11 +17,13 @@ import {
 } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
 import { EXERCISE_CATALOG } from '../data/ExerciseCatalog';
+import { EXERCISE_ADDITIONS } from '../data/ExerciseExpansion';
 import { WORKOUT_SESSION_IDEAS, type WorkoutSessionIdea } from '../data/WorkoutSessions';
 import { GuidedWorkout, loadGuided } from '../components/GuidedWorkout';
 import { WeeklyPlanner } from '../components/WeeklyPlanner';
 import { easierOption } from '../domain/ExerciseGuidance';
-import { ExerciseItem, MuscleGroup } from '../data/types';
+import { ExerciseItem, ExerciseTarget, MuscleGroup } from '../data/types';
+import { EXERCISE_TARGETS, exerciseSearchText, matchesExerciseTarget, exerciseValueLabel, loggedWorkoutUnit } from '../domain/ExerciseDiscovery';
 import { estimateWorkoutCalories, getWorkoutPrescription } from '../domain/AdaptiveWorkoutEngine';
 import { displayWeight, formatWeight, parseInputToKg } from '../domain/WeightConverter';
 import { SegmentedSelector } from '../components/SegmentedSelector';
@@ -30,6 +32,7 @@ import { MotionEntry } from '../components/MotionEntry';
 import { EmptyState } from '../components/EmptyState';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { RestTimer } from '../components/RestTimer';
+import { ExerciseMotion } from '../components/ExerciseMotion';
 
 
 const MUSCLE_GROUPS: MuscleGroup[] = [
@@ -44,7 +47,7 @@ const MUSCLE_GROUPS: MuscleGroup[] = [
   'Full Body',
 ];
 const CATALOG_PAGE_SIZE = 5;
-type EquipmentFilter = 'any' | 'bodyweight' | 'dumbbells' | 'band' | 'machine';
+type EquipmentFilter = 'any' | 'bodyweight' | 'dumbbells' | 'barbell' | 'band' | 'machine' | 'wall' | 'bar' | 'household';
 const NO_EQUIPMENT_COUNT = EXERCISE_CATALOG.filter((exercise) => exercise.equipment === 'Bodyweight').length;
 
 
@@ -56,8 +59,10 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
   const reducedMotion = useReducedMotion();
 
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>(initialGroup);
+  const [selectedTarget, setSelectedTarget] = useState<ExerciseTarget | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [newOnly, setNewOnly] = useState(false);
   const [equipmentFilter, setEquipmentFilter] = useState<EquipmentFilter>('any');
   const [sessionId, setSessionId] = useState<string>('');
   const [pickerId, setPickerId] = useState(WORKOUT_SESSION_IDEAS[0].id);
@@ -72,7 +77,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
   };
   const [restStart, setRestStart] = useState<{ seconds: number; id: number } | null>(null);
   const [visibleCount, setVisibleCount] = useState(CATALOG_PAGE_SIZE);
-  const updateGroup = (value: MuscleGroup) => { setSelectedGroup(value); setVisibleCount(CATALOG_PAGE_SIZE); };
+  const updateGroup = (value: MuscleGroup) => { setSelectedGroup(value); setSelectedTarget('all'); setVisibleCount(CATALOG_PAGE_SIZE); };
   const updateSearch = (value: string) => { setSearchQuery(value); setVisibleCount(CATALOG_PAGE_SIZE); };
   const revealExerciseCatalog = () => requestAnimationFrame(() => {
     const target = document.getElementById('exercise-catalog-heading');
@@ -149,7 +154,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
     e.preventDefault();
     if (!selectedExercise || isSheetClosing) return;
     const weightKg = selectedExercise.isBodyweight ? 0 : parseInputToKg(Number(weightInput), unit);
-    const burned = hasUserWeight ? estimateWorkoutCalories(selectedExercise, sets, reps, latestWeightKg) : 0;
+    const canEstimateEnergy = hasUserWeight && !selectedExercise.energyEstimateUnavailable;
+    const burned = canEstimateEnergy ? estimateWorkoutCalories(selectedExercise, sets, reps, latestWeightKg) : 0;
 
     // Confirm immediately; do not delay the actual save behind an exit animation.
     const entry = {
@@ -160,7 +166,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
       reps,
       weightKg,
       caloriesBurned: burned,
-      energyEstimateAvailable: hasUserWeight,
+      energyEstimateAvailable: canEstimateEnergy,
+      ...(selectedExercise.logUnit === 'seconds' ? { measurementUnit: 'seconds' as const } : {}),
       restSeconds,
     };
     setSelectedExercise(null);
@@ -175,26 +182,26 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
     const matches = EXERCISE_CATALOG.filter((ex) => {
       const matchesGroup = selectedGroup === 'All' || ex.muscleGroup === selectedGroup;
       const q = searchQuery.trim().toLowerCase();
-      const matchesQuery =
-        !q ||
-        ex.name.toLowerCase().includes(q) ||
-        ex.muscleGroup.toLowerCase().includes(q) ||
-        ex.secondaryMuscles.toLowerCase().includes(q) ||
-        ex.equipment.toLowerCase().includes(q);
+      const matchesQuery = !q || exerciseSearchText(ex).includes(q);
+      const matchesTarget = selectedTarget === 'all' || matchesExerciseTarget(ex, selectedTarget);
       const equipment = ex.equipment.toLowerCase();
       const matchesEquipment = equipmentFilter === 'any' ||
         (equipmentFilter === 'bodyweight' && equipment === 'bodyweight') ||
         (equipmentFilter === 'dumbbells' && equipment.includes('dumbbell')) ||
+        (equipmentFilter === 'barbell' && /barbell|ez.bar/.test(equipment)) ||
         (equipmentFilter === 'band' && equipment.includes('band')) ||
-        (equipmentFilter === 'machine' && /machine|cable|sled|elliptical|bike|treadmill|ergometer/i.test(equipment));
-      return matchesGroup && matchesQuery && matchesEquipment && (!selectedSession || selectedSession.ids.includes(ex.id)) && (!favoritesOnly || settings.favoriteExerciseIds.includes(ex.id));
+        (equipmentFilter === 'machine' && /machine|cable|sled|elliptical|bike|treadmill|ergometer/i.test(equipment)) ||
+        (equipmentFilter === 'wall' && equipment.includes('wall')) ||
+        (equipmentFilter === 'bar' && /pull.up bar|secure bar|parallel bars/.test(equipment)) ||
+        (equipmentFilter === 'household' && /towel|backpack|jug|bottle|grocery|sturdy (bench|step)|secure bench/.test(equipment));
+      return matchesGroup && matchesTarget && matchesQuery && matchesEquipment && (!selectedSession || selectedSession.ids.includes(ex.id)) && (!favoritesOnly || settings.favoriteExerciseIds.includes(ex.id)) && (!newOnly || ex.id.startsWith('ex-more-'));
     });
     // Preserve the suggested sequence for a session; otherwise put the new
     // home movements first when the no-equipment filter is active.
     if (selectedSession) return matches.sort((a, b) => selectedSession.ids.indexOf(a.id) - selectedSession.ids.indexOf(b.id));
     if (equipmentFilter === 'bodyweight') return matches.sort((a, b) => Number(b.id.startsWith('ex-home-')) - Number(a.id.startsWith('ex-home-')));
     return matches;
-  }, [selectedGroup, searchQuery, favoritesOnly, equipmentFilter, selectedSession, settings.favoriteExerciseIds]);
+  }, [selectedGroup, selectedTarget, searchQuery, favoritesOnly, newOnly, equipmentFilter, selectedSession, settings.favoriteExerciseIds]);
 
   const totalBurnedToday = useMemo(
     () => todayWorkouts.reduce((s, w) => s + w.caloriesBurned, 0),
@@ -228,7 +235,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         <div className="home-workout-shortcut-icon"><Home size={19} aria-hidden="true" /></div>
         <div className="home-workout-shortcut-copy"><span className="training-eyebrow">TRAIN AT HOME</span><h2>No equipment needed</h2><p>{NO_EQUIPMENT_COUNT} movements · strength, core & cardio</p></div>
         <button type="button" aria-label="Explore no-equipment home exercises" onClick={() => {
-          setSessionId(''); setSelectedGroup('All'); setSearchQuery(''); setEquipmentFilter('bodyweight'); setFavoritesOnly(false); setVisibleCount(CATALOG_PAGE_SIZE);
+          setSessionId(''); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter('bodyweight'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE);
           revealExerciseCatalog();
         }}>Explore <ArrowRight size={15} aria-hidden="true" /></button>
       </section>
@@ -237,11 +244,11 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
 
       <details className="training-disclosure"><summary>Browse session ideas <span aria-hidden="true">⌄</span></summary>
       <section className="session-ideas" aria-label="Workout session ideas">
-        <div className="session-heading"><div><span className="training-eyebrow">NEED A STARTING POINT?</span><h2>Try a session idea</h2></div>{sessionId && <button type="button" onClick={() => { setSessionId(''); setSelectedGroup('All'); setSearchQuery(''); setEquipmentFilter('any'); setFavoritesOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); }}>View all</button>}</div>
+        <div className="session-heading"><div><span className="training-eyebrow">NEED A STARTING POINT?</span><h2>Try a session idea</h2></div>{sessionId && <button type="button" onClick={() => { setSessionId(''); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter('any'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); }}>View all</button>}</div>
         <p>Choose movements that feel right, make space and adjust sets and rest. Stop if you feel pain.</p>
         <div className="session-list">
           {WORKOUT_SESSION_IDEAS.map((session) => <button key={session.id} type="button" className="session-option" aria-pressed={sessionId === session.id}
-            onClick={() => { setSessionId(session.id === sessionId ? '' : session.id); setSelectedGroup('All'); setSearchQuery(''); setEquipmentFilter(session.homeNoEquipment ? 'bodyweight' : 'any'); setFavoritesOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); revealExerciseCatalog(); }}>
+            onClick={() => { setSessionId(session.id === sessionId ? '' : session.id); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter(session.homeNoEquipment ? 'bodyweight' : 'any'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); revealExerciseCatalog(); }}>
             {session.homeNoEquipment ? <Home size={16} aria-hidden="true" /> : <Dumbbell size={16} aria-hidden="true" />}<span><strong>{session.title}</strong><small>{session.detail}</small></span>
           </button>)}
         </div>
@@ -284,8 +291,12 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
 
       <div className="exercise-tools">
         <button className="favorite-filter" type="button" aria-pressed={favoritesOnly} onClick={() => { setFavoritesOnly((value) => !value); setVisibleCount(CATALOG_PAGE_SIZE); }}><Heart size={15} fill={favoritesOnly ? 'currentColor' : 'none'} /> Favorites ({settings.favoriteExerciseIds.length})</button>
+        <button className="favorite-filter" type="button" aria-label="Show new exercises" aria-pressed={newOnly} onClick={() => { setNewOnly(value => !value); setVisibleCount(CATALOG_PAGE_SIZE); }}>New ({EXERCISE_ADDITIONS.length})</button>
         <label className="equipment-filter"><span>Equipment</span><select value={equipmentFilter} onChange={(event) => { setEquipmentFilter(event.target.value as EquipmentFilter); setVisibleCount(CATALOG_PAGE_SIZE); }} aria-label="Filter by equipment">
-          <option value="any">Any equipment</option><option value="bodyweight">No equipment</option><option value="dumbbells">Dumbbells</option><option value="band">Resistance band</option><option value="machine">Gym machines</option>
+          <option value="any">Any equipment</option><option value="bodyweight">No equipment</option><option value="dumbbells">Dumbbells</option><option value="barbell">Barbell / EZ-bar</option><option value="band">Resistance band</option><option value="machine">Machines & cables</option><option value="wall">Wall</option><option value="bar">Pull-up / dip bar</option><option value="household">Home supports & objects</option>
+        </select></label>
+        <label className="equipment-filter target-filter"><span>Target</span><select aria-label="Filter by target muscle" value={selectedTarget} onChange={(event) => { setSelectedTarget(event.target.value as ExerciseTarget | 'all'); setSelectedGroup('All'); setSessionId(''); setVisibleCount(CATALOG_PAGE_SIZE); }}>
+          <option value="all">All target muscles</option>{EXERCISE_TARGETS.map(target => <option key={target} value={target}>{target}</option>)}
         </select></label>
       </div>
 
@@ -293,25 +304,25 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <h2 id="exercise-catalog-heading" data-guide-target="workouts-catalog" tabIndex={-1} className="font-heading text-xs font-semibold uppercase tracking-wider text-[#84877F]">
-            {selectedSession ? selectedSession.title : equipmentFilter === 'bodyweight' ? `${selectedGroup === 'All' ? 'No-equipment' : `${selectedGroup} · no-equipment`} exercises` : `${selectedGroup} Exercises`} ({filteredExercises.length})
+            {selectedSession ? selectedSession.title : equipmentFilter === 'bodyweight' ? `${selectedTarget !== 'all' ? `${selectedTarget} · no-equipment` : selectedGroup === 'All' ? 'No-equipment' : `${selectedGroup} · no-equipment`} exercises` : `${selectedTarget === 'all' ? selectedGroup : selectedTarget} Exercises`} ({filteredExercises.length})
           </h2>
           <span className="text-[0.6875rem] text-[#D8C39E]">Tap for details →</span>
         </div>
 
-        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle={favoritesOnly ? 'Save exercises with the heart, or turn off Favorites.' : 'Try another search, session, equipment or muscle group.'} />}
+        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle={favoritesOnly ? 'Save exercises with the heart, or turn off Favorites.' : 'Try another search, session, filter or muscle group.'} />}
         <div className="space-y-2 pr-0.5" data-testid="exercise-catalog-list">
           {filteredExercises.slice(0, visibleCount).map((ex) => {
             const favorite = settings.favoriteExerciseIds.includes(ex.id);
             return <div key={ex.id} data-exercise-id={ex.id} className="exercise-row">
               <button type="button" className="exercise-open" onClick={() => openExerciseSheet(ex)}>
-                <div className="min-w-0 pr-3"><div className="flex flex-wrap items-center gap-1.5"><h4 className="break-words font-heading text-xs font-semibold leading-snug text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[0.5625rem] font-semibold text-[#D8C39E]">{ex.muscleGroup}</span></div><p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{ex.equipment} · {ex.difficulty} · {ex.secondaryMuscles}</p></div>
+                <div className="min-w-0 pr-3"><div className="flex flex-wrap items-center gap-1.5"><h4 className="break-words font-heading text-xs font-semibold leading-snug text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[0.5625rem] font-semibold text-[#D8C39E]">{ex.targetAreas?.[0] || ex.muscleGroup}</span></div><p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{ex.equipment} · {ex.difficulty} · {ex.secondaryMuscles}</p></div>
                 <div className="flex shrink-0 items-center gap-2"><div className="exercise-stats text-right"><div className="font-heading text-xs font-bold text-[#F4F1EA]">{ex.difficulty}</div><div className="text-[0.625rem] font-semibold text-[#7BB38F]">+20 XP</div></div><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#528B67] text-[#F4F1EA]"><Plus className="h-4 w-4 stroke-[2.5]" /></div></div>
               </button>
               <button type="button" className="exercise-favorite" aria-label={`${favorite ? 'Remove' : 'Add'} ${ex.name} ${favorite ? 'from' : 'to'} favorites`} aria-pressed={favorite} onClick={() => toggleFavoriteExercise(ex.id)}><Heart size={19} fill={favorite ? 'currentColor' : 'none'} /></button>
             </div>;
           })}
         </div>
-        <p className="training-estimate-note">Calories are rough estimates, not measured energy expenditure.</p>
+        <p className="training-estimate-note">Some movements have no energy estimate; available estimates are rough, not measured.</p>
         <p className="catalog-count" aria-live="polite">Showing {Math.min(visibleCount, filteredExercises.length)} of {filteredExercises.length} exercises</p>
         {visibleCount < filteredExercises.length && (
           <button type="button" className="catalog-more" onClick={() => setVisibleCount((count) => count + CATALOG_PAGE_SIZE)}>
@@ -350,8 +361,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                       {w.exerciseName}
                     </h4>
                     <p className="truncate text-[0.6875rem] text-[#84877F]">
-                      {w.sets} sets × {w.reps} {w.muscleGroup === 'Cardio' ? 'min' : 'reps'} ·{' '}
-                      {w.weightKg > 0 ? formatWeight(w.weightKg, unit) : 'Bodyweight'} ·{' '}
+                      {w.sets} sets × {w.reps} {loggedWorkoutUnit(w)} ·{' '}
+                      {w.weightKg > 0 ? formatWeight(w.weightKg, unit) : 'No added load'} ·{' '}
                       <span className="text-[#7BB38F]">{w.energyEstimateAvailable === false ? 'Energy not estimated' : `~${w.caloriesBurned} kcal est.`}</span>
                     </p>
                   </div>
@@ -401,7 +412,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                   {selectedExercise.name}
                 </h3>
                 <p className="text-xs text-[#84877F]">
-                  {selectedExercise.muscleGroup} · {selectedExercise.equipment}
+                  {selectedExercise.targetAreas?.[0] || selectedExercise.muscleGroup} · {selectedExercise.equipment}
                 </p>
               </div>
 
@@ -415,16 +426,22 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
               </button>
             </div>
 
-            {lastSelectedWorkout && <div className="last-workout-note"><strong>Last time · {lastSelectedWorkout.dateKey}</strong><span>{lastSelectedWorkout.sets} sets × {lastSelectedWorkout.reps} {selectedExercise.muscleGroup === 'Cardio' ? 'min' : 'reps'} · {lastSelectedWorkout.weightKg > 0 ? formatWeight(lastSelectedWorkout.weightKg, unit) : 'No added load'}</span></div>}
+            {lastSelectedWorkout && <div className="last-workout-note"><strong>Last time · {lastSelectedWorkout.dateKey}</strong><span>{lastSelectedWorkout.sets} sets × {lastSelectedWorkout.reps} {loggedWorkoutUnit(lastSelectedWorkout)} · {lastSelectedWorkout.weightKg > 0 ? formatWeight(lastSelectedWorkout.weightKg, unit) : 'No added load'}</span></div>}
+
+            <ExerciseMotion exercise={selectedExercise}/>
 
             {/* Adaptive Engine Rationale & Form Tip */}
             <div className="mt-3 rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-3 text-xs space-y-1.5">
               <p className="text-[#F4F1EA]">{prescription.goalRationale}</p>
               <p className="text-[0.6875rem] text-[#D8C39E]">💡 Coach Cue: {selectedExercise.tip}</p>
-              <p className="text-[0.6875rem] text-[#B8B5AD]">Load starts at zero or your previous entry. Choose an amount that suits your ability; start light and adjust as needed.</p>
+              {!selectedExercise.isBodyweight && <p className="text-[0.6875rem] text-[#B8B5AD]">Load starts at zero or your previous entry. Choose an amount that suits your ability; start light and adjust as needed.</p>}
               <p className="exercise-easier"><strong>Easier option:</strong> {easierOption(selectedExercise).note}</p>
               {easierOption(selectedExercise).exerciseId && <button type="button" className="exercise-alternative" onClick={() => { const alt=EXERCISE_CATALOG.find(e => e.id === easierOption(selectedExercise).exerciseId); if (alt) openExerciseSheet(alt); }}>View easier movement</button>}
             </div>
+
+            {selectedExercise.caution && <div role="note" className="mt-2.5 flex items-start gap-2 rounded-2xl border border-[#6E532B] bg-[#2E2418] p-3 text-[0.6875rem] text-[#E0B467]"><AlertCircle className="h-4 w-4 shrink-0" /><span>{selectedExercise.caution}</span></div>}
+            {profile.onboarded && profile.age < 18 && <div role="note" className="mt-2.5 rounded-2xl border border-[#6E532B] bg-[#2E2418] p-3 text-[0.6875rem] text-[#E0B467]">Under 18: train with a qualified adult; avoid maximum lifts and build technique gradually.</div>}
+            {selectedExercise.logUnit === 'seconds' && <p className="mt-2 text-[0.6875rem] text-[#B8B5AD]">Seconds are recorded per set; hold only as long as feels comfortable.</p>}
 
             {/* Light BMI Caution Note (if applicable) */}
             {prescription.bmiCautionNote && (
@@ -472,7 +489,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
 
                 <div className="rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-2 text-center">
                   <label className="block text-[0.625rem] font-semibold uppercase tracking-wider text-[#84877F]">
-                    {selectedExercise.muscleGroup === 'Cardio' ? 'Minutes' : 'Reps'}
+                    {exerciseValueLabel(selectedExercise)}
                   </label>
                   <div className="mt-1 flex items-center justify-between">
                     <button
@@ -485,7 +502,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                     </button>
                     <input
                       type="number"
-                      aria-label={selectedExercise.muscleGroup === 'Cardio' ? 'Minutes' : 'Reps'}
+                      aria-label={exerciseValueLabel(selectedExercise)}
                       min={1}
                       max={100}
                       value={repsInput}
@@ -509,7 +526,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                   </label>
                   {selectedExercise.isBodyweight ? (
                     <div className="mt-2 font-heading text-xs font-bold text-[#D8C39E]">
-                      Bodyweight
+                      {selectedExercise.equipment === 'Bodyweight' ? 'Bodyweight' : 'No added load'}
                     </div>
                   ) : (
                     <input
@@ -532,7 +549,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
                 </span>
                 <span className="flex items-center gap-1 font-semibold text-[#7BB38F]">
                   <Flame className="h-3.5 w-3.5" />
-                  {hasUserWeight ? `~${estimateWorkoutCalories(selectedExercise, sets, reps, latestWeightKg)} kcal est.` : 'Add weight for an estimate'}
+                  {selectedExercise.energyEstimateUnavailable ? 'Energy not estimated' : hasUserWeight ? `~${estimateWorkoutCalories(selectedExercise, sets, reps, latestWeightKg)} kcal est.` : 'Add weight for an estimate'}
                 </span>
               </div>
 

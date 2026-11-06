@@ -1,10 +1,11 @@
 import { ExerciseItem } from './types';
+import { EXERCISE_ADDITIONS } from './ExerciseExpansion';
 
 /**
- * 90 exercises across eight groups, including 30 additional no-equipment home movements.
+ * Existing exercises remain stable for histories, favorites, backups and sync.
  * Energy figures are rough placeholders, not measured calorie expenditure.
  */
-export const EXERCISE_CATALOG: ExerciseItem[] = [
+export const ORIGINAL_EXERCISE_CATALOG: ExerciseItem[] = [
   // CHEST (6)
   {
     id: 'ex-bench-press',
@@ -578,3 +579,5 @@ export const EXERCISE_CATALOG: ExerciseItem[] = [
   { id: "ex-home-walkout", name: "Walkout to High Plank", muscleGroup: "Full Body", secondaryMuscles: "Shoulders, Core, Hamstrings", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "Fold comfortably, walk hands out toward a plank, then walk them back; bend knees as needed." },
   { id: "ex-home-plank-shoulder-taps", name: "Plank Shoulder Taps", muscleGroup: "Full Body", secondaryMuscles: "Core, Shoulders, Glutes", equipment: 'Bodyweight', difficulty: "Intermediate", isBodyweight: true, defaultWeightKg: 0, caloriesPerSet: 10, tip: "From a plank or hands and knees, tap one shoulder at a time while keeping hips steady." },
 ];
+
+export const EXERCISE_CATALOG: ExerciseItem[] = [...ORIGINAL_EXERCISE_CATALOG, ...EXERCISE_ADDITIONS];

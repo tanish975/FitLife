@@ -6,6 +6,11 @@ import { validRecoveryJournal, type RecoveryJournal } from './RecoveryJournal';
 export const GUEST_OWNER = '__fitlife_guest_v1__';
 export const CLOUD_OWNER_KEY = 'fitlife_cloud_owner_v1';
 export const CLOUD_SLOT_PREFIX = 'fitlife_cloud_partition_v1:';
+/** Matches the Android pull limit. This client-side check is not a server transaction. */
+export const CLOUD_DEVICE_LIMIT = 10;
+export function canWriteDeviceSnapshot(deviceId: string, existingIds: string[]): boolean {
+  return existingIds.includes(deviceId) || existingIds.length < CLOUD_DEVICE_LIMIT;
+}
 export const CLOUD_KINDS = ['meals', 'workouts', 'weights', 'moods'] as const;
 export type CloudKind = typeof CLOUD_KINDS[number];
 export type CloudDeletions = Record<CloudKind, string[]>;

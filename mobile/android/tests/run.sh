@@ -14,5 +14,7 @@ mkdir -p "$WORK/ledger"
 javac -encoding UTF-8 -d "$WORK/ledger" \
   "$ROOT"/android/tests/vendor/org/json/*.java \
   "$ROOT/android/tests/android/content/Context.java" "$ROOT/android/tests/android/util/AtomicFile.java" \
+  "$ROOT/android/src/com/tanish/fitlife/WaterReminderPlan.java" "$ROOT/android/tests/com/tanish/fitlife/WaterReminderPlanTest.java" \
   "$ROOT/android/src/com/tanish/fitlife/StepLedger.java" "$ROOT/android/tests/com/tanish/fitlife/StepLedgerTest.java"
+java -cp "$WORK/ledger" com.tanish.fitlife.WaterReminderPlanTest
 java -cp "$WORK/ledger" com.tanish.fitlife.StepLedgerTest

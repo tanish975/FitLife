@@ -30,6 +30,16 @@ public final class StepLedgerTest {
         StepLedger.setReminder(c,"account-A","water",true,13,15);
         yes(StepLedger.reminders(c,"account-A").getJSONObject("water").getBoolean("enabled"),"reminder saved");
         yes(!StepLedger.reminders(c,"account-B").getJSONObject("water").getBoolean("enabled"),"reminder is account partitioned");
+        org.json.JSONObject migrated=StepLedger.reminders(c,"account-A").getJSONObject("water");
+        yes(migrated.getJSONArray("times").getInt(0)==795 && migrated.getString("mode").equals("times"),"existing daily reminder preserved as one time");
+        org.json.JSONObject advanced=new org.json.JSONObject().put("enabled",true).put("mode","times").put("times",new JSONArray().put(660).put(900).put(1140)).put("startMinute",540).put("endMinute",1140).put("intervalMinutes",120);
+        StepLedger.setWaterReminder(c,"account-A",advanced);
+        StepLedger.setReminder(c,"account-A","workout",true,8,30);
+        yes(StepLedger.reminders(c,"account-A").getJSONObject("water").getJSONArray("times").length()==3,"workout edits preserve water schedule");
+        advanced.put("enabled",false); StepLedger.setWaterReminder(c,"account-A",advanced);
+        yes(!StepLedger.reminders(c,"account-A").getJSONObject("water").getBoolean("enabled") && StepLedger.reminders(c,"account-A").getJSONObject("water").getJSONArray("times").length()==3,"turning off retains schedule");
+        boolean badSchedule=false; try { advanced.put("times",new JSONArray().put(1).put(1)); StepLedger.setWaterReminder(c,"account-A",advanced); } catch(Exception e) { badSchedule=true; }
+        yes(badSchedule && StepLedger.reminders(c,"account-A").getJSONObject("water").getJSONArray("times").length()==3,"invalid schedule cannot overwrite saved data");
         File base=file(dir,"account-A"), bak=new File(base.getPath()+".bak");
         Files.move(base.toPath(),bak.toPath());
         yes(count(c,"account-A")==125 && base.isFile(),"legacy .bak recovered when base is absent");

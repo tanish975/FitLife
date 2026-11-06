@@ -9,14 +9,14 @@ interface Guide { area: string; steps: GuideStep[] }
 /** Short, point-of-need guidance: no blocking overlay and no mandatory tour. */
 export const GUIDES: Record<GuideId, Guide> = {
   dashboard: { area: 'Home', steps: [
-    { title: 'Your day at a glance', description: 'See your meals, movement and hydration here. Personal targets appear after you add your profile details.', target: 'home-overview' },
+    { title: 'Your day at a glance', description: 'See your meals, movement and hydration here. Adult estimates may appear after profile setup; no adult calorie targets are provided under 18.', target: 'home-overview' },
     { title: 'Log in a tap', description: 'Use these shortcuts to open workouts or meals. You can also add water further down the page.', target: 'home-actions' },
     { title: 'Connect your steps', description: 'Optionally connect Health Connect or your phone sensor. Counts are not added together, and readings can sync to your account.', target: 'home-steps' },
     { title: 'Explore at your own pace', description: 'Use the five tabs to explore. Settings and the day/night switch are up here.', target: 'home-settings' },
   ] },
   meals: { area: 'Meals', steps: [
     { title: 'Choose a meal', description: 'Pick breakfast, lunch, dinner or a snack before you add food.', target: 'meals-category' },
-    { title: 'Describe and review', description: 'Type what you ate, then check the portions and nutrition. Unknown foods need your own details.', target: 'meals-quick' },
+    { title: 'Describe and review', description: 'Type what you ate, then check the food and portion. Unclear matches need your own nutrition details.', target: 'meals-quick' },
     { title: 'Favorite and repeat', description: 'Heart a logged meal to save it. Use Log again to adjust the portion and review its nutrition.', target: 'meals-shortcuts' },
     { title: 'Browse or add your own', description: 'Search the food list, or use Custom meal for a label or recipe. You can edit a logged meal later.', target: 'meals-search' },
   ] },
@@ -24,12 +24,12 @@ export const GUIDES: Record<GuideId, Guide> = {
     { title: 'Start a guided workout', description: 'Choose a session for step-by-step sets, form cues and rest. Pause or skip anytime.', target: 'workouts-guided' },
     { title: 'Plan your week', description: 'Choose workout or rest days and see your weekly progress. Change the plan anytime.', target: 'workouts-plan' },
     { title: 'Find home movements', description: 'Explore no-equipment exercises. Open one for form cues and easier alternatives.', target: 'workouts-home' },
-    { title: 'Log and save exercises', description: 'Adjust reps, sets and weight, log your work, or heart a movement for later.', target: 'workouts-catalog' },
+    { title: 'Log and save exercises', description: 'Search by movement, target or equipment. Review the form cue, log your work, or heart a favorite.', target: 'workouts-catalog' },
   ] },
   progress: { area: 'Progress', steps: [
     { title: 'Log a check-in', description: 'Enter your weight when you want to. You can use the app without recording it.', target: 'progress-weight' },
     { title: 'Understand the numbers', description: 'BMI is a rough screening measure, not a diagnosis. Add your profile details to see it.', target: 'progress-bmi' },
-    { title: 'Watch your trends', description: 'Your charts grow as you log. Touch a point to inspect an entry.', target: 'progress-chart' },
+    { title: 'Watch your trends', description: 'Touch a point or open the data table. Days without food logs are gaps, not zero intake.', target: 'progress-chart' },
   ] },
   profile: { area: 'Profile', steps: [
     { title: 'Make it yours', description: 'Edit your profile whenever you want to add details and get estimated targets. It is optional.', target: 'profile-card' },
@@ -38,17 +38,17 @@ export const GUIDES: Record<GuideId, Guide> = {
   ] },
   settings: { area: 'Settings', steps: [
     { title: 'Sync and backup', description: 'See your last sync, retry changes, or export an encrypted backup. Keep its passphrase safe.', target: 'settings-data' },
-    { title: 'Reminders on this phone', description: 'Optional workout and water reminders use notifications on this phone. Android may delay them.', target: 'settings-reminders' },
+    { title: 'Reminders on this phone', description: 'Choose water times or an hourly window, or set a workout reminder. Android may delay these optional alerts.', target: 'settings-reminders' },
     { title: 'Comfort and appearance', description: 'Turn on larger text or reduce motion here. Open Appearance below for palettes and day/night mode.', target: 'settings-accessibility' },
     { title: 'Replay these tips', description: 'Review any guide again here; app updates and data controls are below.', target: 'settings-guide-replay' },
   ] },
   daily: { area: 'Daily dashboard', steps: [
-    { title: 'A closer look at today', description: 'Your daily dashboard brings your logged activity together. Targets appear after profile setup.', target: 'daily-overview' },
+    { title: 'A closer look at today', description: 'Your daily dashboard brings your logged activity together. Adult targets depend on profile details.', target: 'daily-overview' },
     { title: 'Check in as you go', description: 'Track water and mood, then review your recent activity below.', target: 'daily-hydration' },
   ] },
   onboarding: { area: 'Profile details', steps: [
     { title: 'Only if you want to', description: 'Add your own measurements and goals to calculate estimates. You can go back without completing this form.', target: 'onboarding-details' },
-    { title: 'Estimates, not advice', description: 'After you enter your details, review the estimated targets. You can change them later.', target: 'onboarding-preview' },
+    { title: 'Estimates, not advice', description: 'Adults can review estimates here. Under 18, ask a qualified health professional for individual advice.', target: 'onboarding-preview' },
   ] },
 };
 

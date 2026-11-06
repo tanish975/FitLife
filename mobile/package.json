@@ -25,7 +25,10 @@
     "test:nutrition": "node qa/nutrition-unit.mjs && node qa/iteration.mjs",
     "test:guides": "node qa/guides.mjs && node qa/guides-upgrades.mjs",
     "test:personal": "node qa/personal-unit.mjs && node qa/personal-browser.mjs && node qa/personal-backup.mjs && node qa/personal-recovery.mjs",
-    "test:accessibility": "node qa/accessibility.mjs && node qa/theme-accessibility.mjs"
+    "test:accessibility": "node qa/accessibility.mjs && node qa/theme-accessibility.mjs",
+    "test:phase0": "node qa/phase0-unit.mjs && node qa/phase0-browser.mjs",
+    "test:exercises": "node qa/exercise-unit.mjs && node qa/exercise-browser.mjs",
+    "test:motion-water": "node qa/motion-reminders-unit.mjs && node qa/motion-reminders-browser.mjs"
   },
   "dependencies": {
     "animejs": "4.5.0",

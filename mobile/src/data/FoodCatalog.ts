@@ -96,7 +96,7 @@ export const FOOD_CATALOG: FoodItem[] = [
     fatG: 4.0,
     fiberG: 1.0,
     defaultCategory: 'Breakfast',
-    tags: ['yogurt', 'curd', 'dahi', 'greek yogurt'],
+    tags: ['greek yogurt'],
   },
   {
     id: 'food-avocado-toast',

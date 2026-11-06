@@ -96,17 +96,19 @@ try {
   // Home entry point exposes all equipment-free choices, with new ones first.
   await clickTab('Workouts');
   const shortcut = page.getByRole('region', { name: 'No-equipment workouts at home' });
-  await shortcut.getByText('39 movements', { exact: false }).waitFor();
+  const homeText = await shortcut.innerText();
+  const homeCount = Number(homeText.match(/(\d+) movements/)?.[1]);
+  assert(homeCount > 39, 'the no-equipment collection expanded');
   await shortcut.getByRole('button', { name: 'Explore no-equipment home exercises' }).click();
-  await page.getByRole('heading', { name: 'No-equipment exercises (39)' }).waitFor();
+  await page.getByRole('heading', { name: `No-equipment exercises (${homeCount})` }).waitFor();
   assert.equal(await page.getByLabel('Filter by equipment').inputValue(), 'bodyweight');
   const catalog = page.getByTestId('exercise-catalog-list');
-  for (let i = 0; i < 7; i++) await page.getByRole('button', { name: /Show more exercises/ }).click();
-  assert.equal(await catalog.locator('.exercise-row').count(), 39);
+  while (await catalog.locator('.exercise-row').count() < homeCount) await page.getByRole('button', { name: /Show more exercises/ }).click();
+  assert.equal(await catalog.locator('.exercise-row').count(), homeCount);
   const ids = await catalog.locator('.exercise-row').evaluateAll(rows => rows.map(row => row.getAttribute('data-exercise-id')));
   assert.equal(ids.filter(id => id.startsWith('ex-home-')).length, 30);
   assert(ids.slice(0,30).every(id => id.startsWith('ex-home-')), 'the 30 new home movements are easy to find');
-  assert.equal(await catalog.locator('.exercise-row').filter({ hasText: 'Bodyweight' }).count(), 39);
+  assert.equal(await catalog.locator('.exercise-row').filter({ hasText: 'Bodyweight' }).count(), homeCount);
   await catalog.locator('.exercise-open').first().click();
   let workout = page.getByRole('dialog', { name: 'Kneeling Push-Up' }); await workout.waitFor();
   assert.ok(await workout.getByText('Bodyweight').count()); assert.equal(await back(), true); await workout.waitFor({ state: 'hidden' });
@@ -140,7 +142,7 @@ try {
 
   // Unmatched/ambiguous foods cannot be saved until values are explicitly supplied.
   await clickTab('Meals');
-  const quick = page.getByPlaceholder('Try "2 eggs and a banana" or "150g chicken & rice"');
+  const quick = page.getByPlaceholder('Try "2 boiled eggs and a banana"');
   await quick.fill('2 mystery soup');
   assert(await page.getByRole('button', { name: 'Add (1)' }).isDisabled());
   assert.equal(await page.getByText('Nutrition details needed').count(), 1);
@@ -201,5 +203,5 @@ try {
   const native = await readFile('android/src/com/tanish/fitlife/MainActivity.java', 'utf8');
   assert.match(native, /evaluateJavascript\(.*__fitlifeHandleBack/); assert.doesNotMatch(native, /canGoBack\(\)/);
   assert.deepEqual(errors, []);
-  console.log('PASS: frosted persistent tab bar, JS Back/sheet history, 91-exercise discovery and 30 no-equipment home additions, reviewed nutrition, BMI first-paint position, reduced motion and responsive layouts');
+  console.log('PASS: frosted persistent tab bar, JS Back/sheet history, expanded exercise discovery and preserved 30 no-equipment home additions, reviewed nutrition, BMI first-paint position, reduced motion and responsive layouts');
 } finally { await context.close(); await browser.close(); }

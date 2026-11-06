@@ -135,15 +135,15 @@ final class StepLedger {
     static JSONObject reminders(Context c, String uid) throws Exception {
         synchronized (LOCK) {
             JSONObject root = read(c, uid), saved = root.optJSONObject("reminders");
+            JSONObject workout = saved == null ? null : saved.optJSONObject("workout");
+            int hour = workout == null ? 8 : workout.optInt("hour", 8);
+            int minute = workout == null ? 0 : workout.optInt("minute", 0);
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) throw new IllegalStateException("Invalid reminder");
             JSONObject out = new JSONObject();
-            for (String kind : new String[]{"workout", "water"}) {
-                JSONObject item = saved == null ? null : saved.optJSONObject(kind);
-                int fallbackHour = "workout".equals(kind) ? 8 : 12;
-                int hour = item == null ? fallbackHour : item.optInt("hour", fallbackHour);
-                int minute = item == null ? 0 : item.optInt("minute", 0);
-                if (hour < 0 || hour > 23 || minute < 0 || minute > 59) throw new IllegalStateException("Invalid reminder");
-                out.put(kind, new JSONObject().put("enabled", item != null && item.optBoolean("enabled", false)).put("hour", hour).put("minute", minute));
-            }
+            out.put("workout", new JSONObject().put("enabled", workout != null && workout.optBoolean("enabled", false)).put("hour", hour).put("minute", minute));
+            // A prior once-a-day water reminder is interpreted as exactly one
+            // custom time; it remains unchanged until the user edits it.
+            out.put("water", WaterReminderPlan.normalize(saved == null ? null : saved.optJSONObject("water")));
             return out;
         }
     }
@@ -151,7 +151,16 @@ final class StepLedger {
         if (!("workout".equals(kind) || "water".equals(kind)) || hour < 0 || hour > 23 || minute < 0 || minute > 59) throw new IllegalArgumentException("Invalid reminder");
         synchronized (LOCK) {
             JSONObject root = read(c, uid), reminders = reminders(c, uid);
-            reminders.put(kind, new JSONObject().put("enabled", enabled).put("hour", hour).put("minute", minute));
+            JSONObject next = new JSONObject().put("enabled", enabled).put("hour", hour).put("minute", minute);
+            reminders.put(kind, "water".equals(kind) ? WaterReminderPlan.normalize(next) : next);
+            root.put("reminders", reminders); write(c, uid, root);
+        }
+    }
+    static void setWaterReminder(Context c, String uid, JSONObject plan) throws Exception {
+        JSONObject validated = WaterReminderPlan.normalize(plan);
+        synchronized (LOCK) {
+            JSONObject root = read(c, uid), reminders = reminders(c, uid);
+            reminders.put("water", validated);
             root.put("reminders", reminders); write(c, uid, root);
         }
     }

@@ -1,234 +1,140 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useFitLife } from '../data/FitLifeStore';
+import { chartDateFractions } from '../domain/ProgressAggregator';
 
 export interface LineChartDatum {
+  dateKey: string;
   label: string;
-  value: number;
+  value: number | null;
   sublabel?: string;
 }
 
 interface LineChartProps {
   data: LineChartDatum[];
+  name: string;
   height?: number;
   lineColor?: string;
-  endColor?: string;
   targetValue?: number;
   targetLabel?: string;
   unitSuffix?: string;
   yDecimals?: number;
 }
 
-/**
- * LineChart — Hand-built HTML5 Canvas chart. Draws data immediately rather
- * than re-rendering React and reallocating a large canvas on every frame.
- */
+/** Calendar-spaced visual chart with a keyboard/screen-reader data table. */
 export const LineChart: React.FC<LineChartProps> = ({
-  data,
-  height = 185,
-  lineColor,
-  targetValue,
-  targetLabel,
-  unitSuffix = '',
-  yDecimals = 0,
+  data, name, height = 185, lineColor, targetValue, targetLabel, unitSuffix = '', yDecimals = 0,
 }) => {
   const { themeColors } = useFitLife();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-
   const resolvedLine = lineColor || themeColors.accentPrimary;
+  const padLeft = 38, padRight = 14, padTop = 20, padBottom = 28;
 
+  useEffect(() => { setHoverIdx(null); }, [data]);
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
+    const canvas = canvasRef.current, container = containerRef.current;
     if (!canvas || !container) return;
-
     const draw = () => {
       const width = container.clientWidth || 320;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const pixelWidth = Math.round(width * dpr);
-      const pixelHeight = Math.round(height * dpr);
-      // Changing canvas dimensions reallocates its backing bitmap; only do it
-      // when its size actually changed, not for every selected data point.
+      const pixelWidth = Math.round(width * dpr), pixelHeight = Math.round(height * dpr);
       if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
       if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-
-      ctx.save();
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, width, height);
-      if (data.length === 0) { ctx.restore(); return; }
-
-      const padLeft = 38;
-      const padRight = 14;
-      const padTop = 20;
-      const padBottom = 28;
-      const plotW = Math.max(10, width - padLeft - padRight);
-      const plotH = Math.max(10, height - padTop - padBottom);
-
-      const values = data.map((d) => d.value);
-      if (targetValue !== undefined && targetValue > 0) {
-        values.push(targetValue);
+      ctx.save(); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, width, height);
+      const values = data.filter(item => item.value !== null && Number.isFinite(item.value)).map(item => item.value as number);
+      if (values.length === 0) {
+        ctx.fillStyle = themeColors.textMuted; ctx.font = '500 12px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('No entries to chart', width / 2, height / 2);
+        ctx.restore(); return;
       }
+      if (targetValue !== undefined && Number.isFinite(targetValue) && targetValue > 0) values.push(targetValue);
+      const plotW = Math.max(10, width - padLeft - padRight), plotH = Math.max(10, height - padTop - padBottom);
+      const rawMin = Math.min(...values), rawMax = Math.max(...values), span = Math.max(1, rawMax - rawMin);
+      const minY = Math.max(0, rawMin - span * 0.18), maxY = rawMax + span * 0.18;
+      const xs = chartDateFractions(data.map(item => item.dateKey));
+      const toX = (index: number) => padLeft + xs[index] * plotW;
+      const toY = (value: number) => padTop + plotH * (1 - (value - minY) / Math.max(0.0001, maxY - minY));
 
-      const rawMin = Math.min(...values);
-      const rawMax = Math.max(...values);
-      const span = Math.max(1, rawMax - rawMin);
-      const minY = Math.max(0, rawMin - span * 0.18);
-      const maxY = rawMax + span * 0.18;
-
-      const toX = (i: number) =>
-        data.length === 1 ? padLeft + plotW / 2 : padLeft + (i / (data.length - 1)) * plotW;
-      const toY = (v: number) => {
-        const norm = (v - minY) / Math.max(0.0001, maxY - minY);
-        return padTop + plotH * (1 - norm);
-      };
-
-      // Draw horizontal grid lines + Y labels
-      ctx.strokeStyle = themeColors.ringTrack;
-      ctx.lineWidth = 1;
-      ctx.fillStyle = themeColors.textMuted;
-      ctx.font = '500 10px Inter, sans-serif';
-      ctx.textAlign = 'right';
-
+      ctx.strokeStyle = themeColors.ringTrack; ctx.lineWidth = 1; ctx.fillStyle = themeColors.textMuted;
+      ctx.font = '500 10px Inter, sans-serif'; ctx.textAlign = 'right';
       for (let g = 0; g <= 3; g++) {
-        const ratio = g / 3;
-        const y = padTop + plotH * ratio;
-        const val = maxY - ratio * (maxY - minY);
-        ctx.beginPath();
-        ctx.moveTo(padLeft, y);
-        ctx.lineTo(width - padRight, y);
-        ctx.stroke();
-        ctx.fillText(val.toFixed(yDecimals), padLeft - 6, y + 3);
+        const ratio = g / 3, y = padTop + plotH * ratio, value = maxY - ratio * (maxY - minY);
+        ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(width - padRight, y); ctx.stroke();
+        ctx.fillText(value.toFixed(yDecimals), padLeft - 6, y + 3);
       }
-
-      // Optional target line
-      if (targetValue !== undefined && targetValue > 0) {
-        const ty = padTop + plotH * (1 - (targetValue - minY) / Math.max(0.0001, maxY - minY));
-        ctx.save();
-        ctx.setLineDash([5, 5]);
-        ctx.strokeStyle = themeColors.accentWarm;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(padLeft, ty);
-        ctx.lineTo(width - padRight, ty);
-        ctx.stroke();
+      if (targetValue !== undefined && Number.isFinite(targetValue) && targetValue > 0) {
+        const y = toY(targetValue);
+        ctx.save(); ctx.setLineDash([5, 5]); ctx.strokeStyle = themeColors.accentWarm; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(width - padRight, y); ctx.stroke();
         if (targetLabel) {
-          ctx.fillStyle = themeColors.accentWarmText;
-          ctx.font = '600 10px Inter, sans-serif';
-          ctx.textAlign = 'right';
-          ctx.fillText(targetLabel, width - padRight - 2, Math.max(12, ty - 5));
+          ctx.fillStyle = themeColors.accentWarmText; ctx.font = '600 10px Inter, sans-serif'; ctx.textAlign = 'right';
+          ctx.fillText(targetLabel, width - padRight - 2, Math.max(12, y - 5));
         }
         ctx.restore();
       }
 
-      const pts = data.map((d, i) => ({ x: toX(i), y: toY(d.value) }));
-
-      const buildCurve = () => {
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const xc = (pts[i].x + pts[i + 1].x) / 2;
-          const yc = (pts[i].y + pts[i + 1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
-        }
-        if (pts.length > 1) {
-          const last = pts[pts.length - 1];
-          ctx.lineTo(last.x, last.y);
-        }
-      };
-
-      // Solid subtle area fill under curve (no gradient)
-      if (pts.length > 1) {
-        ctx.save();
-        buildCurve();
-        ctx.lineTo(pts[pts.length - 1].x, padTop + plotH);
-        ctx.lineTo(pts[0].x, padTop + plotH);
-        ctx.closePath();
-        ctx.fillStyle = `${resolvedLine}22`;
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // Solid stroke curve
-      ctx.save();
-      buildCurve();
-      ctx.strokeStyle = resolvedLine;
-      ctx.lineWidth = 2.75;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      ctx.restore();
-
-      // Points & X-axis labels
-      pts.forEach((p, idx) => {
-        const isHovered = hoverIdx === idx || (hoverIdx === null && idx === pts.length - 1);
-
-        if (idx === 0 || idx === pts.length - 1 || idx % 3 === 0) {
-          ctx.fillStyle = isHovered ? themeColors.textPrimary : themeColors.textMuted;
-          ctx.font = isHovered ? '600 10px Inter, sans-serif' : '500 10px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(data[idx].label, p.x, height - 8);
-        }
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, isHovered ? 5 : 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = isHovered ? themeColors.textPrimary : resolvedLine;
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = themeColors.bgCard;
-        ctx.stroke();
+      // Stop each stroke at an unlogged day. A gap is never drawn as zero or connected across.
+      ctx.save(); ctx.strokeStyle = resolvedLine; ctx.lineWidth = 2.75; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      let active = false;
+      ctx.beginPath();
+      data.forEach((item, index) => {
+        if (item.value === null || !Number.isFinite(item.value)) { active = false; return; }
+        const x = toX(index), y = toY(item.value);
+        if (!active) { ctx.moveTo(x, y); active = true; } else ctx.lineTo(x, y);
       });
+      ctx.stroke(); ctx.restore();
 
+      let lastLabelX = -Infinity;
+      data.forEach((item, index) => {
+        const x = toX(index);
+        if ((index === 0 || index === data.length - 1 || index % 3 === 0) && (x - lastLabelX >= 42 || index === 0)) {
+          ctx.fillStyle = themeColors.textMuted; ctx.font = '500 10px Inter, sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(item.label, x, height - 8); lastLabelX = x;
+        }
+        if (item.value === null || !Number.isFinite(item.value)) return;
+        const selected = hoverIdx === index || (hoverIdx === null && index === data.length - 1);
+        ctx.beginPath(); ctx.arc(x, toY(item.value), selected ? 5 : 3.2, 0, Math.PI * 2);
+        ctx.fillStyle = selected ? themeColors.textPrimary : resolvedLine; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = themeColors.bgCard; ctx.stroke();
+      });
       ctx.restore();
     };
-
     draw();
-    // Redraw after rotation or layout changes without triggering a React render.
-    // A window resize fallback covers older Android WebViews.
     if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(draw);
-      observer.observe(container);
-      return () => observer.disconnect();
+      const observer = new ResizeObserver(draw); observer.observe(container); return () => observer.disconnect();
     }
-    window.addEventListener('resize', draw);
-    return () => window.removeEventListener('resize', draw);
+    window.addEventListener('resize', draw); return () => window.removeEventListener('resize', draw);
   }, [data, height, resolvedLine, targetValue, targetLabel, hoverIdx, yDecimals, themeColors]);
 
-  const activeIndex = hoverIdx !== null ? hoverIdx : Math.max(0, data.length - 1);
+  const activeIndex = hoverIdx !== null && hoverIdx < data.length ? hoverIdx : Math.max(0, data.length - 1);
   const activeDatum = data[activeIndex];
-
+  const formatValue = (value: number | null) => value === null ? 'Not logged' : `${value.toFixed(yDecimals)}${unitSuffix}`;
   const handlePointer = (clientX: number) => {
     const container = containerRef.current;
-    if (!container || data.length === 0) return;
-    const rect = container.getBoundingClientRect();
-    const relX = Math.max(0, Math.min(rect.width, clientX - rect.left));
-    const idx = Math.round((relX / rect.width) * (data.length - 1));
-    setHoverIdx(Math.max(0, Math.min(data.length - 1, idx)));
+    if (!container || !data.length) return;
+    const rect = container.getBoundingClientRect(), plotWidth = Math.max(10, rect.width - padLeft - padRight);
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left - padLeft) / plotWidth));
+    const positions = chartDateFractions(data.map(item => item.dateKey));
+    const index = positions.reduce((best, x, i) => Math.abs(x - fraction) < Math.abs(positions[best] - fraction) ? i : best, 0);
+    setHoverIdx(index);
   };
-
-  return (
-    <div ref={containerRef} className="w-full select-none">
-      {activeDatum && (
-        <div className="mb-2 flex items-center justify-between rounded-xl bg-[#141916] px-3 py-1.5 text-xs border border-[#2F3A33]">
-          <span className="text-[#B8B5AD] font-medium">
-            {activeDatum.sublabel || activeDatum.label}
-          </span>
-          <span className="font-heading font-semibold text-[#7BB38F]">
-            {activeDatum.value.toFixed(yDecimals)}
-            {unitSuffix}
-          </span>
-        </div>
-      )}
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height }}
-        onPointerMove={(e) => handlePointer(e.clientX)}
-        onPointerDown={(e) => handlePointer(e.clientX)}
-        onPointerLeave={() => setHoverIdx(null)}
-        className="touch-pan-y cursor-crosshair block"
-      />
-    </div>
-  );
+  return <div ref={containerRef} className="w-full">
+    {activeDatum && <div aria-hidden="true" className="mb-2 flex items-center justify-between rounded-xl bg-[#141916] px-3 py-1.5 text-xs border border-[#2F3A33]">
+      <span className="text-[#B8B5AD] font-medium">{activeDatum.sublabel || activeDatum.label}</span>
+      <span className="font-heading font-semibold text-[#7BB38F]">{formatValue(activeDatum.value)}</span>
+    </div>}
+    <canvas ref={canvasRef} aria-hidden="true" style={{ width: '100%', height }}
+      onPointerMove={event => handlePointer(event.clientX)} onPointerDown={event => handlePointer(event.clientX)}
+      onPointerLeave={() => setHoverIdx(null)} className="touch-pan-y cursor-crosshair block" />
+    <details className="mt-2 text-xs text-[#B8B5AD]">
+      <summary className="cursor-pointer font-semibold text-[#7BB38F]">View {name.toLowerCase()} data table</summary>
+      {data.length ? <div className="overflow-x-auto"><table aria-label={`${name} data`} className="mt-2 w-full text-left">
+        <thead><tr><th scope="col" className="py-1 pr-3">Date</th><th scope="col" className="py-1">Value</th></tr></thead>
+        <tbody>{data.map((item, index) => <tr key={`${item.dateKey}-${index}`}><th scope="row" className="py-1 pr-3 font-medium">{item.dateKey}</th><td className="py-1">{formatValue(item.value)}</td></tr>)}</tbody>
+      </table></div> : <p className="mt-2">No entries yet.</p>}
+    </details>
+  </div>;
 };

@@ -50,7 +50,10 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
-          code=$((RUN_NUMBER + 2)) # The current locally shared APK has versionCode 2.
+          # Local candidates use versionCodes 12, 13 and 14. Future public builds
+          # must be strictly newer so the in-app updater can recognize them.
+          code=$((RUN_NUMBER + 5))
+          if (( code <= 14 )); then echo 'VersionCodes 12, 13 and 14 are reserved for local candidates; a newer workflow run is required.' >&2; exit 1; fi
           if (( code > 2100000000 )); then echo 'Android versionCode limit reached.' >&2; exit 1; fi
           name="1.0.$code"
           tag="v$name"
@@ -111,6 +114,12 @@ jobs:
         run: bash scripts/verify-apk.sh
       - name: Install Chromium for end-to-end tests
         run: npx playwright install --with-deps chromium
+      - name: Test age safety, food, progress and device cap (simulated native bridge)
+        run: npm run test:phase0
+      - name: Test expanded exercise catalog, filters and data preservation
+        run: npm run test:exercises
+      - name: Test movement previews and local water schedule (simulated native bridge)
+        run: npm run test:motion-water
       - name: Test account isolation and sync (simulated native bridge)
         run: npm run test:cloud
       - name: Test release build, animations, updates, standalone and offline use
@@ -143,11 +152,12 @@ jobs:
           sha256sum FitLife.apk FitLife-App.html > SHA256SUMS.txt
           cat > "$RUNNER_TEMP/fitlife-notes.md" <<EOF
           ## Install on Android
+          Back up your FitLife data with the encrypted export before updating, and keep the passphrase safe.
           Download **FitLife.apk**, open it on Android 8.0 or later, and confirm installation.
-          To update, install the new APK over the existing FitLife app; do not uninstall it.
-          Android may ask you to allow your browser to install apps and to confirm the update.
+          Install over your existing compatible signed FitLife app; do not uninstall or clear app data.
+          Android may ask you to allow your browser to install apps and confirm the update.
 
-          **FitLife-App.html** is the standalone offline web build. See the repository README for details and limitations.
+          **FitLife-App.html** is the standalone offline web build; native Google sign-in requires the Android app.
 
           Android versionCode: $FITLIFE_VERSION_CODE
 
@@ -155,6 +165,7 @@ jobs:
 
           SHA-256 hashes are in SHA256SUMS.txt.
           EOF
+          cat "$GITHUB_WORKSPACE/RELEASE-HIGHLIGHTS.md" >> "$RUNNER_TEMP/fitlife-notes.md"
           gh release create "$FITLIFE_RELEASE_TAG" FitLife.apk FitLife-App.html SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "FitLife $FITLIFE_RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/fitlife-notes.md" --latest

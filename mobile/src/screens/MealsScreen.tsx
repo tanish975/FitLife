@@ -89,7 +89,7 @@ export const MealsScreen: React.FC = () => {
         <div className="rounded-2xl border border-[#3E634B] bg-[#213026] px-3 py-1.5 text-right">
           <div className="text-[0.625rem] font-medium text-[#7BB38F]">Today’s Intake</div>
           <div className="font-heading text-xs font-bold text-[#F4F1EA]">
-            <AnimatedCounter value={todayCalories} /> {profile.onboarded ? `/ ${macroTargets.calories} kcal` : 'kcal logged'}
+            <AnimatedCounter value={todayCalories} /> {macroTargets ? `/ ${macroTargets.calories} kcal` : 'kcal logged'}
           </div>
         </div>
       </div>
@@ -123,7 +123,7 @@ export const MealsScreen: React.FC = () => {
             aria-label="Describe a meal"
             value={quickAddText}
             onChange={(e) => updateQuickText(e.target.value)}
-            placeholder='Try "2 eggs and a banana" or "150g chicken & rice"'
+            placeholder='Try "2 boiled eggs and a banana"'
             className="min-w-0 flex-1 rounded-2xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5 text-xs text-[#F4F1EA] outline-none placeholder:text-[#636961] focus:border-[#6BA37E]"
           />
           <PressScale scaleDown={0.94}>
@@ -137,7 +137,7 @@ export const MealsScreen: React.FC = () => {
           </PressScale>
         </form>
 
-        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">Values are estimates. Check each food and portion before logging.</p>
+        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">Built-in values are approximate and have no recorded per-item source. Check the food, preparation and portion; use a label or recipe for uncertain matches.</p>
 
         {/* Review every amount and nutrient before adding; unknown foods never get invented values. */}
         {parsedQuickDrafts.length > 0 && <div className="meal-draft-list" aria-label="Meal preview">
@@ -151,9 +151,9 @@ export const MealsScreen: React.FC = () => {
         {!quickAddText && (
           <details className="meal-examples"><summary>Examples</summary><div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             {[
-              '2 eggs and a banana',
+              '2 boiled eggs and a banana',
               '1 bowl oats & whey shake',
-              '150g grilled chicken and brown rice',
+              '150g grilled chicken breast and brown rice',
               '2 rotis and palak paneer',
             ].map((sample) => (
               <button
@@ -264,6 +264,7 @@ export const MealsScreen: React.FC = () => {
           />
         ) : (
           <div>
+          <p className="text-xs leading-relaxed text-[#B8B5AD]">Catalog values are approximate; per-item sources were not recorded. Recipes and portions vary.</p>
           <div className="space-y-2 pr-0.5" data-testid="food-catalog-list">
             {filteredCatalog.slice(0, visibleCount).map((item) => (
               <PressScale

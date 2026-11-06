@@ -1,5 +1,6 @@
 import { ExerciseItem, FitnessGoal } from '../data/types';
 import { calculateBmi } from './BmiCalculator';
+import { canUseAdultNutritionTargets } from './AgeSafety';
 
 export interface WorkoutPrescription {
   suggestedSets: number;
@@ -22,10 +23,12 @@ export function getWorkoutPrescription(
   goal: FitnessGoal,
   weightKg: number,
   heightCm: number,
-  age = 18,
+  age = 0,
   profileReady = true
 ): WorkoutPrescription {
-  const bmiInfo = calculateBmi(weightKg, heightCm);
+  const bmiInfo = calculateBmi(weightKg, heightCm, age);
+  // A saved adult weight-loss goal is not applied to a minor's workouts.
+  const adultGoal = profileReady && canUseAdultNutritionTargets(age) ? goal : 'maintain';
 
   let suggestedSets = 3;
   let suggestedReps = 10;
@@ -44,7 +47,7 @@ export function getWorkoutPrescription(
     protocolName = 'Cardio at your pace';
     goalRationale = 'A brief starting template, not a target. Adjust the time, pace and rest to suit your fitness.';
   } else {
-    switch (goal) {
+    switch (adultGoal) {
       case 'gain_muscle':
         suggestedSets = 4;
         suggestedReps = exercise.difficulty === 'Advanced' ? 8 : 10;
@@ -81,22 +84,41 @@ export function getWorkoutPrescription(
     }
   }
 
-  let suggestedWeightKg = exercise.isBodyweight
+  // New exercises with a caution or timed hold do not inherit a high-volume
+  // goal-based template. These values remain editable and are not a prescription.
+  if (exercise.id.startsWith('ex-more-') && exercise.muscleGroup === 'Cardio') {
+    suggestedSets = 1;
+    suggestedReps = exercise.id === 'ex-more-reverse-treadmill' ? 1 : 5;
+  } else if (exercise.logUnit === 'seconds') {
+    suggestedSets = 1;
+    suggestedReps = exercise.id.startsWith('ex-more-neck-') ? 5 : 10;
+    suggestedRestSeconds = 45;
+    protocolName = 'Gentle hold';
+    goalRationale = 'A brief, editable starting duration, not a personal prescription. Breathe and stop if symptoms occur.';
+  } else if (exercise.caution) {
+    suggestedSets = 1;
+    suggestedReps = 5;
+    suggestedRestSeconds = 75;
+    protocolName = 'Review before starting';
+    goalRationale = 'This is not a personalized prescription. Read the safety note and seek qualified guidance when needed.';
+  }
+
+  let suggestedWeightKg = exercise.isBodyweight || exercise.defaultWeightKg <= 0
     ? 0
     : Math.max(2.5, Math.round((exercise.defaultWeightKg * weightMultiplier) / 2.5) * 2.5);
 
-  if (!profileReady && exercise.muscleGroup !== 'Cardio') {
+  if ((!profileReady || !canUseAdultNutritionTargets(age)) && exercise.muscleGroup !== 'Cardio') {
     protocolName = 'Starting template';
     goalRationale = 'A generic starting point, not a personalized prescription. Adjust sets, repetitions and rest to your ability.';
   }
   let bmiCautionNote: string | null = null;
   if (!profileReady) {
     bmiCautionNote = null;
-  } else if (age < 18) {
-    bmiCautionNote = 'Adult BMI categories do not apply below age 18. Adjust exercises to your ability and seek qualified guidance.';
+  } else if (bmiInfo.category === null) {
+    bmiCautionNote = 'Adult BMI categories are not used below age 20. Adjust exercises to your ability and seek qualified guidance.';
   } else if (bmiInfo.category === 'Obese' || bmiInfo.bmi >= 29) {
     bmiCautionNote = `BMI is a rough screening measure and does not assess fitness. Use a comfortable load and range of motion; stop if you experience pain.`;
-    if (!exercise.isBodyweight && (exercise.muscleGroup === 'Legs' || exercise.muscleGroup === 'Full Body')) {
+    if (!exercise.isBodyweight && suggestedWeightKg > 0 && (exercise.muscleGroup === 'Legs' || exercise.muscleGroup === 'Full Body')) {
       suggestedWeightKg = Math.max(5, Math.round((suggestedWeightKg * 0.88) / 2.5) * 2.5);
     }
   } else if (bmiInfo.category === 'Underweight') {
@@ -122,6 +144,7 @@ export function getWorkoutPrescription(
  * 1 kcal/kg/hour: https://pacompendium.com/ .
  */
 export function estimateWorkoutCalories(exercise: ExerciseItem, sets: number, repsOrMinutes: number, weightKg: number): number {
+  if (exercise.energyEstimateUnavailable) return 0;
   if (exercise.muscleGroup === 'Cardio') {
     const genericMet = exercise.id.startsWith('ex-home-') ? 3.5 : 5;
     return Math.max(0, Math.round(genericMet * Math.max(0, weightKg) * sets * repsOrMinutes / 60));

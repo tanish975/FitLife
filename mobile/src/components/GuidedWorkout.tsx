@@ -6,10 +6,13 @@ import type { WeightUnit } from '../data/types';
 import { WORKOUT_SESSION_IDEAS, type WorkoutSessionIdea } from '../data/WorkoutSessions';
 import { useFitLife } from '../data/FitLifeStore';
 import { easierOption } from '../domain/ExerciseGuidance';
+import { exerciseValueLabel } from '../domain/ExerciseDiscovery';
 import { estimateWorkoutCalories } from '../domain/AdaptiveWorkoutEngine';
 import { displayWeight, parseInputToKg } from '../domain/WeightConverter';
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 import { MotionEntry } from './MotionEntry';
+import { ExerciseMotion } from './ExerciseMotion';
+import { exerciseMotionFor } from '../data/ExerciseMotion';
 
 interface GuidedState {
   version: 1; sessionId: string; ids: string[]; index: number; doneSets: number; targetSets: number;
@@ -103,8 +106,9 @@ export const GuidedWorkout: React.FC<{session: WorkoutSessionIdea; resume: boole
     logLock.current = true; window.setTimeout(() => { logLock.current = false; }, 600);
     const hasWeight = profile.onboarded || weights.some(w => !w.id.startsWith('seed-'));
     const weightKg = current.isBodyweight ? 0 : parseInputToKg(state.load, state.loadUnit);
+    const canEstimateEnergy = hasWeight && !current.energyEstimateUnavailable;
     logWorkout({exerciseId:current.id,exerciseName:current.name,muscleGroup:current.muscleGroup,sets:1,reps:state.reps,weightKg,
-      caloriesBurned:hasWeight ? estimateWorkoutCalories(current,1,state.reps,latestWeightKg) : 0,energyEstimateAvailable:hasWeight,restSeconds:state.restSeconds}, `guided-${state.token}-${state.loggedSets}`);
+      caloriesBurned:canEstimateEnergy ? estimateWorkoutCalories(current,1,state.reps,latestWeightKg) : 0,energyEstimateAvailable:canEstimateEnergy,...(current.logUnit === 'seconds' ? {measurementUnit:'seconds' as const} : {}),restSeconds:state.restSeconds}, `guided-${state.token}-${state.loggedSets}`);
     const complete = state.doneSets + 1 >= state.targetSets;
     const index = complete ? state.index + 1 : state.index;
     const end = index >= state.ids.length;
@@ -131,9 +135,10 @@ export const GuidedWorkout: React.FC<{session: WorkoutSessionIdea; resume: boole
         : state.phase === 'rest' ? <div className="guided-rest"><span><Clock3 size={20}/> RECOVERY</span><h3>Take a breath.</h3><div className="guided-rest-time" role="timer" aria-label={`Rest time ${time(state.endAt-now)}`}>{time(state.endAt-now)}</div><p>Next: <strong>{current?.name}</strong></p><div className="guided-rest-actions"><button type="button" onClick={pause}><Pause size={16}/> Pause</button><button type="button" onClick={() => { const remaining = Math.min(3_600_000, Math.max(0,state.endAt-Date.now())+15000); update({endAt:Date.now()+remaining,remainingMs:remaining}); }}>+15 sec</button><button type="button" onClick={() => update({phase:'work',remainingMs:0})}>Skip rest</button></div></div>
         : current && <>
           <div className="guided-exercise"><span className="guided-icon"><Dumbbell size={23}/></span><p>{current.muscleGroup} · {current.equipment}</p><h3>{current.name}</h3><span>Set {state.doneSets+1} of {state.targetSets}</span></div>
-          <div className="guided-instruction"><strong>Form cue</strong><p>{current.tip}</p><small>Move at a comfortable pace. Stop if you feel pain.</small></div>
+          {exerciseMotionFor(current) && <details className="guided-motion"><summary>Watch movement preview</summary><ExerciseMotion exercise={current} showUnavailable={false}/></details>}
+          <div className="guided-instruction"><strong>Form cue</strong><p>{current.tip}</p>{current.caution && <p>{current.caution}</p>}<small>Move at a comfortable pace. Stop if you feel pain.</small></div>
           <div className="guided-alt"><strong>Easier option</strong><p>{alternative?.note}</p>{alternativeExercise && <button type="button" onClick={() => { const ids=[...state.ids]; ids[state.index]=alternativeExercise.id; update({ids,doneSets:0,targetSets:alternativeExercise.muscleGroup === 'Cardio' ? 1 : 2,reps:alternativeExercise.muscleGroup === 'Cardio' ? 1 : 8,load:0}); }}>Use {alternativeExercise.name}</button>}</div>
-          <div className="guided-inputs"><label>{current.muscleGroup === 'Cardio' ? 'Minutes' : 'Reps'}<input type="number" min="1" max="100" inputMode="numeric" value={state.reps} onChange={e => update({reps:Math.max(1,Math.min(100,Math.round(Number(e.target.value)||1)))})}/></label>
+          <div className="guided-inputs"><label>{exerciseValueLabel(current)}<input type="number" min="1" max="100" inputMode="numeric" value={state.reps} onChange={e => update({reps:Math.max(1,Math.min(100,Math.round(Number(e.target.value)||1)))})}/></label>
             {!current.isBodyweight && <label>Load ({state.loadUnit})<input type="number" min="0" max={state.loadUnit === 'lb' ? 2204.6 : 1000} step="0.1" inputMode="decimal" value={state.load} onChange={e => update({load:Math.max(0,Math.min(state.loadUnit === 'lb' ? 2204.6 : 1000,Number(e.target.value)||0))})}/></label>}</div>
           <details className="guided-adjust"><summary>Adjust sets & rest</summary><div><label>Sets for this exercise<input type="number" min={state.doneSets+1} max="20" inputMode="numeric" value={state.targetSets} onChange={e => update({targetSets:Math.max(state.doneSets+1,Math.min(20,Math.round(Number(e.target.value)||1)))})}/></label><label>Rest seconds<input type="number" min="0" max="600" step="15" inputMode="numeric" value={state.restSeconds} onChange={e => update({restSeconds:Math.max(0,Math.min(600,Math.round(Number(e.target.value)||0)))})}/></label></div><p>Starting values are editable, not a prescription.</p></details>
           <button type="button" className="guided-primary" onClick={logSet}><Check size={18}/> Log set</button>

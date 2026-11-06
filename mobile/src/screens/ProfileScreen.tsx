@@ -44,8 +44,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [selectedBadge, setSelectedBadge] = useState<BadgeStatus | null>(null);
 
   const bmiInfo = useMemo(
-    () => calculateBmi(latestWeightKg, profile.heightCm),
-    [latestWeightKg, profile.heightCm]
+    () => calculateBmi(latestWeightKg, profile.heightCm, profile.age),
+    [latestWeightKg, profile.heightCm, profile.age]
   );
 
   const unlockedCount = useMemo(
@@ -94,7 +94,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
         <div className="fitness-profile-bio">
           <h2>{profile.name}</h2>
-          <p>Level {gamification.level} athlete{profile.onboarded ? ` · ${GOAL_CONFIG[profile.goal]?.label}` : ' · Set a goal when you’re ready'}</p>
+          <p>Level {gamification.level} athlete{macroTargets ? ` · ${GOAL_CONFIG[profile.goal]?.label}` : !profile.onboarded ? ' · Set a goal when you’re ready' : ''}</p>
           <span>A little stronger, every day.</span>
         </div>
         <div className="fitness-profile-actions">
@@ -112,7 +112,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       {profile.onboarded ? <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-            Biometrics & Daily Targets
+            {macroTargets ? 'Biometrics & Daily Targets' : 'Your measurements'}
           </h3>
           <button
             onClick={onEditOnboarding}
@@ -135,11 +135,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <div className="text-[0.625rem] text-[#84877F]">Current BMI</div>
             <div className="mt-0.5 font-heading text-sm font-bold text-[#F4F1EA]">{bmiInfo.bmi}</div>
             <div className="text-[0.625rem] font-semibold text-[#F4F1EA]">
-              {profile.age >= 18 ? bmiInfo.category : 'Adult scale not applicable'}
+              {bmiInfo.category ?? 'Adult scale not applicable under 20'}
             </div>
           </div>
 
-          <div className="rounded-2xl bg-[#141916] p-3 border border-[#26302A]">
+          {macroTargets && <div className="rounded-2xl bg-[#141916] p-3 border border-[#26302A]">
             <div className="text-[0.625rem] text-[#84877F]">Daily Target</div>
             <div className="mt-0.5 font-heading text-sm font-bold text-[#7BB38F]">
               {macroTargets.calories} kcal
@@ -147,10 +147,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <div className="text-[0.625rem] text-[#84877F]">
               {GOAL_CONFIG[profile.goal]?.label}
             </div>
-          </div>
+          </div>}
         </div>
 
-        <div className="grid grid-cols-4 gap-2 pt-1">
+        {macroTargets ? <><div className="grid grid-cols-4 gap-2 pt-1">
           <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
             <div className="text-[0.625rem] text-[#84877F]">Protein</div>
             <div className="font-heading text-xs font-bold text-[#7BB38F]">
@@ -180,7 +180,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <div className="flex items-center justify-between rounded-xl bg-[#141916] px-3 py-2 text-[0.6875rem] text-[#84877F]">
           <span>Activity: {ACTIVITY_MULTIPLIERS[profile.activityLevel]?.label}</span>
           <span>BMR {macroTargets.bmr} · TDEE {macroTargets.tdee} kcal</span>
-        </div>
+        </div></> : <p className="text-xs leading-relaxed text-[#B8B5AD]">Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance.</p>}
       </div> : <section className="profile-needed profile-needed-card" aria-label="Optional profile details"><div><strong>Profile details are optional</strong><p>Add your own measurements to see estimated targets and BMI. Nothing is filled in for you.</p></div><button type="button" onClick={onEditOnboarding}>Add profile details</button></section>}
 
       {/* 9-BADGE GAMIFICATION GRID */}
