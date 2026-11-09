@@ -51,7 +51,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
     firstWeight && latestWeightEntry && firstWeight.dateKey !== latestWeightEntry.dateKey
       ? latestWeightEntry.weightKg - firstWeight.weightKg
       : 0;
-  const deltaDisplay = formatWeight(Math.abs(deltaKg), unit);
+  const deltaDisplay = toDisplayWeight(Math.abs(deltaKg), unit);
 
   const weightChartData: LineChartDatum[] = useMemo(() => {
     const pts = aggregateWeightSeries(weights, unit, 14);
