@@ -1,6 +1,10 @@
 import { FoodItem } from './types';
+import { CURATED_INDIAN_FOODS } from './CuratedIndianFoods';
+import { IFCT_CATALOG } from './IfctCatalog';
+import { WORLD_CULINARY_ATLAS } from './WorldCulinaryAtlas';
+import { GLOBAL_LAB_FOOD_CATALOG } from './FitLifeFoodDb';
 
-export const FOOD_CATALOG: FoodItem[] = [
+export const ORIGINAL_FOOD_CATALOG: FoodItem[] = [
   // Breakfast
   {
     id: 'food-eggs',
@@ -393,3 +397,26 @@ export const FOOD_CATALOG: FoodItem[] = [
     tags: ['coffee', 'espresso', 'caffeine', 'preworkout'],
   },
 ];
+
+export const CURATED_FOOD_CATALOG: FoodItem[] = [
+  ...ORIGINAL_FOOD_CATALOG,
+  ...CURATED_INDIAN_FOODS,
+];
+
+export const READY_TO_EAT_FOOD_CATALOG: FoodItem[] = [
+  ...CURATED_FOOD_CATALOG,
+  ...WORLD_CULINARY_ATLAS,
+];
+
+export const INDIAN_FOOD_CATALOG: FoodItem[] = [
+  ...CURATED_FOOD_CATALOG,
+  ...IFCT_CATALOG,
+];
+
+export const FOOD_CATALOG: FoodItem[] = [
+  ...CURATED_FOOD_CATALOG,
+  ...WORLD_CULINARY_ATLAS,
+  ...IFCT_CATALOG,
+  ...GLOBAL_LAB_FOOD_CATALOG,
+];
+

@@ -12,8 +12,9 @@ import { EXERCISE_CATALOG } from '../data/ExerciseCatalog';
 import { MuscleGroup } from '../data/types';
 import { MOOD_OPTIONS, generateAiCoachMessage } from '../domain/AiCoach';
 import { calculateHealthScore } from '../domain/HealthScoreCalculator';
-import { formatWeight } from '../domain/WeightConverter';
+import { formatWeight, toDisplayWeight } from '../domain/WeightConverter';
 import { loggedWorkoutUnit } from '../domain/ExerciseDiscovery';
+import { computeWeeklyWeightTrend } from '../domain/ProgressAggregator';
 import partnerTraining from '../assets/partner-training.jpg';
 import maleTraining from '../assets/male-strength.jpg';
 import femaleTraining from '../assets/female-strength.jpg';
@@ -32,7 +33,10 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
   const {
     profile, settings, themeColors, meals, workouts, weights, moods, todayMeals, todayWorkouts, todayMood,
     waterTodayMl, macroTargets, gamification, addWaterMl, logMood, toggleThemeMode,
+    weeklyWeightTrend, consistencyStrip, weeklySummaryDigest,
   } = useFitLife();
+
+  const unit = settings.weightUnit;
 
   const totals = useMemo(() => todayMeals.reduce((sum, meal) => ({
     calories: sum.calories + meal.calories,
@@ -106,7 +110,133 @@ export const FitnessHomeScreen: React.FC<FitnessHomeProps> = ({ onNavigateTab, o
           <button className="home-action secondary" onClick={() => onNavigateTab('meals')}><span className="home-action-icon"><Utensils size={20} /></span><span><strong>Log a meal</strong></span><Plus size={19} /></button>
         </div>
 
+        {/* Quick natural-language meal input bar */}
+        <section className="rounded-[26px] border border-[#3E634B] bg-[#213026] p-4" data-guide-target="home-nl-meal" aria-label="Quick natural-language meal logging">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Quick Meal Log</h2>
+              <p className="text-[0.6875rem] text-[#84877F]">Describe what you ate — we’ll confirm before logging</p>
+            </div>
+            <button onClick={() => onNavigateTab('meals')} className="text-xs font-semibold text-[#7BB38F] hover:underline">Open full log →</button>
+          </div>
+          <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
+            <input
+              type="text"
+              placeholder='Try "2 roti, 1 katori dal"'
+              className="flex-1 rounded-xl border border-[#2F3A33] bg-[#141916] px-3.5 py-2.5 text-xs text-[#F4F1EA] outline-none focus:border-[#6BA37E]"
+            />
+            <button
+              type="button"
+              className="rounded-xl bg-[#528B67] hover:bg-[#5E9A74] px-4 py-2.5 text-xs font-bold text-[#F4F1EA]"
+              onClick={() => onNavigateTab('meals')}
+            >
+              Confirm & log
+            </button>
+          </form>
+        </section>
+
         <StepTracker />
+
+        {/* Weekly streak consistency strip */}
+        {settings.dashboardWidgets.showActivityFeed && (
+          <section className="home-streak-strip rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" aria-label="Weekly streak consistency">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">7-Day Streak Consistency</h2>
+                <p className="text-[0.6875rem] text-[#84877F]">Logged activity across meals, workouts & mood</p>
+              </div>
+              <span className="text-xs font-semibold text-[#7BB38F]">
+                {consistencyStrip.filter(d => d.isActive).length}/7 active
+              </span>
+            </div>
+            <div className="flex items-end gap-1.5 h-16">
+              {consistencyStrip.map((day) => (
+                <div key={day.dateKey} className="flex flex-col items-center gap-1" title={`${day.weekdayShort} ${day.dayOfMonth}: ${day.isActive ? 'Active' : 'No activity logged'}`}>
+                  <div className={`w-6 rounded-t-md ${day.isActive ? 'bg-[#528B67]' : 'bg-[#2F3A33]'}`}>
+                    {day.isToday && <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#D8C39E]" />}
+                  </div>
+                  <span className="text-[0.5625rem] text-[#84877F]">{day.weekdayShort}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Weekly weight trend card */}
+        <section className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="home-weekly-trend" aria-label="Weekly weight trend">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">7-Day Weight Trend Average</h2>
+              <p className="text-[0.6875rem] text-[#84877F]">Week-over-week change — never react to one day’s weight</p>
+            </div>
+            <span className="text-xs font-semibold text-[#7BB38F]">
+              {weeklyWeightTrend.currentWeekDaysLogged}/7 logged
+            </span>
+          </div>
+          {weeklyWeightTrend.currentWeekAvgKg !== null ? (
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div className="rounded-2xl border border-[#344A3C] bg-[#151F19] p-3">
+                <div className="text-[0.625rem] font-semibold text-[#84877F] uppercase tracking-wider">This 7d average</div>
+                <div className="font-heading text-2xl font-extrabold text-[#F4F1EA]">
+                  {toDisplayWeight(weeklyWeightTrend.currentWeekAvgKg, unit).toFixed(1)} {unit}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#344A3C] bg-[#151F19] p-3">
+                <div className="text-[0.625rem] font-semibold text-[#84877F] uppercase tracking-wider">Week-over-week</div>
+                <div className="font-heading text-2xl font-extrabold">
+                  {weeklyWeightTrend.weeklyTrendDeltaKg !== null ? (
+                    <>
+                      {weeklyWeightTrend.weeklyTrendDeltaKg < 0 ? <Flame className="h-4 w-4 text-[#DE9473]" /> : weeklyWeightTrend.weeklyTrendDeltaKg > 0 ? <Flame className="h-4 w-4 text-[#7BB38F]" /> : null}
+                      {weeklyWeightTrend.weeklyTrendDeltaKg >= 0 ? '+' : ''}{weeklyWeightTrend.weeklyTrendDeltaKg.toFixed(1)} {unit}
+                    </>
+                  ) : (
+                    <span className="text-[#B8B5AD]">Insufficient data</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#344A3C] bg-[#151F19] p-4 text-center">
+              <p className="text-xs text-[#B8B5AD]">Log 2+ morning weigh-ins this week for your 7-day trend average.</p>
+            </div>
+          )}
+          <p className="mt-2 text-xs leading-relaxed text-[#B8B5AD]">
+            <strong>{weeklyWeightTrend.coachingHeadline}.</strong> {weeklyWeightTrend.coachingBody}
+          </p>
+        </section>
+
+        {/* Weekly summary digest card */}
+        <section className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="home-weekly-digest" aria-label="Weekly summary digest">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Weekly Summary</h2>
+              <p className="text-[0.6875rem] text-[#84877F]">{weeklySummaryDigest.weekRangeLabel}</p>
+            </div>
+            <button onClick={() => onNavigateTab('progress')} className="text-xs font-semibold text-[#7BB38F] hover:underline">View details →</button>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
+              <div className="text-[0.625rem] text-[#84877F]">Active days</div>
+              <div className="font-heading text-sm font-bold text-[#F4F1EA]">{weeklySummaryDigest.activeDays}/7</div>
+            </div>
+            <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
+              <div className="text-[0.625rem] text-[#84877F]">Workouts</div>
+              <div className="font-heading text-sm font-bold text-[#7BB38F]">{weeklySummaryDigest.workoutsCompleted}/{weeklySummaryDigest.weeklyWorkoutGoal}</div>
+            </div>
+            <div className="rounded-xl bg-[#141916] p-2 text-center border border-[#26302A]">
+              <div className="text-[0.625rem] text-[#84877F]">Streak</div>
+              <div className="font-heading text-sm font-bold text-[#E0B467]">{weeklySummaryDigest.currentStreak}d</div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-xl bg-[#151F19] border border-[#344A3C] p-3">
+            <div>
+              <div className="text-[0.625rem] text-[#84877F]">Focus this week</div>
+              <div className="font-heading text-xs font-bold text-[#F4F1EA]">{weeklySummaryDigest.focusHeadline}</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-[#84877F]" />
+          </div>
+          <p className="mt-2 text-xs text-[#B8B5AD]">{weeklySummaryDigest.focusDetail}</p>
+        </section>
 
         <section className="home-overview" data-guide-target="home-overview" aria-labelledby="overview-title">
           <div className="home-card-heading"><div><h2 id="overview-title">Today's overview</h2>{usingDemoData && <span className="home-demo-label">Demo data</span>}</div><button onClick={onOpenDaily}>Details <ArrowRight size={15} /></button></div>

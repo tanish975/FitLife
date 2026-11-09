@@ -118,6 +118,72 @@
 .water-field input,.water-field select { width:100%; min-width:0; min-height:48px; padding:8px 10px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--bg-base); color:var(--text-primary); font-size:calc(16px * var(--fitlife-text-scale, 1)); }
 .water-schedule button { min-height:44px; padding:8px 11px; display:inline-flex; align-items:center; justify-content:center; gap:5px; border:1px solid var(--border-strong); border-radius:12px; color:var(--accent-primary-text); background:var(--accent-primary-soft); font-size:calc(12px * var(--fitlife-text-scale, 1)); font-weight:800; }
 .water-schedule button:disabled { opacity:.5; }
+
+/* IFCT 2017, household portions (katori/glass/tbsp/roti), raw/cooked, oil/ghee, saved meals & custom recipes */
+.meal-shortcuts-heading { flex-wrap:wrap; }
+.meal-shortcuts-heading > div { flex-wrap:wrap; max-width:100%; }
+.meal-shortcut-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.meal-shortcut-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:6px 11px; border:1px solid var(--border-strong); border-radius:12px; background:var(--accent-primary-soft); color:var(--accent-primary-text); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:800; }
+.meal-add-row { flex-wrap:wrap; }
+.meal-add-row > div:first-child { flex:1 1 150px; min-width:0; }
+.meal-add-row > .meal-add-buttons { display:flex; flex-direction:row; flex-wrap:wrap; gap:7px; align-items:center; }
+.meal-combo-btn { min-height:44px; display:inline-flex; align-items:center; gap:5px; padding:6px 10px; border:1px solid var(--border-strong); border-radius:12px; background:var(--accent-primary-soft); color:var(--accent-primary-text); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:800; }
+.meal-undo-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:8px 12px; border:1px solid var(--border-strong); border-radius:14px; background:var(--accent-primary-soft); color:var(--text-primary); font-size:calc(12px * var(--fitlife-text-scale, 1)); font-weight:700; }
+.meal-undo-bar button { min-height:44px; display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border:1px solid var(--border-strong); border-radius:11px; background:var(--bg-card); color:var(--accent-primary-text); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:800; }
+.catalog-clear-btn { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:44px; height:44px; display:grid; place-items:center; border:0; background:transparent; color:var(--text-secondary); }
+.catalog-filter-bar { display:flex; flex-wrap:wrap; gap:6px; }
+.catalog-pill { min-height:44px; padding:6px 11px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--bg-card); color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:800; }
+.catalog-pill.active { border-color:var(--border-strong); background:var(--accent-primary-soft); color:var(--accent-primary-text); }
+.catalog-group-filter { display:block; }
+.catalog-group-filter select { width:100%; min-width:0; min-height:46px; padding:8px 11px; border:1px solid var(--border-subtle); border-radius:13px; background:var(--bg-card); color:var(--text-primary); font-size:calc(16px * var(--fitlife-text-scale, 1)); }
+.food-catalog-row { display:flex; align-items:stretch; min-width:0; overflow:hidden; }
+.food-catalog-row .food-open { flex:1 1 auto; min-width:0; }
+.food-portion-btn { width:46px; min-height:48px; flex:0 0 46px; display:grid; place-items:center; border:0; border-left:1px solid var(--border-subtle); background:transparent; color:var(--accent-primary-text); }
+.portion-vernacular { display:block; margin-top:3px; color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); line-height:1.35; }
+.portion-fieldset { display:grid; gap:9px; padding:12px; border:1px solid var(--border-subtle); border-radius:16px; background:var(--bg-base); min-width:0; }
+.portion-state-box { border-color:var(--border-strong); background:var(--accent-primary-soft); }
+.portion-section-label { color:var(--text-primary); font-size:calc(12px * var(--fitlife-text-scale, 1)); font-weight:850; }
+.portion-chip-row,.portion-preset-row { display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
+.portion-chip { min-height:44px; padding:7px 11px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--bg-card); color:var(--text-primary); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:800; }
+.portion-chip.active { border-color:var(--border-strong); background:var(--accent-primary-text); color:var(--bg-card); }
+.portion-subchip { min-height:44px; padding:6px 10px; border:1px solid var(--border-subtle); border-radius:11px; background:var(--bg-card); color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:750; }
+.portion-subchip.active { border-color:var(--border-strong); background:var(--accent-primary-soft); color:var(--accent-primary-text); }
+.portion-helper-note { margin:0; color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); line-height:1.45; }
+.portion-summary-card { padding:14px; border:1px solid var(--border-strong); border-radius:16px; background:var(--accent-primary-soft); color:var(--text-primary); }
+.portion-summary-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.portion-summary-label { font-size:calc(13px * var(--fitlife-text-scale, 1)); font-weight:850; line-height:1.35; overflow-wrap:anywhere; }
+.portion-summary-note { margin-top:4px; color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); line-height:1.4; overflow-wrap:anywhere; }
+.portion-summary-kcal { flex:0 0 auto; text-align:right; color:var(--accent-primary-text); }
+.portion-summary-kcal strong { font-size:calc(20px * var(--fitlife-text-scale, 1)); font-weight:850; }
+.portion-summary-kcal span { font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:750; }
+.portion-macro-strip { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border-subtle); color:var(--text-primary); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:750; }
+.catalog-atlas-grid { display:grid; grid-template-columns:1fr; gap:7px; }
+@media (min-width: 640px) {
+  .catalog-atlas-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+.food-meta-badges { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.food-meta-tag { display:inline-flex; align-items:center; padding:2px 8px; border:1px solid var(--border-strong); border-radius:999px; background:var(--accent-primary-soft); color:var(--accent-primary-text); font-size:calc(10px * var(--fitlife-text-scale, 1)); font-weight:750; }
+.food-meta-tag.allergen { border-color:var(--border-subtle); background:var(--bg-base); color:var(--text-primary); }
+.food-density-strip { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-subtle); color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:700; }
+.food-micro-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:6px; margin-top:9px; padding-top:9px; border-top:1px solid var(--border-subtle); }
+.food-micro-cell { display:flex; flex-direction:column; gap:1px; padding:6px 8px; border:1px solid var(--border-subtle); border-radius:10px; background:var(--bg-base); }
+.food-micro-cell span { color:var(--text-secondary); font-size:calc(10px * var(--fitlife-text-scale, 1)); font-weight:700; }
+.food-micro-cell strong { color:var(--text-primary); font-size:calc(11.5px * var(--fitlife-text-scale, 1)); font-weight:800; }
+.food-source-footnote { margin-top:9px; padding-top:8px; border-top:1px solid var(--border-subtle); color:var(--text-secondary); font-size:calc(10.5px * var(--fitlife-text-scale, 1)); line-height:1.4; overflow-wrap:anywhere; }
+.portion-action-row { display:flex; flex-wrap:wrap; gap:8px; }
+.portion-action-row > button { flex:1 1 130px; }
+.portion-secondary-btn { min-height:48px; padding:8px 12px; border:1px solid var(--border-strong); border-radius:14px; background:var(--bg-base); color:var(--accent-primary-text); font-size:calc(12px * var(--fitlife-text-scale, 1)); font-weight:850; }
+.recipe-ing-list { display:grid; gap:7px; }
+.recipe-ing-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 10px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--bg-card); }
+.recipe-ing-name { color:var(--text-primary); font-size:calc(12px * var(--fitlife-text-scale, 1)); font-weight:800; overflow-wrap:anywhere; }
+.recipe-ing-meta { margin-top:2px; color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); line-height:1.35; }
+.recipe-ing-remove { min-height:44px; padding:6px 10px; border:1px solid var(--border-subtle); border-radius:10px; background:var(--bg-base); color:var(--text-primary); font-size:calc(11px * var(--fitlife-text-scale, 1)); font-weight:750; flex:0 0 auto; }
+.recipe-selected-box { display:grid; gap:10px; padding:11px; border:1px solid var(--border-strong); border-radius:13px; background:var(--bg-card); }
+.recipe-search-wrap { display:grid; gap:8px; }
+.recipe-search-results { display:grid; gap:5px; max-height:220px; overflow-y:auto; }
+.recipe-search-option { min-height:48px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; padding:8px 11px; border:1px solid var(--border-subtle); border-radius:11px; background:var(--bg-card); color:var(--text-primary); text-align:left; font-size:calc(12px * var(--fitlife-text-scale, 1)); }
+.recipe-search-option small { color:var(--text-secondary); font-size:calc(11px * var(--fitlife-text-scale, 1)); }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .water-times,.water-window { display:grid; gap:9px; margin-top:10px; }
 .water-time-row { display:flex; align-items:end; gap:8px; }
 .water-time-row label { flex:1; }

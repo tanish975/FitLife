@@ -1,94 +1,407 @@
-import { LoggedMeal, WeightEntry } from '../data/types';
+import { LoggedMeal, LoggedWorkout, WeightEntry, WeightUnit } from '../data/types';
+import type { BodyMeasurementEntry } from './PersonalFeatures';
+import { canUseAdultBmiCategories } from './AgeSafety';
+import { LengthUnit, toDisplayLength, toDisplayWeight } from './WeightConverter';
 
-export interface DailyCaloriePoint {
+export interface DailyDataPoint {
   dateKey: string;
   label: string;
-  shortDay: string;
-  /** Null means no meals logged; 0 is retained when a zero-energy meal was logged. */
-  calories: number | null;
+  value: number | null;
 }
 
-export interface WeightChartPoint {
-  dateKey: string;
-  label: string;
-  weightKg: number;
+export interface WeeklyWeightTrendSummary {
+  referenceDateKey: string;
+  currentWeekAvgKg: number | null;
+  currentWeekDaysLogged: number;
+  currentWeekMinKg: number | null;
+  currentWeekMaxKg: number | null;
+  previousWeekAvgKg: number | null;
+  previousWeekDaysLogged: number;
+  /** Difference: currentWeekAvgKg - previousWeekAvgKg (null unless both 7d windows have >=1 log). */
+  weeklyTrendDeltaKg: number | null;
+  /** Latest single-day weight minus currentWeekAvgKg when >=2 days logged this week. */
+  latestVsWeeklyAvgKg: number | null;
+  latestEntryDateKey: string | null;
+  latestEntryWeightKg: number | null;
+  trendDirection: 'down' | 'up' | 'steady' | 'insufficient_data';
+  coachingHeadline: string;
+  coachingBody: string;
 }
 
-export function getDateKeyDaysAgo(daysAgo: number, baseDate = new Date()): string {
-  const d = new Date(baseDate);
-  // Local noon avoids moving to a neighboring date during DST transitions.
-  d.setHours(12, 0, 0, 0);
+export type BodyMeasurementMetricKey =
+  | 'waistCm'
+  | 'hipsCm'
+  | 'chestCm'
+  | 'neckCm'
+  | 'armCm'
+  | 'thighCm'
+  | 'bodyFatPct';
+
+export function formatLocalDateKey(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function shiftDateKey(baseDateKey: string, deltaDays: number): string {
+  const [y, m, d] = baseDateKey.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + deltaDays);
+  return formatLocalDateKey(dt);
+}
+
+/**
+ * Generates YYYY-MM-DD string for N days ago in local timezone.
+ */
+export function getDateKeyDaysAgo(daysAgo: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - daysAgo);
-  return formatDateKey(d);
+  return formatLocalDateKey(d);
 }
 
-export function formatDateKey(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/** Calendar-day positions, not 24-hour intervals: no timezone/DST distortion. */
-export function calendarDayNumber(dateKey: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+export function shortDateLabel(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number);
-  const utc = new Date(Date.UTC(y, m - 1, d));
-  if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== m - 1 || utc.getUTCDate() !== d) return null;
-  return utc.getTime() / 86_400_000;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function chartDateFractions(dateKeys: string[]): number[] {
-  const dates = dateKeys.map(calendarDayNumber);
-  if (dates.some(day => day === null)) throw new Error('A chart date is invalid.');
-  if (!dates.length) return [];
-  const numeric = dates as number[];
-  const first = Math.min(...numeric), last = Math.max(...numeric);
-  return numeric.map(day => first === last ? 0.5 : (day - first) / (last - first));
-}
-
-export function formatShortDateLabel(dateKey: string): { label: string; shortDay: string } {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const dateObj = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
-  const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const shortDay = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-  return { label, shortDay };
-}
-
-/** Missing logging days are not evidence of zero food intake. */
-export function aggregateDailyCalories(meals: LoggedMeal[], days = 14, baseDate = new Date()): DailyCaloriePoint[] {
-  const byDate = new Map<string, number>();
-  for (const meal of meals) {
-    if (calendarDayNumber(meal.dateKey) !== null && Number.isFinite(meal.calories)) {
-      byDate.set(meal.dateKey, (byDate.get(meal.dateKey) ?? 0) + meal.calories);
-    }
-  }
-  const points: DailyCaloriePoint[] = [];
+function buildDateWindow(days: number, referenceDateKey?: string): string[] {
+  const ref = referenceDateKey ?? getDateKeyDaysAgo(0);
+  const keys: string[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const dateKey = getDateKeyDaysAgo(i, baseDate);
-    const { label, shortDay } = formatShortDateLabel(dateKey);
-    points.push({ dateKey, label, shortDay, calories: byDate.has(dateKey) ? byDate.get(dateKey)! : null });
+    keys.push(shiftDateKey(ref, -i));
   }
-  return points;
+  return keys;
 }
 
-/** Last 14 distinct check-in days; latest timestamp on the same day wins. */
-export function aggregateWeightTrend(entries: WeightEntry[], limit = 14): WeightChartPoint[] {
-  const latestPerDay = new Map<string, WeightEntry>();
-  for (const entry of entries) {
-    if (calendarDayNumber(entry.dateKey) === null || !Number.isFinite(entry.weightKg) || !Number.isFinite(entry.timestamp)) continue;
-    const existing = latestPerDay.get(entry.dateKey);
-    if (!existing || entry.timestamp > existing.timestamp || (entry.timestamp === existing.timestamp && entry.id > existing.id)) {
-      latestPerDay.set(entry.dateKey, entry);
+/**
+ * Latest weigh-in per calendar day, sorted chronologically.
+ * Multiple weigh-ins on one day are retained in storage; daily aggregation uses the latest timestamp.
+ */
+export function groupLatestDailyWeights(weights: WeightEntry[]): Map<string, WeightEntry> {
+  const byDate = new Map<string, WeightEntry>();
+  for (const w of weights) {
+    if (!w || !/^\d{4}-\d{2}-\d{2}$/.test(w.dateKey) || !Number.isFinite(w.weightKg) || w.weightKg <= 0) {
+      continue;
+    }
+    const existing = byDate.get(w.dateKey);
+    if (!existing || w.timestamp >= existing.timestamp) {
+      byDate.set(w.dateKey, w);
     }
   }
-  return Array.from(latestPerDay.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey)).slice(-limit)
-    .map(entry => ({ dateKey: entry.dateKey, label: formatShortDateLabel(entry.dateKey).label, weightKg: entry.weightKg }));
+  return byDate;
 }
 
-/** Actual first and latest logs, never implied to be a 14-day change. */
-export function weightLogComparison(entries: WeightEntry[]): { first: WeightEntry; latest: WeightEntry } | null {
-  const valid = entries.filter(entry => calendarDayNumber(entry.dateKey) !== null && Number.isFinite(entry.weightKg) && Number.isFinite(entry.timestamp))
-    .sort((a, b) => a.timestamp - b.timestamp || a.dateKey.localeCompare(b.dateKey) || a.id.localeCompare(b.id));
-  return valid.length >= 2 ? { first: valid[0], latest: valid[valid.length - 1] } : null;
+/**
+ * Computes the 7-day Weekly Weight-Trend Average and week-over-week change.
+ * Core principle: NEVER react to a single day's scale reading — hydration, glycogen,
+ * dietary sodium, and gut transit routinely move daily body weight by 0.5–1.5 kg.
+ */
+export function computeWeeklyWeightTrend(
+  weights: WeightEntry[],
+  unit: WeightUnit = 'kg',
+  referenceDateKey?: string
+): WeeklyWeightTrendSummary {
+  const ref = referenceDateKey ?? getDateKeyDaysAgo(0);
+  const daily = groupLatestDailyWeights(weights);
+
+  const currentWindowKeys = buildDateWindow(7, ref); // [ref-6 .. ref]
+  const prevRef = shiftDateKey(ref, -7);
+  const previousWindowKeys = buildDateWindow(7, prevRef); // [ref-13 .. ref-7]
+
+  const currentValues = currentWindowKeys
+    .map((k) => daily.get(k)?.weightKg)
+    .filter((v): v is number => v !== undefined);
+
+  const previousValues = previousWindowKeys
+    .map((k) => daily.get(k)?.weightKg)
+    .filter((v): v is number => v !== undefined);
+
+  const mean = (arr: number[]): number | null =>
+    arr.length > 0
+      ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100
+      : null;
+
+  const currentWeekAvgKg = mean(currentValues);
+  const previousWeekAvgKg = mean(previousValues);
+
+  const weeklyTrendDeltaKg =
+    currentWeekAvgKg !== null && previousWeekAvgKg !== null
+      ? Math.round((currentWeekAvgKg - previousWeekAvgKg) * 100) / 100
+      : null;
+
+  const sortedEntries = [...daily.values()].sort((a, b) =>
+    a.dateKey !== b.dateKey ? a.dateKey.localeCompare(b.dateKey) : a.timestamp - b.timestamp
+  );
+  const latestEntry = sortedEntries.length > 0 ? sortedEntries[sortedEntries.length - 1] : null;
+
+  const latestVsWeeklyAvgKg =
+    latestEntry &&
+    currentWeekAvgKg !== null &&
+    currentValues.length >= 2 &&
+    currentWindowKeys.includes(latestEntry.dateKey)
+      ? Math.round((latestEntry.weightKg - currentWeekAvgKg) * 100) / 100
+      : null;
+
+  let trendDirection: WeeklyWeightTrendSummary['trendDirection'] = 'insufficient_data';
+  if (weeklyTrendDeltaKg !== null) {
+    if (Math.abs(weeklyTrendDeltaKg) < 0.15) {
+      trendDirection = 'steady';
+    } else {
+      trendDirection = weeklyTrendDeltaKg < 0 ? 'down' : 'up';
+    }
+  }
+
+  const fmtSigned = (deltaKg: number) => {
+    const disp = toDisplayWeight(Math.abs(deltaKg), unit);
+    const sign = deltaKg > 0 ? '+' : deltaKg < 0 ? '−' : '';
+    return `${sign}${disp.toFixed(1)} ${unit}`;
+  };
+
+  let coachingHeadline = 'Never react to one day’s weight';
+  let coachingBody =
+    'Water, glycogen, sodium, and digestion shift single-day scale readings overnight. Log 2–4 morning weigh-ins per week and judge your 7-day average.';
+
+  if (currentWeekAvgKg !== null && currentValues.length >= 2 && weeklyTrendDeltaKg !== null) {
+    if (
+      latestVsWeeklyAvgKg !== null &&
+      Math.abs(latestVsWeeklyAvgKg) >= 0.25 &&
+      Math.sign(latestVsWeeklyAvgKg) !== Math.sign(weeklyTrendDeltaKg) &&
+      trendDirection !== 'steady'
+    ) {
+      coachingHeadline = 'Daily bounce vs steady weekly trend';
+      coachingBody = `Your latest weigh-in sits ${fmtSigned(
+        latestVsWeeklyAvgKg
+      )} from this week’s 7-day average — normal fluid/glycogen noise. Week-over-week your 7-day average is ${fmtSigned(
+        weeklyTrendDeltaKg
+      )}.`;
+    } else if (trendDirection === 'steady') {
+      coachingHeadline = '7-day weight trend is holding steady';
+      coachingBody = `Your 7-day average changed by just ${fmtSigned(
+        weeklyTrendDeltaKg
+      )} vs last week across ${currentValues.length} check-ins. Ignore day-to-day bumps.`;
+    } else {
+      coachingHeadline = `7-day trend: ${fmtSigned(weeklyTrendDeltaKg)} vs prior week`;
+      coachingBody = `Averaged across ${currentValues.length} check-in${
+        currentValues.length === 1 ? '' : 's'
+      } this week vs ${previousValues.length} last week — smoothing out single-day water fluctuations.`;
+    }
+  } else if (currentWeekAvgKg !== null && currentValues.length === 1) {
+    coachingHeadline = 'One weigh-in logged in the last 7 days';
+    coachingBody =
+      'One day is just a snapshot, not a trend. Add 1–2 more morning weigh-ins this week before drawing any nutrition conclusions.';
+  }
+
+  return {
+    referenceDateKey: ref,
+    currentWeekAvgKg,
+    currentWeekDaysLogged: currentValues.length,
+    currentWeekMinKg: currentValues.length > 0 ? Math.min(...currentValues) : null,
+    currentWeekMaxKg: currentValues.length > 0 ? Math.max(...currentValues) : null,
+    previousWeekAvgKg,
+    previousWeekDaysLogged: previousValues.length,
+    weeklyTrendDeltaKg,
+    latestVsWeeklyAvgKg,
+    latestEntryDateKey: latestEntry?.dateKey ?? null,
+    latestEntryWeightKg: latestEntry?.weightKg ?? null,
+    trendDirection,
+    coachingHeadline,
+    coachingBody,
+  };
+}
+
+/**
+ * Aggregates daily calorie intake for the past N days.
+ * Unlogged days remain null (never fabricated as 0 kcal).
+ */
+export function aggregateDailyCalories(
+  meals: LoggedMeal[],
+  days = 14,
+  referenceDateKey?: string
+): DailyDataPoint[] {
+  const byDate = new Map<string, number>();
+  for (const m of meals) {
+    byDate.set(m.dateKey, (byDate.get(m.dateKey) ?? 0) + m.calories);
+  }
+
+  return buildDateWindow(days, referenceDateKey).map((dateKey) => ({
+    dateKey,
+    label: shortDateLabel(dateKey),
+    value: byDate.has(dateKey) ? Math.round(byDate.get(dateKey)!) : null,
+  }));
+}
+
+/**
+ * Aggregates daily protein intake (g) for the past N days.
+ * Unlogged meal days remain null.
+ */
+export function aggregateDailyProtein(
+  meals: LoggedMeal[],
+  days = 14,
+  referenceDateKey?: string
+): DailyDataPoint[] {
+  const byDate = new Map<string, number>();
+  for (const m of meals) {
+    byDate.set(m.dateKey, (byDate.get(m.dateKey) ?? 0) + m.proteinG);
+  }
+
+  return buildDateWindow(days, referenceDateKey).map((dateKey) => ({
+    dateKey,
+    label: shortDateLabel(dateKey),
+    value: byDate.has(dateKey) ? Math.round(byDate.get(dateKey)! * 10) / 10 : null,
+  }));
+}
+
+/**
+ * Aggregates daily workout sets for the past N days.
+ * Days without logged workouts remain null so rest days aren't misread as zero-effort failures.
+ */
+export function aggregateDailyWorkoutSets(
+  workouts: LoggedWorkout[],
+  days = 14,
+  referenceDateKey?: string
+): DailyDataPoint[] {
+  const byDate = new Map<string, number>();
+  for (const w of workouts) {
+    byDate.set(w.dateKey, (byDate.get(w.dateKey) ?? 0) + w.sets);
+  }
+
+  return buildDateWindow(days, referenceDateKey).map((dateKey) => ({
+    dateKey,
+    label: shortDateLabel(dateKey),
+    value: byDate.has(dateKey) ? byDate.get(dateKey)! : null,
+  }));
+}
+
+/**
+ * Aggregates daily weight entries over a calendar-day window, converted to the active display unit.
+ * Unlogged days remain null so spacing reflects real calendar days without fabricated readings.
+ */
+export function aggregateWeightSeries(
+  weights: WeightEntry[],
+  unit: WeightUnit,
+  days = 14,
+  referenceDateKey?: string
+): DailyDataPoint[] {
+  const byDate = groupLatestDailyWeights(weights);
+  return buildDateWindow(days, referenceDateKey).map((dateKey) => {
+    const entry = byDate.get(dateKey);
+    return {
+      dateKey,
+      label: shortDateLabel(dateKey),
+      value: entry ? toDisplayWeight(entry.weightKg, unit) : null,
+    };
+  });
+}
+
+/**
+ * Trailing 7-day rolling weight average across a calendar-day window.
+ * A point is emitted for day D when at least one real weigh-in occurred inside [D-6 .. D];
+ * otherwise null (never extrapolated from stale history >7 days old).
+ */
+export function aggregateRolling7DayWeightSeries(
+  weights: WeightEntry[],
+  unit: WeightUnit,
+  days = 14,
+  referenceDateKey?: string
+): DailyDataPoint[] {
+  const byDate = groupLatestDailyWeights(weights);
+  return buildDateWindow(days, referenceDateKey).map((dateKey) => {
+    const samples: number[] = [];
+    for (let k = 0; k < 7; k++) {
+      const entry = byDate.get(shiftDateKey(dateKey, -k));
+      if (entry) samples.push(entry.weightKg);
+    }
+    if (samples.length === 0) {
+      return { dateKey, label: shortDateLabel(dateKey), value: null };
+    }
+    const avgKg = samples.reduce((s, v) => s + v, 0) / samples.length;
+    return {
+      dateKey,
+      label: shortDateLabel(dateKey),
+      value: toDisplayWeight(avgKg, unit),
+    };
+  });
+}
+
+/**
+ * Aggregates a body measurement metric (e.g. waist, hips, chest, arm, thigh, bodyFatPct)
+ * across a calendar-day window, converting length metrics to cm or in.
+ */
+export function aggregateBodyMeasurementSeries(
+  entries: BodyMeasurementEntry[],
+  metric: BodyMeasurementMetricKey,
+  lengthUnit: LengthUnit,
+  days = 28,
+  referenceDateKey?: string
+): DailyDataPoint[] {
+  const active = entries.filter((e) => !e.deleted && e[metric] !== undefined);
+  const byDate = new Map<string, BodyMeasurementEntry>();
+  for (const e of active) {
+    const prev = byDate.get(e.dateKey);
+    if (!prev || e.updatedAt >= prev.updatedAt) {
+      byDate.set(e.dateKey, e);
+    }
+  }
+
+  return buildDateWindow(days, referenceDateKey).map((dateKey) => {
+    const entry = byDate.get(dateKey);
+    const raw = entry?.[metric];
+    if (raw === undefined || !Number.isFinite(raw)) {
+      return { dateKey, label: shortDateLabel(dateKey), value: null };
+    }
+    const value =
+      metric === 'bodyFatPct'
+        ? Math.round(raw * 10) / 10
+        : toDisplayLength(raw, lengthUnit);
+    return {
+      dateKey,
+      label: shortDateLabel(dateKey),
+      value,
+    };
+  });
+}
+
+/**
+ * Evenly spaced x-axis fractions for N calendar-date keys, used by LineChart
+ * so unlogged days still occupy their correct calendar position.
+ */
+export function chartDateFractions(dateKeys: string[]): number[] {
+  if (dateKeys.length === 0) return [];
+  if (dateKeys.length === 1) return [0.5];
+  return dateKeys.map((_, i) => i / (dateKeys.length - 1));
+}
+
+/**
+ * Adult Waist-to-Height Ratio (WHtR = waistCm / heightCm).
+ * Adult category guidance is gated to ages >= 20, matching adult BMI safety policy.
+ */
+export function computeWaistToHeightRatio(
+  waistCm: number | undefined,
+  heightCm: number,
+  age: number
+): { ratio: number; adultCategory: string | null } | null {
+  if (
+    waistCm === undefined ||
+    !Number.isFinite(waistCm) ||
+    !Number.isFinite(heightCm) ||
+    waistCm <= 0 ||
+    heightCm <= 0
+  ) {
+    return null;
+  }
+  const ratio = Math.round((waistCm / heightCm) * 100) / 100;
+  if (!canUseAdultBmiCategories(age)) {
+    return { ratio, adultCategory: null };
+  }
+  const adultCategory =
+    ratio < 0.4
+      ? 'Slender range (<0.40)'
+      : ratio < 0.5
+      ? 'Healthy central range (0.40–0.49)'
+      : ratio < 0.6
+      ? 'Elevated central range (0.50–0.59)'
+      : 'High central range (≥0.60)';
+  return { ratio, adultCategory };
 }

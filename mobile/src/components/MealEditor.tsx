@@ -47,6 +47,21 @@ export const MealEditor: React.FC<Props> = ({ title, initial, category, portionS
     setServing(factor === 1 ? initial.servingLabel : `${factor} × ${initial.servingLabel}`.slice(0,100));
   };
 
+  const applyCookingFatTopper = (grams: number, labelText: string) => {
+    const addKcal = Math.round(grams * 9);
+    const curCals = Number(numbers.calories);
+    const curFat = Number(numbers.fatG);
+    setNumbers((prev) => ({
+      ...prev,
+      calories: String(Math.round(((Number.isFinite(curCals) ? curCals : 0) + addKcal) * 10) / 10),
+      fatG: String(Math.round(((Number.isFinite(curFat) ? curFat : 0) + grams) * 10) / 10),
+      proteinG: prev.proteinG || '0',
+      carbsG: prev.carbsG || '0',
+      fiberG: prev.fiberG || '0',
+    }));
+    setServing((prev) => (prev ? `${prev} + ${labelText}` : labelText).slice(0, 100));
+  };
+
   const dialog = useRef<HTMLDivElement>(null);
   const closeWhenReady = () => { if (!busy) onClose(); };
   useAccessibleDialog(true, dialog, closeWhenReady);
@@ -76,9 +91,29 @@ export const MealEditor: React.FC<Props> = ({ title, initial, category, portionS
       <form onSubmit={submit} className="meal-editor-form">
         {portionScaling && initial && <div className="meal-portion-scale"><label>Portion multiplier<input type="number" inputMode="decimal" min="0.1" max="10" step="0.1" value={multiplier} onChange={e => scalePortion(e.target.value)} /></label><small>Based on {initial.servingLabel}. Values scale proportionally; review and adjust them before saving.</small></div>}
         <label>Food or meal name<input autoComplete="off" maxLength={120} required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. homemade dal" /></label>
-        <label>Amount eaten<input maxLength={100} required value={serving} onChange={e => setServing(e.target.value)} placeholder="e.g. 1 bowl or 200 g" /></label>
+        <label>Amount eaten<input maxLength={100} required value={serving} onChange={e => setServing(e.target.value)} placeholder="e.g. 1 medium katori (150g), 1 glass (200ml), 2 rotis" /></label>
+        <div className="portion-preset-row" aria-label="Household portion presets">
+          {[
+            '1 small katori (100g)',
+            '1 medium katori (150g)',
+            '1 large katori (200g)',
+            '1 glass (200ml)',
+            '1 tbsp (15ml)',
+            '1 medium roti (40g)',
+          ].map((preset) => (
+            <button key={preset} type="button" className="portion-subchip" onClick={() => setServing(preset)}>
+              {preset.replace(/\s*\([^)]+\)/, '')}
+            </button>
+          ))}
+        </div>
         <label>Meal<select value={mealCategory} onChange={e => setMealCategory(e.target.value as MealCategory)}><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label>
         <div className="meal-nutrient-grid">{NUMBERS.map(({ key, label, max, step }) => <label key={key}>{label}<input type="number" inputMode="decimal" min="0" max={max} step={step} required value={numbers[key]} onChange={e => setNumbers(prev => ({ ...prev, [key]: e.target.value }))} placeholder="0" /></label>)}</div>
+        <div className="portion-preset-row" aria-label="Add cooking oil or ghee">
+          <button type="button" className="portion-subchip" onClick={() => applyCookingFatTopper(2.25, '0.5 tsp ghee')}>+ ½ tsp ghee (+20 kcal)</button>
+          <button type="button" className="portion-subchip" onClick={() => applyCookingFatTopper(4.5, '1 tsp oil')}>+ 1 tsp oil (+41 kcal)</button>
+          <button type="button" className="portion-subchip" onClick={() => applyCookingFatTopper(4.5, '1 tsp ghee')}>+ 1 tsp ghee (+41 kcal)</button>
+          <button type="button" className="portion-subchip" onClick={() => applyCookingFatTopper(13.5, '1 tbsp oil')}>+ 1 tbsp oil (+122 kcal)</button>
+        </div>
         <div className="meal-nutrient-grid"><label>Sugar (g) · optional<input type="number" inputMode="decimal" min="0" max="2000" step="0.1" value={sugar} onChange={e => setSugar(e.target.value)} placeholder="Unknown" /></label><label>Sodium (mg) · optional<input type="number" inputMode="decimal" min="0" max="100000" step="0.1" value={sodium} onChange={e => setSodium(e.target.value)} placeholder="Unknown" /></label></div>
         <label>Nutrition source or notes · optional<input maxLength={300} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. package label, recipe" /></label>
         <p className="meal-optional-hint">Leave optional fields blank when unknown; blank is not treated as zero.</p>
