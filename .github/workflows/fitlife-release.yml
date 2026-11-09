@@ -123,9 +123,12 @@ jobs:
             const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
             console.log('Chromium launch smoke test: OK');
             await browser.close();
-          "
-          node qa/phase0-unit.mjs
-          node qa/phase0-browser.mjs
+          " || { echo "## Chromium smoke test FAILED" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
+          echo "## Chromium smoke test: OK" >> "$GITHUB_STEP_SUMMARY"
+          node qa/phase0-unit.mjs || { echo "## Phase0 unit test FAILED" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
+          echo "## Phase0 unit test: OK" >> "$GITHUB_STEP_SUMMARY"
+          node qa/phase0-browser.mjs || { echo "## Phase0 browser test FAILED" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
+          echo "## Phase0 browser test: OK" >> "$GITHUB_STEP_SUMMARY"
       - name: Test expanded exercise catalog, filters and data preservation
         run: npm run test:exercises
       - name: Test movement previews and local water schedule (simulated native bridge)
