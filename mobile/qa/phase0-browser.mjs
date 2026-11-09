@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { nativeApp, installNativeFixture } from './mock-native.mjs';
 
-const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
+const browser = await chromium.launch({headless:true,args:['--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disable-setuid-sandbox']});
 const errors = [];
 const date = n => { const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const profile = (age=15) => ({name:'Fixture Athlete',email:'fixture@example.test',sex:'female',age,heightCm:160,weightKg:50,goal:'lose_weight',activityLevel:'light',onboarded:true,uid:'qa-legacy'});
