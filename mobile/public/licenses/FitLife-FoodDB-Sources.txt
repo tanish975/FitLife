@@ -1,0 +1,47 @@
+FitLife Global & Regional Food Composition Database (FitLife FoodDB v1)
+Open Scientific Data & Software Attributions
+=======================================================================
+
+1. U.S. Department of Agriculture (USDA), Agricultural Research Service
+   USDA National Nutrient Database for Standard Reference, Release 28 (SR28)
+   Status: U.S. Government Public Domain (17 U.S.C. § 105 / CC0 1.0 Universal)
+   Citation: U.S. Department of Agriculture, Agricultural Research Service.
+   USDA National Nutrient Database for Standard Reference, Release 28.
+
+2. ICMR-National Institute of Nutrition (ICMR-NIN), Hyderabad, India
+   Indian Food Composition Tables 2017 (IFCT 2017) via @ifct2017/compositions
+   License: MIT License — Copyright (c) 2018 Indian Food Composition Tables
+
+3. NEPA-UNICAMP (Universidade Estadual de Campinas, Brazil)
+   Tabela Brasileira de Composição de Alimentos (TACO), 4th Edition
+   CSV Normalization: raulfdm/taco-api — MIT License
+   Copyright (c) 2022 Raul de Melo
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+4. ANSES (French Agency for Food, Environmental and Occupational Health & Safety)
+   Table de composition nutritionnelle des aliments Ciqual (https://ciqual.anses.fr/)
+   Data License: Licence Ouverte / Open Licence v2.0 (Etalab, French Republic)
+   JSON Conversion: LaurentPortefaix/waistline-ciqual — MIT License
+   Copyright (c) 2026 LaurentPortefaix
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+5. FitLife World Culinary & Edible Atlas
+   Curated regional & national dish compositions across 17 world regions and
+   75+ countries, deterministically derived from verified laboratory staple
+   ingredients in USDA SR28, ICMR-NIN IFCT 2017, UNICAMP TACO, and ANSES CIQUAL.

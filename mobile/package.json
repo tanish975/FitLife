@@ -8,6 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "typecheck": "tsc --noEmit",
+    "import:ifct": "node scripts/import-ifct.mjs",
+    "import:fooddb": "node scripts/build-fitlife-fooddb.mjs",
     "build:standalone": "npm run build && node scripts/build-standalone.mjs",
     "test:qa": "node qa/test.mjs && npm run test:mobile && npm run test:features && npm run test:security && npm run test:guides && npm run test:personal && npm run test:accessibility && npm run test:motion",
     "test:offline": "node qa/offline.mjs",
@@ -28,7 +30,9 @@
     "test:accessibility": "node qa/accessibility.mjs && node qa/theme-accessibility.mjs",
     "test:phase0": "node qa/phase0-unit.mjs && node qa/phase0-browser.mjs",
     "test:exercises": "node qa/exercise-unit.mjs && node qa/exercise-browser.mjs",
-    "test:motion-water": "node qa/motion-reminders-unit.mjs && node qa/motion-reminders-browser.mjs"
+    "test:motion-water": "node qa/motion-reminders-unit.mjs && node qa/motion-reminders-browser.mjs",
+    "test:indian-nutrition": "node qa/indian-nutrition-unit.mjs && node qa/indian-nutrition-browser.mjs",
+    "test:global-fooddb": "node qa/global-fooddb-unit.mjs"
   },
   "dependencies": {
     "animejs": "4.5.0",

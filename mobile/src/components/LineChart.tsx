@@ -14,6 +14,9 @@ interface LineChartProps {
   name: string;
   height?: number;
   lineColor?: string;
+  secondaryData?: LineChartDatum[];
+  secondaryLabel?: string;
+  secondaryColor?: string;
   targetValue?: number;
   targetLabel?: string;
   unitSuffix?: string;
@@ -22,16 +25,27 @@ interface LineChartProps {
 
 /** Calendar-spaced visual chart with a keyboard/screen-reader data table. */
 export const LineChart: React.FC<LineChartProps> = ({
-  data, name, height = 185, lineColor, targetValue, targetLabel, unitSuffix = '', yDecimals = 0,
+  data,
+  name,
+  height = 185,
+  lineColor,
+  secondaryData,
+  secondaryLabel,
+  secondaryColor,
+  targetValue,
+  targetLabel,
+  unitSuffix = '',
+  yDecimals = 0,
 }) => {
   const { themeColors } = useFitLife();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const resolvedLine = lineColor || themeColors.accentPrimary;
+  const resolvedSecondary = secondaryColor || themeColors.accentWarm;
   const padLeft = 38, padRight = 14, padTop = 20, padBottom = 28;
 
-  useEffect(() => { setHoverIdx(null); }, [data]);
+  useEffect(() => { setHoverIdx(null); }, [data, secondaryData]);
   useEffect(() => {
     const canvas = canvasRef.current, container = containerRef.current;
     if (!canvas || !container) return;
@@ -44,17 +58,19 @@ export const LineChart: React.FC<LineChartProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.save(); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, width, height);
-      const values = data.filter(item => item.value !== null && Number.isFinite(item.value)).map(item => item.value as number);
-      if (values.length === 0) {
+      const allValues: number[] = [];
+      data.forEach((item) => { if (item.value !== null && Number.isFinite(item.value)) allValues.push(item.value); });
+      secondaryData?.forEach((item) => { if (item.value !== null && Number.isFinite(item.value)) allValues.push(item.value); });
+      if (targetValue !== undefined && Number.isFinite(targetValue) && targetValue > 0) allValues.push(targetValue);
+      if (allValues.length === 0) {
         ctx.fillStyle = themeColors.textMuted; ctx.font = '500 12px Inter, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('No entries to chart', width / 2, height / 2);
         ctx.restore(); return;
       }
-      if (targetValue !== undefined && Number.isFinite(targetValue) && targetValue > 0) values.push(targetValue);
       const plotW = Math.max(10, width - padLeft - padRight), plotH = Math.max(10, height - padTop - padBottom);
-      const rawMin = Math.min(...values), rawMax = Math.max(...values), span = Math.max(1, rawMax - rawMin);
+      const rawMin = Math.min(...allValues), rawMax = Math.max(...allValues), span = Math.max(1, rawMax - rawMin);
       const minY = Math.max(0, rawMin - span * 0.18), maxY = rawMax + span * 0.18;
-      const xs = chartDateFractions(data.map(item => item.dateKey));
+      const xs = chartDateFractions(data.map((item) => item.dateKey));
       const toX = (index: number) => padLeft + xs[index] * plotW;
       const toY = (value: number) => padTop + plotH * (1 - (value - minY) / Math.max(0.0001, maxY - minY));
 
@@ -76,16 +92,29 @@ export const LineChart: React.FC<LineChartProps> = ({
         ctx.restore();
       }
 
-      // Stop each stroke at an unlogged day. A gap is never drawn as zero or connected across.
-      ctx.save(); ctx.strokeStyle = resolvedLine; ctx.lineWidth = 2.75; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      let active = false;
-      ctx.beginPath();
-      data.forEach((item, index) => {
-        if (item.value === null || !Number.isFinite(item.value)) { active = false; return; }
-        const x = toX(index), y = toY(item.value);
-        if (!active) { ctx.moveTo(x, y); active = true; } else ctx.lineTo(x, y);
-      });
-      ctx.stroke(); ctx.restore();
+      const drawSeries = (items: LineChartDatum[], color: string, keyPrefix: string) => {
+        ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.75; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        let active = false;
+        ctx.beginPath();
+        items.forEach((item, index) => {
+          if (item.value === null || !Number.isFinite(item.value)) { active = false; return; }
+          const x = toX(index), y = toY(item.value);
+          if (!active) { ctx.moveTo(x, y); active = true; } else ctx.lineTo(x, y);
+        });
+        ctx.stroke(); ctx.restore();
+
+        items.forEach((item, index) => {
+          const x = toX(index);
+          if (item.value === null || !Number.isFinite(item.value)) return;
+          const selected = hoverIdx === index || (hoverIdx === null && index === data.length - 1);
+          ctx.beginPath(); ctx.arc(x, toY(item.value), selected ? 5 : 3.2, 0, Math.PI * 2);
+          ctx.fillStyle = selected ? themeColors.textPrimary : color; ctx.fill();
+          ctx.lineWidth = 2; ctx.strokeStyle = themeColors.bgCard; ctx.stroke();
+        });
+      };
+
+      drawSeries(data, resolvedLine, 'primary');
+      if (secondaryData) drawSeries(secondaryData, resolvedSecondary, 'secondary');
 
       let lastLabelX = -Infinity;
       data.forEach((item, index) => {
@@ -94,11 +123,6 @@ export const LineChart: React.FC<LineChartProps> = ({
           ctx.fillStyle = themeColors.textMuted; ctx.font = '500 10px Inter, sans-serif'; ctx.textAlign = 'center';
           ctx.fillText(item.label, x, height - 8); lastLabelX = x;
         }
-        if (item.value === null || !Number.isFinite(item.value)) return;
-        const selected = hoverIdx === index || (hoverIdx === null && index === data.length - 1);
-        ctx.beginPath(); ctx.arc(x, toY(item.value), selected ? 5 : 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = selected ? themeColors.textPrimary : resolvedLine; ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = themeColors.bgCard; ctx.stroke();
       });
       ctx.restore();
     };
@@ -107,7 +131,7 @@ export const LineChart: React.FC<LineChartProps> = ({
       const observer = new ResizeObserver(draw); observer.observe(container); return () => observer.disconnect();
     }
     window.addEventListener('resize', draw); return () => window.removeEventListener('resize', draw);
-  }, [data, height, resolvedLine, targetValue, targetLabel, hoverIdx, yDecimals, themeColors]);
+  }, [data, height, resolvedLine, resolvedSecondary, targetValue, targetLabel, hoverIdx, yDecimals, themeColors, secondaryData]);
 
   const activeIndex = hoverIdx !== null && hoverIdx < data.length ? hoverIdx : Math.max(0, data.length - 1);
   const activeDatum = data[activeIndex];
@@ -117,7 +141,7 @@ export const LineChart: React.FC<LineChartProps> = ({
     if (!container || !data.length) return;
     const rect = container.getBoundingClientRect(), plotWidth = Math.max(10, rect.width - padLeft - padRight);
     const fraction = Math.max(0, Math.min(1, (clientX - rect.left - padLeft) / plotWidth));
-    const positions = chartDateFractions(data.map(item => item.dateKey));
+    const positions = chartDateFractions(data.map((item) => item.dateKey));
     const index = positions.reduce((best, x, i) => Math.abs(x - fraction) < Math.abs(positions[best] - fraction) ? i : best, 0);
     setHoverIdx(index);
   };
@@ -126,8 +150,8 @@ export const LineChart: React.FC<LineChartProps> = ({
       <span className="text-[#B8B5AD] font-medium">{activeDatum.sublabel || activeDatum.label}</span>
       <span className="font-heading font-semibold text-[#7BB38F]">{formatValue(activeDatum.value)}</span>
     </div>}
-    <canvas ref={canvasRef} aria-hidden="true" style={{ width: '100%', height }}
-      onPointerMove={event => handlePointer(event.clientX)} onPointerDown={event => handlePointer(event.clientX)}
+    <canvas ref={canvasRef as React.RefObject<HTMLCanvasElement>} aria-hidden="true" style={{ width: '100%', height }}
+      onPointerMove={(event) => handlePointer(event.clientX)} onPointerDown={(event) => handlePointer(event.clientX)}
       onPointerLeave={() => setHoverIdx(null)} className="touch-pan-y cursor-crosshair block" />
     <details className="mt-2 text-xs text-[#B8B5AD]">
       <summary className="cursor-pointer font-semibold text-[#7BB38F]">View {name.toLowerCase()} data table</summary>

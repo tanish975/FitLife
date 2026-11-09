@@ -31,6 +31,7 @@ import { FITLIFE_RELEASES_URL, getNativeUpdateBridge } from '../domain/Updates';
 import { EncryptedBackupPanel } from '../components/EncryptedBackupPanel';
 import { CloudAccountPanel } from '../components/CloudAccountPanel';
 import { LocalReminders } from '../components/LocalReminders';
+import { HabitRemindersPanel } from '../components/HabitRemindersPanel';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -106,6 +107,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
       </div>
 
       <LocalReminders />
+      <HabitRemindersPanel />
       <div className="accessibility-options" role="group" aria-label="Accessibility options">
         <div className="accessibility-setting"><div><strong>Larger text</strong><small>Increase text size throughout FitLife</small></div><button type="button" role="switch" aria-label="Larger text" data-guide-target="settings-accessibility" aria-checked={!!settings.largeText} onClick={() => setLargeText(!settings.largeText)}><span className={settings.largeText ? 'is-on' : ''}><i/></span></button></div>
         <div className="accessibility-setting"><div><strong>Reduce motion</strong><small>Keep transitions still; device preferences also apply</small></div><button type="button" role="switch" aria-label="Reduce motion" aria-checked={settings.motionStyle === 'reduced'} onClick={() => setMotionStyle(settings.motionStyle === 'reduced' ? 'spring' : 'reduced')}><span className={settings.motionStyle === 'reduced' ? 'is-on' : ''}><i/></span></button></div>

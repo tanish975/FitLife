@@ -120,6 +120,10 @@ jobs:
         run: npm run test:exercises
       - name: Test movement previews and local water schedule (simulated native bridge)
         run: npm run test:motion-water
+      - name: Test IFCT 2017, household portions, raw/cooked, oil/ghee and custom recipes
+        run: npm run test:indian-nutrition
+      - name: Test FitLife Global FoodDB across world regions, edible categories and lab tables
+        run: npm run test:global-fooddb
       - name: Test account isolation and sync (simulated native bridge)
         run: npm run test:cloud
       - name: Test release build, animations, updates, standalone and offline use

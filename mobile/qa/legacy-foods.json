@@ -1,0 +1,541 @@
+[
+  {
+    "id": "food-eggs",
+    "name": "Whole Boiled Egg",
+    "servingLabel": "1 large egg (50g)",
+    "calories": 72,
+    "proteinG": 6.3,
+    "carbsG": 0.4,
+    "fatG": 4.8,
+    "fiberG": 0,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "egg",
+      "eggs",
+      "boiled egg",
+      "omelette",
+      "protein"
+    ]
+  },
+  {
+    "id": "food-egg-whites",
+    "name": "Scrambled Egg Whites (4 Whites)",
+    "servingLabel": "1 bowl (130g)",
+    "calories": 68,
+    "proteinG": 14.5,
+    "carbsG": 1,
+    "fatG": 0.3,
+    "fiberG": 0,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "egg white",
+      "whites",
+      "breakfast"
+    ]
+  },
+  {
+    "id": "food-oats",
+    "name": "Rolled Oats Porridge",
+    "servingLabel": "1 bowl cooked (60g dry)",
+    "calories": 230,
+    "proteinG": 8.5,
+    "carbsG": 39,
+    "fatG": 4.2,
+    "fiberG": 6,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "oats",
+      "oatmeal",
+      "porridge",
+      "breakfast"
+    ]
+  },
+  {
+    "id": "food-banana",
+    "name": "Medium Ripe Banana",
+    "servingLabel": "1 medium (118g)",
+    "calories": 105,
+    "proteinG": 1.3,
+    "carbsG": 27,
+    "fatG": 0.4,
+    "fiberG": 3.1,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "banana",
+      "fruit",
+      "preworkout"
+    ]
+  },
+  {
+    "id": "food-poha",
+    "name": "Vegetable Poha with Peanuts",
+    "servingLabel": "1 medium bowl (180g)",
+    "calories": 250,
+    "proteinG": 5.8,
+    "carbsG": 42,
+    "fatG": 6.8,
+    "fiberG": 3.5,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "poha",
+      "indian",
+      "flattened rice",
+      "breakfast"
+    ]
+  },
+  {
+    "id": "food-idli",
+    "name": "Steamed Idli with Sambar",
+    "servingLabel": "2 idlis + 1 cup sambar",
+    "calories": 225,
+    "proteinG": 7.5,
+    "carbsG": 41,
+    "fatG": 2.8,
+    "fiberG": 4.2,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "idli",
+      "sambar",
+      "south indian",
+      "breakfast"
+    ]
+  },
+  {
+    "id": "food-moong-chilla",
+    "name": "Moong Dal Paneer Chilla",
+    "servingLabel": "2 chillas (160g)",
+    "calories": 285,
+    "proteinG": 16.5,
+    "carbsG": 31,
+    "fatG": 9.5,
+    "fiberG": 5.5,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "chilla",
+      "cheela",
+      "moong",
+      "paneer",
+      "indian"
+    ]
+  },
+  {
+    "id": "food-greek-yogurt",
+    "name": "High-Protein Greek Yogurt Bowl",
+    "servingLabel": "1 cup (170g)",
+    "calories": 140,
+    "proteinG": 17,
+    "carbsG": 7.5,
+    "fatG": 4,
+    "fiberG": 1,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "greek yogurt"
+    ]
+  },
+  {
+    "id": "food-avocado-toast",
+    "name": "Sourdough Avocado Toast",
+    "servingLabel": "1 slice + 1/2 avocado",
+    "calories": 265,
+    "proteinG": 6.5,
+    "carbsG": 26,
+    "fatG": 15,
+    "fiberG": 6.8,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "avocado",
+      "toast",
+      "bread",
+      "breakfast"
+    ]
+  },
+  {
+    "id": "food-peanut-butter",
+    "name": "Natural Peanut Butter",
+    "servingLabel": "2 tbsp (32g)",
+    "calories": 190,
+    "proteinG": 8,
+    "carbsG": 6,
+    "fatG": 16,
+    "fiberG": 2.5,
+    "defaultCategory": "Breakfast",
+    "tags": [
+      "peanut butter",
+      "pb",
+      "nut butter"
+    ]
+  },
+  {
+    "id": "food-chicken-breast",
+    "name": "Grilled Chicken Breast",
+    "servingLabel": "150g cooked",
+    "calories": 248,
+    "proteinG": 46.5,
+    "carbsG": 0,
+    "fatG": 5.4,
+    "fiberG": 0,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "chicken",
+      "chicken breast",
+      "grilled chicken",
+      "meat"
+    ]
+  },
+  {
+    "id": "food-paneer-tikka",
+    "name": "Tandoori Paneer Tikka",
+    "servingLabel": "150g serving",
+    "calories": 360,
+    "proteinG": 24,
+    "carbsG": 8,
+    "fatG": 26,
+    "fiberG": 1.8,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "paneer",
+      "cottage cheese",
+      "tikka",
+      "vegetarian"
+    ]
+  },
+  {
+    "id": "food-dal-tadka",
+    "name": "Yellow Dal Tadka (Lentils)",
+    "servingLabel": "1 bowl (200g)",
+    "calories": 215,
+    "proteinG": 11.2,
+    "carbsG": 29,
+    "fatG": 6.2,
+    "fiberG": 6.5,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "dal",
+      "lentils",
+      "daal",
+      "indian"
+    ]
+  },
+  {
+    "id": "food-roti",
+    "name": "Whole Wheat Phulka / Roti",
+    "servingLabel": "1 medium roti (40g)",
+    "calories": 110,
+    "proteinG": 3.5,
+    "carbsG": 21.5,
+    "fatG": 1.2,
+    "fiberG": 2.8,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "roti",
+      "chapati",
+      "phulka",
+      "wheat",
+      "bread"
+    ]
+  },
+  {
+    "id": "food-brown-rice",
+    "name": "Steamed Brown Rice",
+    "servingLabel": "1 cup cooked (195g)",
+    "calories": 216,
+    "proteinG": 5,
+    "carbsG": 45,
+    "fatG": 1.8,
+    "fiberG": 3.5,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "rice",
+      "brown rice",
+      "chawal",
+      "carbs"
+    ]
+  },
+  {
+    "id": "food-rajma-chawal",
+    "name": "Rajma Masala with Steamed Rice",
+    "servingLabel": "1 plate (320g)",
+    "calories": 410,
+    "proteinG": 15.5,
+    "carbsG": 68,
+    "fatG": 8.5,
+    "fiberG": 10.2,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "rajma",
+      "kidney beans",
+      "rajma chawal",
+      "indian"
+    ]
+  },
+  {
+    "id": "food-chole",
+    "name": "Punjabi Chole (Chickpea Curry)",
+    "servingLabel": "1 bowl (220g)",
+    "calories": 280,
+    "proteinG": 12.5,
+    "carbsG": 38,
+    "fatG": 9,
+    "fiberG": 8.5,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "chole",
+      "chickpeas",
+      "chana",
+      "curry"
+    ]
+  },
+  {
+    "id": "food-quinoa-bowl",
+    "name": "Mediterranean Quinoa Power Bowl",
+    "servingLabel": "1 bowl (280g)",
+    "calories": 385,
+    "proteinG": 14,
+    "carbsG": 52,
+    "fatG": 13.5,
+    "fiberG": 7.5,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "quinoa",
+      "salad",
+      "bowl",
+      "healthy"
+    ]
+  },
+  {
+    "id": "food-tofu-stirfry",
+    "name": "Crispy Tofu & Broccoli Stir-Fry",
+    "servingLabel": "1 bowl (250g)",
+    "calories": 290,
+    "proteinG": 21,
+    "carbsG": 16,
+    "fatG": 16,
+    "fiberG": 4.8,
+    "defaultCategory": "Lunch",
+    "tags": [
+      "tofu",
+      "soy",
+      "vegan",
+      "broccoli"
+    ]
+  },
+  {
+    "id": "food-salmon",
+    "name": "Pan-Seared Atlantic Salmon",
+    "servingLabel": "150g fillet",
+    "calories": 312,
+    "proteinG": 33.5,
+    "carbsG": 0,
+    "fatG": 19,
+    "fiberG": 0,
+    "defaultCategory": "Dinner",
+    "tags": [
+      "salmon",
+      "fish",
+      "seafood",
+      "omega"
+    ]
+  },
+  {
+    "id": "food-khichdi",
+    "name": "Moong Dal Vegetable Khichdi",
+    "servingLabel": "1 bowl (260g)",
+    "calories": 295,
+    "proteinG": 11.5,
+    "carbsG": 48,
+    "fatG": 6.5,
+    "fiberG": 5.2,
+    "defaultCategory": "Dinner",
+    "tags": [
+      "khichdi",
+      "gujarati",
+      "moong",
+      "dinner",
+      "comfort"
+    ]
+  },
+  {
+    "id": "food-palak-paneer",
+    "name": "Homestyle Palak Paneer",
+    "servingLabel": "1 bowl (220g)",
+    "calories": 310,
+    "proteinG": 18.5,
+    "carbsG": 11,
+    "fatG": 21.5,
+    "fiberG": 4.5,
+    "defaultCategory": "Dinner",
+    "tags": [
+      "palak paneer",
+      "spinach",
+      "paneer",
+      "dinner"
+    ]
+  },
+  {
+    "id": "food-soya-chunks",
+    "name": "Masala Soya Chunks Stir-Fry",
+    "servingLabel": "1 bowl (60g dry soya)",
+    "calories": 245,
+    "proteinG": 31,
+    "carbsG": 20,
+    "fatG": 4.5,
+    "fiberG": 7.5,
+    "defaultCategory": "Dinner",
+    "tags": [
+      "soya",
+      "soy chunks",
+      "nutrela",
+      "high protein"
+    ]
+  },
+  {
+    "id": "food-sweet-potato",
+    "name": "Roasted Sweet Potato",
+    "servingLabel": "1 medium (150g)",
+    "calories": 135,
+    "proteinG": 3,
+    "carbsG": 31,
+    "fatG": 0.2,
+    "fiberG": 4.5,
+    "defaultCategory": "Dinner",
+    "tags": [
+      "sweet potato",
+      "shakarkandi",
+      "carbs"
+    ]
+  },
+  {
+    "id": "food-chicken-salad",
+    "name": "Chargrilled Chicken Caesar Salad",
+    "servingLabel": "1 large bowl (300g)",
+    "calories": 340,
+    "proteinG": 36,
+    "carbsG": 14,
+    "fatG": 15.5,
+    "fiberG": 4,
+    "defaultCategory": "Dinner",
+    "tags": [
+      "salad",
+      "chicken salad",
+      "greens",
+      "dinner"
+    ]
+  },
+  {
+    "id": "food-whey-shake",
+    "name": "Whey Isolate Protein Shake",
+    "servingLabel": "1 scoop (32g) in water",
+    "calories": 125,
+    "proteinG": 25,
+    "carbsG": 2.5,
+    "fatG": 1.2,
+    "fiberG": 0.5,
+    "defaultCategory": "Snack",
+    "tags": [
+      "whey",
+      "protein",
+      "shake",
+      "protein shake",
+      "scoop"
+    ]
+  },
+  {
+    "id": "food-almonds",
+    "name": "Raw California Almonds",
+    "servingLabel": "1 handful (28g / ~23 almonds)",
+    "calories": 164,
+    "proteinG": 6,
+    "carbsG": 6.1,
+    "fatG": 14.2,
+    "fiberG": 3.5,
+    "defaultCategory": "Snack",
+    "tags": [
+      "almonds",
+      "badam",
+      "nuts",
+      "snack"
+    ]
+  },
+  {
+    "id": "food-apple",
+    "name": "Crisp Honeycrisp Apple",
+    "servingLabel": "1 medium (182g)",
+    "calories": 95,
+    "proteinG": 0.5,
+    "carbsG": 25,
+    "fatG": 0.3,
+    "fiberG": 4.4,
+    "defaultCategory": "Snack",
+    "tags": [
+      "apple",
+      "fruit",
+      "snack"
+    ]
+  },
+  {
+    "id": "food-makhana",
+    "name": "Roasted Fox Nuts (Makhana)",
+    "servingLabel": "1 bowl (35g)",
+    "calories": 130,
+    "proteinG": 4.2,
+    "carbsG": 24,
+    "fatG": 2.2,
+    "fiberG": 2.8,
+    "defaultCategory": "Snack",
+    "tags": [
+      "makhana",
+      "fox nuts",
+      "indian snack"
+    ]
+  },
+  {
+    "id": "food-sprouts",
+    "name": "Sprouted Moong Chaat",
+    "servingLabel": "1 bowl (150g)",
+    "calories": 165,
+    "proteinG": 11,
+    "carbsG": 27,
+    "fatG": 1.5,
+    "fiberG": 6.2,
+    "defaultCategory": "Snack",
+    "tags": [
+      "sprouts",
+      "moong",
+      "chaat",
+      "salad"
+    ]
+  },
+  {
+    "id": "food-protein-bar",
+    "name": "Dark Chocolate Protein Bar",
+    "servingLabel": "1 bar (60g)",
+    "calories": 210,
+    "proteinG": 20,
+    "carbsG": 21,
+    "fatG": 7,
+    "fiberG": 5,
+    "defaultCategory": "Snack",
+    "tags": [
+      "protein bar",
+      "bar",
+      "chocolate"
+    ]
+  },
+  {
+    "id": "food-black-coffee",
+    "name": "Iced Americano / Black Coffee",
+    "servingLabel": "1 cup (240ml)",
+    "calories": 5,
+    "proteinG": 0.3,
+    "carbsG": 0.8,
+    "fatG": 0,
+    "fiberG": 0,
+    "defaultCategory": "Snack",
+    "tags": [
+      "coffee",
+      "espresso",
+      "caffeine",
+      "preworkout"
+    ]
+  }
+]

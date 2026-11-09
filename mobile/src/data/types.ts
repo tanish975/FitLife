@@ -1,4 +1,11 @@
-import type { StepObservation, SavedMeal, PlannedDay } from '../domain/PersonalFeatures';
+import type {
+  StepObservation,
+  SavedMeal,
+  CustomRecipe,
+  PlannedDay,
+  BodyMeasurementEntry,
+  HabitReminderPreferences,
+} from '../domain/PersonalFeatures';
 
 import {
   CornerStyle,
@@ -86,7 +93,123 @@ export interface MacroTargets {
   carbsG: number;
   fatG: number;
   fiberG: number;
+  calculationVersion?: string;
+  wasFloored?: boolean;
 }
+
+export type FoodSourceKind =
+  | 'curated'
+  | 'ifct2017'
+  | 'usda-sr28'
+  | 'taco-brazil'
+  | 'ciqual-france'
+  | 'fitlife-global-dish';
+
+export type WorldRegionId =
+  | 'global'
+  | 'south-asia'
+  | 'east-asia'
+  | 'southeast-asia'
+  | 'central-asia-caucasus'
+  | 'middle-east'
+  | 'north-africa'
+  | 'west-africa'
+  | 'east-southern-africa'
+  | 'mediterranean-europe'
+  | 'western-central-europe'
+  | 'nordic-baltic'
+  | 'eastern-europe'
+  | 'north-america'
+  | 'mexico-central-america-caribbean'
+  | 'south-america'
+  | 'oceania-pacific';
+
+export type EdibleCategoryId =
+  | 'prepared-dishes'
+  | 'grains-cereals'
+  | 'roots-tubers'
+  | 'legumes-pulses'
+  | 'vegetables-greens'
+  | 'fruits-berries'
+  | 'mushrooms-fungi'
+  | 'seaweeds-algae'
+  | 'nuts-seeds'
+  | 'dairy-cheeses'
+  | 'eggs'
+  | 'poultry-fowl'
+  | 'meats-game'
+  | 'fish-seafood'
+  | 'oils-fats'
+  | 'herbs-spices-condiments'
+  | 'beverages-infusions'
+  | 'sweets-bakery';
+
+export type FoodDietaryFlag =
+  | 'vegan'
+  | 'vegetarian'
+  | 'eggetarian'
+  | 'pescatarian'
+  | 'gluten-free'
+  | 'dairy-free'
+  | 'high-protein'
+  | 'high-fiber'
+  | 'fermented';
+
+export type FoodAllergenFlag =
+  | 'milk'
+  | 'egg'
+  | 'fish'
+  | 'shellfish'
+  | 'tree-nut'
+  | 'peanut'
+  | 'wheat-gluten'
+  | 'soy'
+  | 'sesame';
+
+export type FoodEdibleState =
+  | 'raw'
+  | 'cooked'
+  | 'steamed-boiled'
+  | 'roasted-grilled'
+  | 'fried'
+  | 'fermented'
+  | 'dried'
+  | 'ready-to-eat';
+
+export interface FoodMeasuredPortion {
+  label: string;
+  grams: number;
+}
+
+export interface FoodMicronutrients {
+  saturatedFatG?: number;
+  cholesterolMg?: number;
+  calciumMg?: number;
+  ironMg?: number;
+  magnesiumMg?: number;
+  potassiumMg?: number;
+  zincMg?: number;
+  vitaminCMg?: number;
+  vitaminB12Ug?: number;
+  folateUg?: number;
+  vitaminDUg?: number;
+  vitaminAUg?: number;
+  caffeineMg?: number;
+}
+
+export type FoodPreparationProfile =
+  | 'cooked_dish'
+  | 'raw_rice_grain'
+  | 'raw_dal'
+  | 'raw_whole_legume'
+  | 'raw_poha'
+  | 'raw_flour_roti'
+  | 'raw_semolina_dalia'
+  | 'raw_vegetable_tuber'
+  | 'raw_meat_seafood'
+  | 'liquid_dairy_beverage'
+  | 'cooking_fat_oil'
+  | 'ready_to_eat';
 
 export interface FoodItem {
   id: string;
@@ -99,6 +222,30 @@ export interface FoodItem {
   fiberG: number;
   defaultCategory: MealCategory;
   tags: string[];
+  /** Optional catalog metadata for FitLife FoodDB, IFCT 2017 & global portions; legacy 32 items remain untouched. */
+  source?: FoodSourceKind;
+  sourceCode?: string;
+  ifctCode?: string;
+  ifctGroup?: string;
+  scientificName?: string;
+  cuisineTag?: 'gujarati' | 'indian' | 'global';
+  worldRegion?: WorldRegionId;
+  countryCodes?: string[];
+  originLabel?: string;
+  edibleCategory?: EdibleCategoryId;
+  edibleState?: FoodEdibleState;
+  dietaryFlags?: FoodDietaryFlag[];
+  allergenFlags?: FoodAllergenFlag[];
+  measuredPortions?: FoodMeasuredPortion[];
+  micronutrients?: FoodMicronutrients;
+  aliases?: string[];
+  servingGrams?: number;
+  sugarG?: number;
+  sodiumMg?: number;
+  moistureG?: number;
+  preparationProfile?: FoodPreparationProfile;
+  isRaw?: boolean;
+  provenanceNote?: string;
 }
 
 export interface LoggedMeal {
@@ -200,7 +347,10 @@ export interface AppSettings {
   stepGoal?: number;
   stepHistory?: StepObservation[];
   savedMeals?: SavedMeal[];
+  customRecipes?: CustomRecipe[];
   weeklyPlan?: PlannedDay[];
+  bodyMeasurements?: BodyMeasurementEntry[];
+  habitReminders?: HabitReminderPreferences;
 }
 
 export interface BadgeStatus {

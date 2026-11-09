@@ -237,15 +237,15 @@ try {
   await page.waitForTimeout(250);
   await assertNoHorizontalOverflow(page, 'meals');
   const foodList = page.getByTestId('food-catalog-list');
-  assert.equal(await foodList.getByRole('button').count(), 5);
+  assert.equal(await foodList.locator('.food-open').count(), 5);
   await assertSwipeFromCardScrolls(page, context, 'food-catalog-list');
   await page.getByRole('button', { name: /Show more foods/ }).click();
-  assert.equal(await foodList.getByRole('button').count(), 10);
+  assert.equal(await foodList.locator('.food-open').count(), 10);
   await page.getByPlaceholder(/Search \d+ foods/).fill('paneer');
-  assert.equal(await foodList.getByRole('button').count(), 3);
+  assert.equal(await foodList.locator('.food-open').count(), 5);
   assert.equal(await page.locator('.shimmer-pulse').count(), 0, 'Search still inserts an artificial loading state');
   const previousMealCount = await page.evaluate(() => JSON.parse(localStorage.getItem('fitlife_meals_v1') || '[]').length);
-  await foodList.getByRole('button').first().click();
+  await foodList.locator('.food-open').first().click();
   await page.waitForFunction(count => JSON.parse(localStorage.getItem('fitlife_meals_v1') || '[]').length > count, previousMealCount);
   console.log('✓ Touch scrolling over food cards, pagination, immediate search and meal logging');
 

@@ -147,6 +147,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <div className="text-[0.625rem] text-[#84877F]">
               {GOAL_CONFIG[profile.goal]?.label}
             </div>
+            {macroTargets.calculationVersion && (
+              <div className="mt-1 text-[0.5625rem] font-mono text-[#87B5AD]">
+                v{macroTargets.calculationVersion}{macroTargets.wasFloored ? ' · floored to minimums' : ''}
+              </div>
+            )}
           </div>}
         </div>
 

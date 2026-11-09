@@ -31,14 +31,40 @@ import {
 } from '../domain/ThemePalettes';
 import { calculateMacroTargets } from '../domain/CalorieCalculator';
 import { canUseAdultNutritionTargets } from '../domain/AgeSafety';
-import { getDateKeyDaysAgo } from '../domain/ProgressAggregator';
+import {
+  computeWeeklyWeightTrend,
+  getDateKeyDaysAgo,
+  WeeklyWeightTrendSummary,
+} from '../domain/ProgressAggregator';
+import {
+  buildWeeklySummaryDigest,
+  computeConsistencyStrip,
+  ConsistencyDayStatus,
+  DueHabitNotification,
+  evaluateDueHabitNotifications,
+  WeeklySummaryDigest,
+} from '../domain/WeeklySummaryEngine';
+import { hasNativeReminders } from '../domain/Reminders';
 import { computeGamification } from '../domain/GamificationEngine';
 import { triggerHaptic } from '../domain/Haptics';
 import { ParsedMealDraft } from '../domain/MealTextParser';
 import { applyThemeColorVariables } from '../domain/ThemeColorVariables';
 import { createThemeRevealController } from '../domain/ThemeReveal';
 import { BackupSnapshot, mergeBackupRows } from '../domain/EncryptedBackup';
-import { mergePersonalSettings, mergeStepObservations, validSavedMeal, validStepObservation, type StepObservation } from '../domain/PersonalFeatures';
+import {
+  DEFAULT_HABIT_REMINDERS,
+  mergePersonalSettings,
+  mergeStepObservations,
+  validBodyMeasurement,
+  validCustomRecipe,
+  validHabitReminders,
+  validSavedMeal,
+  validStepObservation,
+  type BodyMeasurementEntry,
+  type CustomRecipe,
+  type HabitReminderPreferences,
+  type StepObservation,
+} from '../domain/PersonalFeatures';
 import { allRecoveryChanges, applyRecoveryChoices, emptyRecoveryJournal, noteRecoveryChanges, RECOVERY_PROFILE_KEYS, RECOVERY_SETTING_KEYS,
   type RecoveryJournal, type RecoverySettingKey } from '../domain/RecoveryJournal';
 import { activatePartition, CLOUD_KINDS, CloudDeletions, CloudKind, CloudPartition, CloudPayload, emptyDeletions,
@@ -85,6 +111,12 @@ interface FitLifeContextValue {
   startingWeightKg: number;
   macroTargets: MacroTargets | null;
   gamification: GamificationSummary;
+  weeklyWeightTrend: WeeklyWeightTrendSummary;
+  weeklySummaryDigest: WeeklySummaryDigest;
+  consistencyStrip: ConsistencyDayStatus[];
+  dueHabitNotifications: DueHabitNotification[];
+  dismissHabitNotification: (key: string) => void;
+  triggerWeeklySummaryNotificationNow: () => void;
   celebration: CelebrationPayload | null;
   toastMessage: string | null;
   dismissCelebration: () => void;
@@ -104,6 +136,14 @@ interface FitLifeContextValue {
   setWeeklyWorkoutGoal: (days: number) => void;
   toggleFavoriteExercise: (id: string) => void;
   toggleSavedMeal: (meal: LoggedMeal) => void;
+  saveMealTemplate: (draft: Omit<LoggedMeal, 'id' | 'dateKey' | 'timestamp'>) => boolean;
+  editSavedMeal: (savedId: string, draft: Omit<LoggedMeal, 'id' | 'dateKey' | 'timestamp'>) => boolean;
+  removeSavedMeal: (savedId: string) => void;
+  saveCustomRecipe: (draft: Omit<CustomRecipe, 'id' | 'updatedAt' | 'deleted'> & { id?: string }) => boolean;
+  removeCustomRecipe: (recipeId: string) => void;
+  saveBodyMeasurement: (draft: Omit<BodyMeasurementEntry, 'id' | 'updatedAt' | 'deleted'> & { id?: string }) => boolean;
+  removeBodyMeasurement: (measurementId: string) => void;
+  updateHabitReminders: (next: Partial<Omit<HabitReminderPreferences, 'updatedAt'>>) => boolean;
   setPlannedDay: (weekday: number, sessionId: string) => void;
   setStepGoal: (goal: number) => void;
   recordStepObservations: (owner: string, records: StepObservation[]) => boolean;
@@ -661,6 +701,167 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return todayEntries[0]?.moodId ?? null;
   }, [moods, todayKey]);
 
+  const weeklyWeightTrend = useMemo(
+    () => computeWeeklyWeightTrend(weights, settings.weightUnit, todayKey),
+    [weights, settings.weightUnit, todayKey]
+  );
+
+  const consistencyStrip = useMemo(
+    () => computeConsistencyStrip(meals, workouts, moods, 7, todayKey),
+    [meals, workouts, moods, todayKey]
+  );
+
+  const weeklySummaryDigest = useMemo(
+    () =>
+      buildWeeklySummaryDigest({
+        meals,
+        workouts,
+        moods,
+        weights,
+        gamification,
+        macroTargets,
+        weeklyWorkoutGoal: settings.weeklyWorkoutGoal,
+        weightUnit: settings.weightUnit,
+        referenceDateKey: todayKey,
+      }),
+    [
+      meals,
+      workouts,
+      moods,
+      weights,
+      gamification,
+      macroTargets,
+      settings.weeklyWorkoutGoal,
+      settings.weightUnit,
+      todayKey,
+    ]
+  );
+
+  const deliveredStorageKey = `fitlife_delivered_reminders_v1:${localOwnerId || GUEST_OWNER}`;
+  const [deliveredKeys, setDeliveredKeys] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(`fitlife_delivered_reminders_v1:${GUEST_OWNER}`);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((k) => typeof k === 'string').slice(-120) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [manualWeeklyBanner, setManualWeeklyBanner] = useState<DueHabitNotification | null>(null);
+  const [clockTick, setClockTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(deliveredStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setDeliveredKeys(Array.isArray(parsed) ? parsed.filter((k) => typeof k === 'string').slice(-120) : []);
+    } catch {
+      setDeliveredKeys([]);
+    }
+    setManualWeeklyBanner(null);
+  }, [deliveredStorageKey]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const scheduledDueNotifications = useMemo(() => {
+    if (!settings.habitReminders) return [];
+    const loggedBreakfastToday = todayMeals.some((m) => m.category === 'Breakfast');
+    const loggedLunchToday = todayMeals.some((m) => m.category === 'Lunch');
+    const loggedDinnerToday = todayMeals.some((m) => m.category === 'Dinner');
+    const loggedWeightToday = weights.some((w) => w.dateKey === todayKey && !isDemoId(w.id));
+    return evaluateDueHabitNotifications({
+      prefs: settings.habitReminders,
+      now: new Date(clockTick),
+      alreadyDeliveredKeys: new Set(deliveredKeys),
+      hasNativeWorkoutWater: hasNativeReminders(),
+      loggedWorkoutToday: todayWorkouts.length > 0,
+      loggedBreakfastToday,
+      loggedLunchToday,
+      loggedDinnerToday,
+      loggedWeightToday,
+      waterTodayMl,
+      waterGoalMl: settings.waterGoalMl,
+      weeklyDigest: weeklySummaryDigest,
+    });
+  }, [
+    settings.habitReminders,
+    settings.waterGoalMl,
+    clockTick,
+    deliveredKeys,
+    todayMeals,
+    todayWorkouts.length,
+    weights,
+    todayKey,
+    waterTodayMl,
+    weeklySummaryDigest,
+  ]);
+
+  const notifiedOsKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    for (const item of scheduledDueNotifications) {
+      if (notifiedOsKeysRef.current.has(item.key)) continue;
+      notifiedOsKeysRef.current.add(item.key);
+      try {
+        new Notification(item.title, { body: item.body });
+      } catch {
+        /* Browser notification constructor may be restricted in some WebViews; in-app card still renders. */
+      }
+    }
+  }, [scheduledDueNotifications]);
+
+  const dueHabitNotifications = useMemo(() => {
+    if (!manualWeeklyBanner) return scheduledDueNotifications;
+    return [
+      manualWeeklyBanner,
+      ...scheduledDueNotifications.filter((n) => n.key !== manualWeeklyBanner.key),
+    ];
+  }, [manualWeeklyBanner, scheduledDueNotifications]);
+
+  const dismissHabitNotification = (key: string) => {
+    if (manualWeeklyBanner?.key === key) {
+      setManualWeeklyBanner(null);
+      return;
+    }
+    setDeliveredKeys((prev) => {
+      const next = [...new Set([...prev, key])].slice(-120);
+      try {
+        localStorage.setItem(deliveredStorageKey, JSON.stringify(next));
+      } catch {
+        /* ignore quota */
+      }
+      return next;
+    });
+  };
+
+  const triggerWeeklySummaryNotificationNow = () => {
+    const banner: DueHabitNotification = {
+      key: `weekly_summary_preview:${Date.now()}`,
+      kind: 'weekly_summary',
+      scheduledTimeLabel: 'Weekly digest',
+      title: weeklySummaryDigest.notificationTitle,
+      body: weeklySummaryDigest.notificationBody,
+      actionTab: 'progress',
+    };
+    setManualWeeklyBanner(banner);
+    if (
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      try {
+        new Notification(banner.title, { body: banner.body });
+      } catch {
+        /* ignore */
+      }
+    }
+    showToast('Weekly summary notification sent');
+  };
+
   // Deletions are content-specific and recorded before activity is removed.
   // If another account becomes active while hashes are computed, do nothing.
   const markCloudDeletes = async (groups: Partial<Record<CloudKind, { id: string }[]>>): Promise<boolean> => {
@@ -851,6 +1052,206 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const saveMealTemplate = (draft: Omit<LoggedMeal, 'id' | 'dateKey' | 'timestamp'>): boolean => {
+    const now = Date.now();
+    const id = `saved-${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const templateMeal: LoggedMeal = {
+      ...draft,
+      id: `meal-tpl-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      dateKey: todayKey,
+      timestamp: now,
+    };
+    const candidate = { id, updatedAt: now, deleted: false, meal: templateMeal };
+    if (!validSavedMeal(candidate)) {
+      showToast('This meal needs valid nutrition details before it can be saved.');
+      return false;
+    }
+    if ((settings.savedMeals || []).length >= 500) {
+      showToast('Favorite meal limit reached. Keep an encrypted backup.');
+      return false;
+    }
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((previous) => {
+      const items = previous.savedMeals || [];
+      if (items.length >= 500) return previous;
+      return { ...previous, savedMeals: [...items, candidate] };
+    });
+    showToast(`Saved "${draft.name}" to favorites`);
+    return true;
+  };
+
+  const editSavedMeal = (savedId: string, draft: Omit<LoggedMeal, 'id' | 'dateKey' | 'timestamp'>): boolean => {
+    const existing = (settings.savedMeals || []).find((x) => x.id === savedId);
+    if (!existing) return false;
+    const updatedAt = Math.max(Date.now(), existing.updatedAt + 1);
+    const updatedMeal: LoggedMeal = {
+      ...existing.meal,
+      ...draft,
+      sugarG: draft.sugarG,
+      sodiumMg: draft.sodiumMg,
+      nutritionNote: draft.nutritionNote,
+    };
+    const nextEntry = { id: existing.id, updatedAt, deleted: false, meal: updatedMeal };
+    if (!validSavedMeal(nextEntry)) {
+      showToast('Enter valid nutrition numbers to update this saved meal.');
+      return false;
+    }
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((previous) => ({
+      ...previous,
+      savedMeals: (previous.savedMeals || []).map((x) => (x.id === savedId ? nextEntry : x)),
+    }));
+    showToast('Saved meal updated');
+    return true;
+  };
+
+  const removeSavedMeal = (savedId: string) => {
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((previous) => {
+      const items = previous.savedMeals || [];
+      const existing = items.find((x) => x.id === savedId);
+      if (!existing || existing.deleted) return previous;
+      const updatedAt = Math.max(Date.now(), existing.updatedAt + 1);
+      return {
+        ...previous,
+        savedMeals: items.map((x) => (x.id === savedId ? { ...x, deleted: true, updatedAt } : x)),
+      };
+    });
+    showToast('Removed from saved meals');
+  };
+
+  const saveCustomRecipe = (
+    draft: Omit<CustomRecipe, 'id' | 'updatedAt' | 'deleted'> & { id?: string }
+  ): boolean => {
+    const current = settings.customRecipes || [];
+    const existing = draft.id ? current.find((r) => r.id === draft.id) : undefined;
+    if (!existing && current.length >= 200) {
+      showToast('Custom recipe limit (200) reached. Keep an encrypted backup.');
+      return false;
+    }
+    const id =
+      existing?.id ??
+      (draft.id && /^[A-Za-z0-9_-]{1,120}$/.test(draft.id)
+        ? draft.id
+        : `recipe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const updatedAt = Math.max(Date.now(), (existing?.updatedAt || 0) + 1);
+    const candidate: CustomRecipe = {
+      ...draft,
+      id,
+      updatedAt,
+      deleted: false,
+    };
+    if (!validCustomRecipe(candidate)) {
+      showToast('Add a recipe name, valid yield, and at least one ingredient.');
+      return false;
+    }
+    triggerHaptic('success', settings.hapticsEnabled);
+    setSettings((previous) => {
+      const items = previous.customRecipes || [];
+      if (!items.some((r) => r.id === id) && items.length >= 200) return previous;
+      return {
+        ...previous,
+        customRecipes: [...items.filter((r) => r.id !== id), candidate],
+      };
+    });
+    showToast(existing ? `Updated recipe "${candidate.name}"` : `Saved recipe "${candidate.name}"`);
+    return true;
+  };
+
+  const removeCustomRecipe = (recipeId: string) => {
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((previous) => {
+      const items = previous.customRecipes || [];
+      const existing = items.find((r) => r.id === recipeId);
+      if (!existing || existing.deleted) return previous;
+      const updatedAt = Math.max(Date.now(), existing.updatedAt + 1);
+      return {
+        ...previous,
+        customRecipes: items.map((r) =>
+          r.id === recipeId ? { ...r, deleted: true, updatedAt } : r
+        ),
+      };
+    });
+    showToast('Recipe removed');
+  };
+
+  const saveBodyMeasurement = (
+    draft: Omit<BodyMeasurementEntry, 'id' | 'updatedAt' | 'deleted'> & { id?: string }
+  ): boolean => {
+    const current = settings.bodyMeasurements || [];
+    const existing = draft.id ? current.find((m) => m.id === draft.id) : undefined;
+    if (!existing && current.length >= 1000) {
+      showToast('Body measurement limit (1,000) reached. Keep an encrypted backup.');
+      return false;
+    }
+    const id =
+      existing?.id ??
+      (draft.id && /^[A-Za-z0-9_-]{1,120}$/.test(draft.id)
+        ? draft.id
+        : `bm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const updatedAt = Math.max(Date.now(), (existing?.updatedAt || 0) + 1);
+    const candidate: BodyMeasurementEntry = {
+      ...draft,
+      id,
+      updatedAt,
+      deleted: false,
+    };
+    if (!validBodyMeasurement(candidate)) {
+      showToast('Enter at least one valid body measurement within clinical bounds.');
+      return false;
+    }
+    triggerHaptic('success', settings.hapticsEnabled);
+    setSettings((previous) => {
+      const items = previous.bodyMeasurements || [];
+      if (!items.some((m) => m.id === id) && items.length >= 1000) return previous;
+      return {
+        ...previous,
+        bodyMeasurements: [...items.filter((m) => m.id !== id), candidate],
+      };
+    });
+    showToast(existing ? 'Body measurements updated' : 'Body measurements logged');
+    return true;
+  };
+
+  const removeBodyMeasurement = (measurementId: string) => {
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((previous) => {
+      const items = previous.bodyMeasurements || [];
+      const existing = items.find((m) => m.id === measurementId);
+      if (!existing || existing.deleted) return previous;
+      const updatedAt = Math.max(Date.now(), existing.updatedAt + 1);
+      return {
+        ...previous,
+        bodyMeasurements: items.map((m) =>
+          m.id === measurementId ? { ...m, deleted: true, updatedAt } : m
+        ),
+      };
+    });
+    showToast('Measurement entry removed');
+  };
+
+  const updateHabitReminders = (
+    next: Partial<Omit<HabitReminderPreferences, 'updatedAt'>>
+  ): boolean => {
+    const base = settings.habitReminders ?? DEFAULT_HABIT_REMINDERS;
+    const candidate: HabitReminderPreferences = {
+      ...base,
+      ...next,
+      updatedAt: Math.max(Date.now(), base.updatedAt + 1),
+    };
+    if (!validHabitReminders(candidate)) {
+      showToast('Check reminder times — end time must be later on the same day.');
+      return false;
+    }
+    triggerHaptic('light', settings.hapticsEnabled);
+    setSettings((previous) => ({
+      ...previous,
+      habitReminders: candidate,
+    }));
+    showToast('Reminder schedule saved');
+    return true;
+  };
+
   const setPlannedDay = (weekday: number, sessionId: string) => {
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !/^[a-z0-9-]{0,80}$/.test(sessionId)) return;
     setSettings(previous => {
@@ -939,6 +1340,9 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       carbsG: item.carbsG,
       fatG: item.fatG,
       fiberG: item.fiberG,
+      ...(item.sugarG !== undefined ? { sugarG: item.sugarG } : {}),
+      ...(item.sodiumMg !== undefined ? { sodiumMg: item.sodiumMg } : {}),
+      ...(item.provenanceNote ? { nutritionNote: item.provenanceNote.slice(0, 295) } : {}),
     };
     setMeals((prev) => [newMeal, ...prev]);
     showToast(`Logged ${item.name} (+10 XP)`);
@@ -1433,12 +1837,25 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         (imported as any)[kind] = rows;
       }
     }
-    // Importing an older backup is an explicit restore: revive favorites that
-    // were subsequently removed rather than letting their tombstones hide them.
-    const importedSettings = { ...imported.settings, savedMeals: (imported.settings.savedMeals || []).map(item => {
-      const existing = (current.settings.savedMeals || []).find(saved => saved.id === item.id);
-      return !item.deleted && existing?.deleted ? { ...item, updatedAt: Math.max(Date.now(), existing.updatedAt + 1) } : item;
-    }) };
+    // Importing an older backup is an explicit restore: revive favorites and
+    // custom recipes that were subsequently removed rather than letting tombstones hide them.
+    const importedSettings = {
+      ...imported.settings,
+      savedMeals: (imported.settings.savedMeals || []).map(item => {
+        const existing = (current.settings.savedMeals || []).find(saved => saved.id === item.id);
+        return !item.deleted && existing?.deleted ? { ...item, updatedAt: Math.max(Date.now(), existing.updatedAt + 1) } : item;
+      }),
+      ...(imported.settings.customRecipes
+        ? {
+            customRecipes: imported.settings.customRecipes.map(recipe => {
+              const existing = (current.settings.customRecipes || []).find(r => r.id === recipe.id);
+              return !recipe.deleted && existing?.deleted
+                ? { ...recipe, updatedAt: Math.max(Date.now(), existing.updatedAt + 1) }
+                : recipe;
+            }),
+          }
+        : {}),
+    };
     const next: BackupSnapshot = mode === 'merge' ? {
       ...current,
       settings: mergePersonalSettings(current.settings, [current.settings, importedSettings]),
@@ -1530,6 +1947,12 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         startingWeightKg,
         macroTargets,
         gamification,
+        weeklyWeightTrend,
+        weeklySummaryDigest,
+        consistencyStrip,
+        dueHabitNotifications,
+        dismissHabitNotification,
+        triggerWeeklySummaryNotificationNow,
         celebration,
         toastMessage,
         dismissCelebration,
@@ -1549,6 +1972,14 @@ export const FitLifeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setWeeklyWorkoutGoal,
         toggleFavoriteExercise,
         toggleSavedMeal,
+        saveMealTemplate,
+        editSavedMeal,
+        removeSavedMeal,
+        saveCustomRecipe,
+        removeCustomRecipe,
+        saveBodyMeasurement,
+        removeBodyMeasurement,
+        updateHabitReminders,
         setPlannedDay,
         setStepGoal,
         recordStepObservations,
