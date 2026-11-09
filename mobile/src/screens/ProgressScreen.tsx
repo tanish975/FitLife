@@ -58,7 +58,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
     return pts.map((p) => ({
       dateKey: p.dateKey,
       label: p.label,
-      value: p.value,
+      value: p.calories,
       sublabel: p.dateKey,
     }));
   }, [weights, unit]);
@@ -68,7 +68,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
     return pts.map((p) => ({
       dateKey: p.dateKey,
       label: p.label,
-      value: p.value ?? null,
+      value: p.calories ?? null,
       sublabel: p.label,
     }));
   }, [meals]);
@@ -78,7 +78,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
     return pts.map((p) => ({
       dateKey: p.dateKey,
       label: p.label,
-      value: p.value ?? null,
+      value: p.calories ?? null,
       sublabel: p.label,
     }));
   }, [meals]);
