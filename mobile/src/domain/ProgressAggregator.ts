@@ -66,6 +66,16 @@ export function shortDateLabel(dateKey: string): string {
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/** Backwards-compatible alias: returns { shortDay } for a date key. */
+export function formatShortDateLabel(dateKey: string): { shortDay: string } {
+  return { shortDay: shortDateLabel(dateKey) };
+}
+
+/** Converts a Date object to a YYYY-MM-DD date key. */
+export function formatDateKey(date: Date): string {
+  return formatLocalDateKey(date);
+}
+
 function buildDateWindow(days: number, referenceDateKey?: string): string[] {
   const ref = referenceDateKey ?? getDateKeyDaysAgo(0);
   const keys: string[] = [];

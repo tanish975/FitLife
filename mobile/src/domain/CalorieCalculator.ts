@@ -410,17 +410,9 @@ export function calculateVersionedNutritionPlan(
  * Mifflin-St Jeor Equation for adult BMR, TDEE, and daily macro targets.
  * Ages under 18 fail closed (`null`) per `canUseAdultNutritionTargets`.
  */
-export function calculateMacroTargets(profile: UserProfile): MacroTargets | null {
-  if (!profile.onboarded) return null;
-  const plan = calculateVersionedNutritionPlan({
-    sex: profile.sex,
-    age: profile.age,
-    weightKg: profile.weightKg,
-    heightCm: profile.heightCm,
-    goal: profile.goal,
-    activityLevel: profile.activityLevel,
-    onboarded: profile.onboarded,
-  });
+export function calculateMacroTargets(input: VersionedCalculationInput): MacroTargets | null {
+  if (input.onboarded === false) return null;
+  const plan = calculateVersionedNutritionPlan(input);
   if (!plan) return null;
   return {
     calories: plan.calories,
