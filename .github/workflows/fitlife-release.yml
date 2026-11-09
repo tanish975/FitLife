@@ -115,7 +115,17 @@ jobs:
       - name: Install Chromium for end-to-end tests
         run: npx playwright install --with-deps chromium
       - name: Test age safety, food, progress and device cap (simulated native bridge)
-        run: npm run test:phase0
+        run: |
+          set -euo pipefail
+          # Smoke test: verify Chromium can launch before running browser tests
+          node --input-type=module -e "
+            import { chromium } from 'playwright';
+            const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+            console.log('Chromium launch smoke test: OK');
+            await browser.close();
+          "
+          node qa/phase0-unit.mjs
+          node qa/phase0-browser.mjs
       - name: Test expanded exercise catalog, filters and data preservation
         run: npm run test:exercises
       - name: Test movement previews and local water schedule (simulated native bridge)
