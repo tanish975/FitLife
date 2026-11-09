@@ -65,26 +65,26 @@ const meals: LoggedMeal[] = [
 const cals = aggregateDailyCalories(meals, 14, '2026-11-01');
 assert.equal(cals.length, 14);
 const nov1 = cals.find(p => p.dateKey === '2026-11-01');
-assert.equal(nov1?.value, 400, 'Nov 1 has 400 kcal');
+assert.equal(nov1?.calories, 400, 'Nov 1 has 400 kcal');
 const nov2 = cals.find(p => p.dateKey === '2026-10-30');
-assert.equal(nov2?.value, 800, 'Oct 30 has 800 kcal');
+assert.equal(nov2?.calories, 800, 'Oct 30 has 800 kcal');
 const unlogged = cals.find(p => p.dateKey === '2026-10-29');
-assert.equal(unlogged?.value, null, 'unlogged days are null, not zero');
+assert.equal(unlogged?.calories, null, 'unlogged days are null, not zero');
 
 const prots = aggregateDailyProtein(meals, 14, '2026-11-01');
 const nov1Prot = prots.find(p => p.dateKey === '2026-11-01');
-assert.equal(nov1Prot?.value, 20, 'Nov 1 has 20g protein');
+assert.equal(nov1Prot?.calories, 20, 'Nov 1 has 20g protein');
 
 // ---------- Weight series ----------
 const ws = aggregateWeightSeries(weights, 'kg', 14, '2026-11-01');
 const wsNov1 = ws.find(p => p.dateKey === '2026-11-01');
-assert.equal(wsNov1?.value, 70, 'Nov 1 weight is 70 kg');
+assert.equal(wsNov1?.calories, 70, 'Nov 1 weight is 70 kg');
 
 
 // ---------- Rolling 7-day ----------
 const roll7 = aggregateRolling7DayWeightSeries(weights, 'kg', 14, '2026-11-01');
 const rollNov1 = roll7.find(p => p.dateKey === '2026-11-01');
-assert(rollNov1!.value !== null && rollNov1!.value > 0, 'rolling 7-day average exists for Nov 1');
+assert(rollNov1!.calories !== null && rollNov1!.calories > 0, 'rolling 7-day average exists for Nov 1');
 
 // ---------- Waist-to-height ----------
 const whtr = computeWaistToHeightRatio(80, 170, 30);
