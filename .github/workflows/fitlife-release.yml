@@ -145,6 +145,7 @@ jobs:
         run: npm run test:cloud
       - name: Test release build, animations, updates, standalone and offline use
         continue-on-error: true
+        run: |
           set -euo pipefail
           npm run build
           npx vite preview --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/fitlife-preview.log" 2>&1 &
