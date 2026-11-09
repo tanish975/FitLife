@@ -364,6 +364,29 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
             unitSuffix=" kcal"
             yDecimals={0}
           />
+          <details className="mt-3">
+            <summary className="cursor-pointer font-semibold text-[#7BB38F]">View food energy data table</summary>
+            <table aria-label="Food energy data" className="mt-2 w-full text-left text-xs">
+              <thead>
+                <tr>
+                  <th scope="col" className="py-1 pr-3">Date</th>
+                  <th scope="col" className="py-1">Energy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calorieChartData.map((item, index) => (
+                  <tr key={`${item.dateKey}-${index}`}>
+                    <th scope="row" className="py-1 pr-3 font-medium">
+                      {item.dateKey}
+                    </th>
+                    <td className="py-1">
+                      {item.value === null ? 'Not logged' : `${item.value.toFixed(0)} kcal`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
         </div>
 
         <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4">
