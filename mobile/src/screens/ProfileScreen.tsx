@@ -183,7 +183,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
 
         <div className="flex items-center justify-between rounded-xl bg-[#141916] px-3 py-2 text-[0.6875rem] text-[#84877F]">
-          <span>Activity: {ACTIVITY_MULTIPLIERS[profile.activityLevel]?.label}</span>
+          <span>Activity: {ACTIVITY_MULTIPLIERS[profile.activityLevel]}</span>
           <span>BMR {macroTargets.bmr} · TDEE {macroTargets.tdee} kcal</span>
         </div></> : <p className="text-xs leading-relaxed text-[#B8B5AD]">Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance.</p>}
       </div> : <section className="profile-needed profile-needed-card" aria-label="Optional profile details"><div><strong>Profile details are optional</strong><p>Add your own measurements to see estimated targets and BMI. Nothing is filled in for you.</p></div><button type="button" onClick={onEditOnboarding}>Add profile details</button></section>}

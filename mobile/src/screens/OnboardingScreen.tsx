@@ -295,10 +295,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
                   <div className="flex items-center gap-2">
                     <span className="font-heading text-xs font-bold text-[#F4F1EA]">{cfg.label}</span>
                     <span className="rounded-md bg-[#2A352E] px-1.5 py-0.5 text-[0.625rem] font-semibold text-[#7BB38F]">
-                      {cfg.calorieDelta > 0 ? `+${cfg.calorieDelta}` : cfg.calorieDelta} kcal
+                      {cfg.calorieOffset > 0 ? `+${cfg.calorieOffset}` : cfg.calorieOffset} kcal
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{cfg.subtitle}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{gKey === 'lose_weight' ? 'Fat loss (−500 kcal)' : gKey === 'gain_muscle' ? 'Lean bulk (+300 kcal)' : gKey === 'endurance' ? 'Endurance (+150 kcal)' : 'Maintenance'}</p>
                 </div>
                 <div
                   className={`flex h-5 w-5 items-center justify-center rounded-full border ${
@@ -336,12 +336,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-heading text-xs font-bold text-[#F4F1EA]">{item.label}</span>
+                    <span className="font-heading text-xs font-bold text-[#F4F1EA]">{aKey === 'sedentary' ? 'Sedentary' : aKey === 'light' ? 'Light' : aKey === 'moderate' ? 'Moderate' : aKey === 'active' ? 'Active' : 'Athlete'}</span>
                     <span className="rounded-md bg-[#2E2B23] px-1.5 py-0.5 text-[0.625rem] font-semibold text-[#D8C39E]">
-                      ×{item.multiplier}
+                      ×{item}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{item.subtitle}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{aKey === 'sedentary' ? 'Little or no exercise' : aKey === 'light' ? 'Light exercise 1-3 days/week' : aKey === 'moderate' ? 'Moderate exercise 3-5 days/week' : aKey === 'active' ? 'Hard exercise 6-7 days/week' : 'Very hard exercise \& physical job'}</p>
                 </div>
                 <div
                   className={`flex h-5 w-5 items-center justify-center rounded-full border ${

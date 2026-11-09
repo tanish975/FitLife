@@ -60,6 +60,18 @@ export function fromDisplayWeight(displayVal: number, unit: WeightUnit): number 
   return Math.round(kg * 100) / 100;
 }
 
+/** Format weight for display with a fixed number of decimal places. */
+export function displayWeight(weightKg: number, unit: WeightUnit, decimals = 1): number {
+  const val = toDisplayWeight(weightKg, unit);
+  const factor = Math.pow(10, decimals);
+  return Math.round(val * factor) / factor;
+}
+
+/** Parse a display-formatted weight back into kilograms. */
+export function parseInputToKg(displayVal: number, unit: WeightUnit): number {
+  return fromDisplayWeight(displayVal, unit);
+}
+
 export function formatWeight(weightKg: number, unit: WeightUnit): string {
   return `${toDisplayWeight(weightKg, unit).toFixed(1)} ${unit}`;
 }
