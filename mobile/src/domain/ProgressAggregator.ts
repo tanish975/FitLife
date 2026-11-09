@@ -6,7 +6,7 @@ import { LengthUnit, toDisplayLength, toDisplayWeight } from './WeightConverter'
 export interface DailyDataPoint {
   dateKey: string;
   label: string;
-  value: number | null;
+  calories: number | null;
 }
 
 export interface WeeklyWeightTrendSummary {
@@ -53,8 +53,8 @@ export function shiftDateKey(baseDateKey: string, deltaDays: number): string {
 /**
  * Generates YYYY-MM-DD string for N days ago in local timezone.
  */
-export function getDateKeyDaysAgo(daysAgo: number): string {
-  const d = new Date();
+export function getDateKeyDaysAgo(daysAgo: number, baseDate?: Date): string {
+  const d = baseDate ? new Date(baseDate.getTime()) : new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - daysAgo);
   return formatLocalDateKey(d);
@@ -76,8 +76,8 @@ export function formatDateKey(date: Date): string {
   return formatLocalDateKey(date);
 }
 
-function buildDateWindow(days: number, referenceDateKey?: string): string[] {
-  const ref = referenceDateKey ?? getDateKeyDaysAgo(0);
+function buildDateWindow(days: number, referenceDateKey?: string | Date): string[] {
+  const ref = typeof referenceDateKey === 'string' ? referenceDateKey : formatDateKey(referenceDateKey ?? new Date());
   const keys: string[] = [];
   for (let i = days - 1; i >= 0; i--) {
     keys.push(shiftDateKey(ref, -i));
@@ -101,6 +101,43 @@ export function groupLatestDailyWeights(weights: WeightEntry[]): Map<string, Wei
     }
   }
   return byDate;
+}
+
+/**
+ * Returns weigh-in entries sorted chronologically with same-day duplicates collapsed
+ * to the latest entry per day. Multiple weigh-ins on one day are retained in storage;
+ * daily aggregation uses the latest timestamp. Limited to the last 14 days for charting.
+ */
+export function aggregateWeightTrend(weights: WeightEntry[]): WeightEntry[] {
+  const daily = groupLatestDailyWeights(weights);
+  return [...daily.values()]
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+    .slice(-14);
+}
+
+/**
+ * Returns the day-of-month number for a valid calendar date key (YYYY-MM-DD),
+ * or null if the date is invalid (e.g. 2026-02-29 or 2026-11-31).
+ */
+export function calendarDayNumber(dateKey: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (!Number.isFinite(date.getTime())) return null;
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  return d;
+}
+
+/**
+ * Returns { first, latest } weight-log comparison for two or more entries,
+ * or null when there are fewer than two entries. Entries are compared by dateKey
+ * then timestamp; the latest same-day entry wins.
+ */
+export function weightLogComparison(weights: WeightEntry[]): { first: WeightEntry; latest: WeightEntry } | null {
+  const trend = aggregateWeightTrend(weights);
+  if (trend.length < 2) return null;
+  return { first: trend[0], latest: trend[trend.length - 1] };
 }
 
 /**
@@ -238,7 +275,7 @@ export function aggregateDailyCalories(
   return buildDateWindow(days, referenceDateKey).map((dateKey) => ({
     dateKey,
     label: shortDateLabel(dateKey),
-    value: byDate.has(dateKey) ? Math.round(byDate.get(dateKey)!) : null,
+    calories: byDate.has(dateKey) ? Math.round(byDate.get(dateKey)!) : null,
   }));
 }
 
@@ -259,7 +296,7 @@ export function aggregateDailyProtein(
   return buildDateWindow(days, referenceDateKey).map((dateKey) => ({
     dateKey,
     label: shortDateLabel(dateKey),
-    value: byDate.has(dateKey) ? Math.round(byDate.get(dateKey)! * 10) / 10 : null,
+    calories: byDate.has(dateKey) ? Math.round(byDate.get(dateKey)! * 10) / 10 : null,
   }));
 }
 
@@ -280,7 +317,7 @@ export function aggregateDailyWorkoutSets(
   return buildDateWindow(days, referenceDateKey).map((dateKey) => ({
     dateKey,
     label: shortDateLabel(dateKey),
-    value: byDate.has(dateKey) ? byDate.get(dateKey)! : null,
+    calories: byDate.has(dateKey) ? byDate.get(dateKey)! : null,
   }));
 }
 
@@ -300,7 +337,7 @@ export function aggregateWeightSeries(
     return {
       dateKey,
       label: shortDateLabel(dateKey),
-      value: entry ? toDisplayWeight(entry.weightKg, unit) : null,
+      calories: entry ? toDisplayWeight(entry.weightKg, unit) : null,
     };
   });
 }
@@ -324,13 +361,13 @@ export function aggregateRolling7DayWeightSeries(
       if (entry) samples.push(entry.weightKg);
     }
     if (samples.length === 0) {
-      return { dateKey, label: shortDateLabel(dateKey), value: null };
+      return { dateKey, label: shortDateLabel(dateKey), calories: null };
     }
     const avgKg = samples.reduce((s, v) => s + v, 0) / samples.length;
     return {
       dateKey,
       label: shortDateLabel(dateKey),
-      value: toDisplayWeight(avgKg, unit),
+      calories: toDisplayWeight(avgKg, unit),
     };
   });
 }
@@ -359,16 +396,16 @@ export function aggregateBodyMeasurementSeries(
     const entry = byDate.get(dateKey);
     const raw = entry?.[metric];
     if (raw === undefined || !Number.isFinite(raw)) {
-      return { dateKey, label: shortDateLabel(dateKey), value: null };
+      return { dateKey, label: shortDateLabel(dateKey), calories: null };
     }
-    const value =
+    const calories =
       metric === 'bodyFatPct'
         ? Math.round(raw * 10) / 10
         : toDisplayLength(raw, lengthUnit);
     return {
       dateKey,
       label: shortDateLabel(dateKey),
-      value,
+      calories,
     };
   });
 }
@@ -379,8 +416,25 @@ export function aggregateBodyMeasurementSeries(
  */
 export function chartDateFractions(dateKeys: string[]): number[] {
   if (dateKeys.length === 0) return [];
+  const parse = (k: string): number => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(k);
+    if (!m) throw new Error(`Invalid date key: ${k}`);
+    const [, yStr, mStr, dStr] = m;
+    const y = Number(yStr), mo = Number(mStr), d = Number(dStr);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (!Number.isFinite(dt.getTime()) || dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+      throw new Error(`Invalid date key: ${k}`);
+    }
+    return dt.getTime();
+  };
+  // Validate all keys before computing fractions
+  dateKeys.forEach(parse);
   if (dateKeys.length === 1) return [0.5];
-  return dateKeys.map((_, i) => i / (dateKeys.length - 1));
+  const first = parse(dateKeys[0]);
+  const last = parse(dateKeys[dateKeys.length - 1]);
+  const span = last - first;
+  if (span === 0) return dateKeys.map(() => 0.5);
+  return dateKeys.map((k) => (parse(k) - first) / span);
 }
 
 /**
