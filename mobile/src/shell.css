@@ -218,16 +218,15 @@ button, a, [role="button"] { touch-action: manipulation; }
 .fitlife-brand-mark .fitlife-logo { width: 28px; height: 28px; }
 .fitlife-splash { gap: 5px; }
 
-/* Floating glass navigation has a solid fallback and one compositor-friendly highlight. */
+/* Bottom navigation sits flush at the bottom edge — full width, no floating pill. */
 @media (max-width: 650px) {
   .mobile-bottom-nav {
-    left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom)); min-height: 66px; padding: 5px;
-    border: 1px solid var(--border-subtle); border-radius: 25px; background: var(--bg-card);
-    box-shadow: 0 6px 24px rgba(0,0,0,.13); isolation: isolate;
+    left: 0; right: 0; bottom: 0; min-height: 66px; padding: 5px;
+    border: 1px solid var(--border-subtle); border-radius: 0; background: var(--bg-card);
+    box-shadow: none; isolation: isolate;
   }
-  .mobile-nav-selection { position:absolute; z-index:-1; left:5px; top:5px; bottom:5px; width:calc((100% - 10px) / 5); border-radius:19px; background:var(--accent-primary-soft); transform:translateX(calc(var(--nav-index) * 100%)); transition:transform var(--motion-duration) cubic-bezier(.22,1,.36,1); }
-  .mobile-bottom-item { position:relative; z-index:1; gap:3px; min-height:55px; border-radius:18px; transition:color 160ms ease; }
+  .mobile-nav-selection { position:absolute; z-index:-1; left:0; top:0; bottom:0; width:calc(100% / 5); border-radius:0; background:var(--accent-primary-soft); transform:translateX(calc(var(--nav-index) * 100%)); transition:transform var(--motion-duration) cubic-bezier(.22,1,.36,1); }
+  .mobile-bottom-item { position:relative; z-index:1; gap:3px; min-height:55px; border-radius:0; transition:color 160ms ease; }
   .mobile-bottom-item svg { transition:transform var(--motion-duration) cubic-bezier(.22,1,.36,1); }
   .mobile-bottom-item.is-active > svg, .mobile-bottom-item.is-active .mobile-nav-avatar { transform:translateY(-1px); }
   .mobile-bottom-item:focus-visible { outline:2px solid var(--accent-primary-text); outline-offset:-3px; }
@@ -318,27 +317,26 @@ button, a, [role="button"] { touch-action: manipulation; }
   .mobile-bottom-nav[data-nav-style="glass"], [data-theme-mode="dark"] .mobile-bottom-nav[data-nav-style="glass"] { background:var(--bg-card); -webkit-backdrop-filter:none; backdrop-filter:none; }
 }
 
-/* 1.0.6 — stronger frosted glass, kept in one small, persistent compositor layer.
-   The fallback stays solid when backdrop filtering is unavailable. */
+/* 1.0.6 — bottom navigation flush at the bottom edge. Full width, no floating pill. */
 @media (max-width: 650px) {
   .mobile-bottom-nav {
     z-index: 40;
     min-height: 70px;
     padding: 5px;
     border: 1px solid rgba(255,255,255,.52);
-    border-radius: 27px;
-    box-shadow: 0 9px 26px rgba(15,30,21,.20), inset 0 1px 0 rgba(255,255,255,.55);
+    border-radius: 0;
+    box-shadow: none;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
   .mobile-nav-selection {
     z-index: 0;
-    border-radius: 21px;
+    border-radius: 0;
     background: var(--accent-primary-soft);
     box-shadow: inset 0 0 0 1px var(--border-strong);
     transition: transform 230ms cubic-bezier(.2,.8,.2,1);
   }
-  .mobile-bottom-item { z-index: 1; min-height: 58px; gap: 3px; }
+  .mobile-bottom-item { z-index: 1; min-height: 58px; gap: 3px; border-radius: 0; }
   .mobile-bottom-item .mobile-nav-icon {
     display: grid; place-items: center; width: 26px; height: 26px;
     transform: translateY(0) scale(1);
