@@ -348,6 +348,115 @@ button, a, [role="button"] { touch-action: manipulation; }
   .mobile-bottom-item.is-active .mobile-nav-label { font-weight: 850; }
   .fitness-home { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 }
+
+/* 1.0.7 — Glassy Liquid Tab Bar.
+   Frosted backdrop + gradient border + soft inner glow = liquid glass base.
+   SVG blob morphs fluidly between tab positions like a liquid droplet.
+   Active icon pulses with colored outer glow; inactive icons carry a subtle hover halo. */
+@media (max-width: 650px) {
+  .mobile-bottom-nav.liquid-glass-nav {
+    background: rgba(247, 245, 239, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 30px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+    padding: 6px;
+    min-height: 74px;
+    isolation: isolate;
+  }
+  [data-theme-mode="dark"] .mobile-bottom-nav.liquid-glass-nav {
+    background: rgba(20, 28, 24, 0.45);
+    border: 1px solid rgba(222, 239, 227, 0.18);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .liquid-selection {
+    position: absolute;
+    z-index: 0;
+    left: 6px;
+    top: 6px;
+    right: 6px;
+    bottom: 6px;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .liquid-blob {
+    fill: var(--accent-primary);
+    filter: blur(6px) saturate(180%);
+    opacity: 0.85;
+    transition: d 400ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: center;
+    animation: liquid-pulse 3s ease-in-out infinite;
+  }
+
+  .mobile-bottom-item.liquid-item {
+    z-index: 1;
+    position: relative;
+    min-height: 62px;
+    border-radius: 22px;
+    transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: transparent;
+  }
+
+  .mobile-bottom-item.liquid-item.is-active {
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+  [data-theme-mode="dark"] .mobile-bottom-item.liquid-item.is-active {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .mobile-bottom-item.liquid-item .mobile-nav-icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mobile-bottom-item.liquid-item .mobile-nav-icon.is-active {
+    color: var(--accent-primary-text);
+    filter: drop-shadow(0 0 10px var(--accent-primary)) drop-shadow(0 0 20px var(--accent-primary));
+    animation: icon-glow 2.5s ease-in-out infinite;
+  }
+
+  .mobile-bottom-item.liquid-item .mobile-nav-icon:not(.is-active) {
+    color: var(--text-secondary);
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.15));
+  }
+
+  .mobile-bottom-item.liquid-item .mobile-nav-icon:not(.is-active):hover {
+    filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.25));
+  }
+
+  .mobile-bottom-item.liquid-item .mobile-nav-label {
+    font-size: calc(9.5px * var(--fitlife-text-scale, 1));
+    font-weight: 750;
+    line-height: 1;
+    transition: color 300ms ease;
+  }
+
+  .mobile-bottom-item.liquid-item.is-active .mobile-nav-label {
+    color: var(--accent-primary-text);
+    font-weight: 850;
+  }
+
+  @keyframes liquid-pulse {
+    0%, 100% { opacity: 0.85; filter: blur(6px) saturate(180%); }
+    50% { opacity: 0.7; filter: blur(9px) saturate(220%); }
+  }
+
+  @keyframes icon-glow {
+    0%, 100% { filter: drop-shadow(0 0 10px var(--accent-primary)) drop-shadow(0 0 20px var(--accent-primary)); opacity: 1; }
+    50% { filter: drop-shadow(0 0 16px var(--accent-primary)) drop-shadow(0 0 32px var(--accent-primary)); opacity: 0.9; }
+  }
+}
+
 @supports ((backdrop-filter: blur(18px)) or (-webkit-backdrop-filter: blur(18px))) {
   @media (max-width: 650px) {
     .mobile-bottom-nav[data-nav-style="glass"] {
@@ -402,14 +511,21 @@ button, a, [role="button"] { touch-action: manipulation; }
 @keyframes lift-shadow { 0%, 12%, 100% { transform:scaleX(1); opacity:.18; } 48%, 60% { transform:scaleX(.76); opacity:.1; } }
 @keyframes loading-dot { 0%, 65%, 100% { opacity:.35; } 30% { opacity:1; } }
 [data-motion="reduced"] .kettlebell-lift, [data-motion="reduced"] .lift-shadow,
-[data-motion="reduced"] .loading-dots i, [data-motion="reduced"] .mobile-nav-icon { animation:none !important; transition:none !important; }
+[data-motion="reduced"] .loading-dots i, [data-motion="reduced"] .mobile-nav-icon,
+[data-motion="reduced"] .liquid-blob, [data-motion="reduced"] .mobile-nav-icon.is-active { animation:none !important; transition:none !important; }
 @media (prefers-reduced-motion: reduce) {
   .kettlebell-lift, .lift-shadow, .loading-dots i, .mobile-nav-icon,
-  .animate-tab-right, .animate-tab-left { animation:none !important; transition:none !important; }
+  .animate-tab-right, .animate-tab-left,
+  .liquid-blob, .mobile-nav-icon.is-active { animation:none !important; transition:none !important; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .mobile-bottom-nav[data-nav-style="glass"], [data-theme-mode="dark"] .mobile-bottom-nav[data-nav-style="glass"] {
     background:var(--bg-card); -webkit-backdrop-filter:none; backdrop-filter:none;
+  }
+  .mobile-bottom-nav.liquid-glass-nav {
+    background:var(--bg-card); -webkit-backdrop-filter:none; backdrop-filter:none;
+    box-shadow:none;
+    border:1px solid var(--border-subtle);
   }
 }
 
