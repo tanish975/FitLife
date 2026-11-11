@@ -276,8 +276,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       <section className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-3" aria-label="Weekly streak consistency">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="font-heading text-xs font-semibold text-[#F4F1EA] uppercase tracking-wider">7-Day Streak Consistency</h2>
-            <p className="text-[0.625rem] text-[#84877F]">Logged activity across meals, workouts & mood</p>
+            <h2 className="font-heading text-xs font-semibold text-[#F4F1EA] uppercase tracking-wider">7-Day Streak</h2>
           </div>
           <span className="text-[0.625rem] font-semibold text-[#7BB38F]">
             {consistencyStrip.filter(d => d.isActive).length}/7 active
@@ -299,8 +298,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       <section className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-3" data-guide-target="dashboard-weekly-trend" aria-label="Weekly weight trend">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="font-heading text-xs font-semibold text-[#F4F1EA] uppercase tracking-wider">7-Day Weight Trend Average</h2>
-            <p className="text-[0.625rem] text-[#84877F]">Week-over-week change — never react to one day’s weight</p>
+            <h2 className="font-heading text-xs font-semibold text-[#F4F1EA] uppercase tracking-wider">7-Day Weight Trend</h2>
           </div>
           <span className="text-[0.625rem] font-semibold text-[#7BB38F]">
             {weeklyWeightTrend.currentWeekDaysLogged}/7 logged
@@ -333,17 +331,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <p className="text-[0.625rem] text-[#B8B5AD]">Log 2+ morning weigh-ins this week for your 7-day trend average.</p>
           </div>
         )}
-        <p className="mt-1.5 text-[0.625rem] leading-relaxed text-[#B8B5AD]">
-          <strong>{weeklyWeightTrend.coachingHeadline}.</strong> {weeklyWeightTrend.coachingBody}
-        </p>
-      </section>
+              </section>
 
       {/* Weekly summary digest card */}
       <section className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-3" data-guide-target="dashboard-weekly-digest" aria-label="Weekly summary digest">
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="font-heading text-xs font-semibold text-[#F4F1EA] uppercase tracking-wider">Weekly Summary</h2>
-            <p className="text-[0.625rem] text-[#84877F]">{weeklySummaryDigest.weekRangeLabel}</p>
           </div>
           <button onClick={() => onNavigateTab('progress')} className="text-[0.625rem] font-semibold text-[#7BB38F] hover:underline">View details →</button>
         </div>
@@ -368,7 +362,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-[#84877F]" />
         </div>
-        <p className="mt-1.5 text-[0.625rem] text-[#B8B5AD]">{weeklySummaryDigest.focusDetail}</p>
       </section>
 
       {/* Quick natural-language meal input bar */}
@@ -376,7 +369,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="font-heading text-xs font-semibold text-[#F4F1EA] uppercase tracking-wider">Quick Meal Log</h2>
-            <p className="text-[0.625rem] text-[#84877F]">Describe what you ate — we’ll confirm before logging</p>
           </div>
           <button onClick={() => onNavigateTab('meals')} className="text-[0.625rem] font-semibold text-[#7BB38F] hover:underline">Open full log →</button>
         </div>
@@ -440,7 +432,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </AnimatedRing>
           </div>
         </div>
-        <p className="pt-3 text-[0.6875rem] text-[#B8B5AD]">Tracking score reflects logs, not your health. Targets and exercise calories are estimates.</p>
+        
         <div className="grid grid-cols-3 gap-2 pt-4">
               <div className="rounded-xl bg-[#151F19] px-2.5 py-1.5 border border-[#2F4536]">
                 <div className="text-[0.625rem] text-[#84877F]">Target</div>
@@ -461,7 +453,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </div>
               </div>
             </div>
-      </div> : <section className="profile-needed profile-needed-card" data-guide-target="daily-overview" aria-label="Daily overview"><div><strong>{Math.round(totals.calories)} kcal logged today</strong><p>{profile.onboarded ? "Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance." : "Add your own profile details to see estimated targets. It is optional."}</p></div>{!profile.onboarded && <button type="button" onClick={onEditProfile}>Add profile details</button>}</section>}
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="daily-overview" aria-label="Daily overview"><div><strong>{Math.round(totals.calories)} kcal logged today</strong><p>{profile.onboarded ? "Adult targets not provided under 18." : "Add profile details for estimated targets."}</p></div>{!profile.onboarded && <button type="button" onClick={onEditProfile}>Add profile details</button>}</section>}
 
       {/* FOUR ANIMATED MACRO RINGS (Customizable Visibility) */}
       {settings.dashboardWidgets.showMacros && macroTargets && (

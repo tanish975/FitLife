@@ -214,9 +214,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Workouts</h1>
-          <p className="text-xs text-[#84877F]">
-            {EXERCISE_CATALOG.length} exercises · your pace
-          </p>
+          
         </div>
         <div className="rounded-2xl border border-[#6E4433] bg-[#33241E] px-3 py-1.5 text-right">
           <div className="text-[0.625rem] font-medium text-[#DE9473]">Est. burn today</div>
@@ -225,15 +223,15 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
       </div>
 
       <section className="guided-picker" aria-labelledby="guided-picker-title" data-guide-target="workouts-guided">
-        <div className="guided-picker-heading"><span><Dumbbell size={21}/></span><div><p>TRAIN WITH A PLAN</p><h2 id="guided-picker-title">Guided workout</h2><small>One set at a time, at your pace.</small></div></div>
+        <div className="guided-picker-heading"><span><Dumbbell size={21}/></span><div><h2 id="guided-picker-title">Guided workout</h2></div></div>
         {savedSession && <button type="button" className="guided-resume" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === savedSession.sessionId); if (session) openGuided(session,true); }}>Resume {WORKOUT_SESSION_IDEAS.find(x => x.id === savedSession.sessionId)?.title} <ArrowRight size={16}/></button>}
-        <label htmlFor="guided-session-select">Choose a session</label><div className="guided-picker-controls"><select id="guided-session-select" value={pickerId} onChange={e => {setPickerId(e.target.value);setConfirmReplace(false);}}>{WORKOUT_SESSION_IDEAS.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="button" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === pickerId); if (session) openGuided(session); }}>Start</button></div>
+        <label htmlFor="guided-session-select">Session</label><div className="guided-picker-controls"><select id="guided-session-select" value={pickerId} onChange={e => {setPickerId(e.target.value);setConfirmReplace(false);}}>{WORKOUT_SESSION_IDEAS.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="button" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === pickerId); if (session) openGuided(session); }}>Start</button></div>
         {confirmReplace && <div className="guided-replace" role="alert"><p>Start a new session? Your logged sets stay saved, but the paused session will be replaced.</p><button type="button" onClick={() => { const session=WORKOUT_SESSION_IDEAS.find(x => x.id === pickerId); if (session) {setConfirmReplace(false);setGuided({session,resume:false});} }}>Start new session</button><button type="button" onClick={() => setConfirmReplace(false)}>Cancel</button></div>}
       </section>
       <WeeklyPlanner />
       <section className="home-workout-shortcut" data-guide-target="workouts-home" aria-label="No-equipment workouts at home">
         <div className="home-workout-shortcut-icon"><Home size={19} aria-hidden="true" /></div>
-        <div className="home-workout-shortcut-copy"><span className="training-eyebrow">TRAIN AT HOME</span><h2>No equipment needed</h2><p>{NO_EQUIPMENT_COUNT} movements · strength, core & cardio</p></div>
+        <div className="home-workout-shortcut-copy"><h2>No equipment needed</h2></div>
         <button type="button" aria-label="Explore no-equipment home exercises" onClick={() => {
           setSessionId(''); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter('bodyweight'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE);
           revealExerciseCatalog();
@@ -244,8 +242,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
 
       <details className="training-disclosure"><summary>Browse session ideas <span aria-hidden="true">⌄</span></summary>
       <section className="session-ideas" aria-label="Workout session ideas">
-        <div className="session-heading"><div><span className="training-eyebrow">NEED A STARTING POINT?</span><h2>Try a session idea</h2></div>{sessionId && <button type="button" onClick={() => { setSessionId(''); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter('any'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); }}>View all</button>}</div>
-        <p>Choose movements that feel right, make space and adjust sets and rest. Stop if you feel pain.</p>
+        <div className="session-heading"><div><h2>Session ideas</h2></div>{sessionId && <button type="button" onClick={() => { setSessionId(''); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter('any'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); }}>View all</button>}</div>
         <div className="session-list">
           {WORKOUT_SESSION_IDEAS.map((session) => <button key={session.id} type="button" className="session-option" aria-pressed={sessionId === session.id}
             onClick={() => { setSessionId(session.id === sessionId ? '' : session.id); setSelectedGroup('All'); setSelectedTarget('all'); setSearchQuery(''); setEquipmentFilter(session.homeNoEquipment ? 'bodyweight' : 'any'); setFavoritesOnly(false); setNewOnly(false); setVisibleCount(CATALOG_PAGE_SIZE); revealExerciseCatalog(); }}>
@@ -309,20 +306,20 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
           <span className="text-[0.6875rem] text-[#D8C39E]">Tap for details →</span>
         </div>
 
-        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle={favoritesOnly ? 'Save exercises with the heart, or turn off Favorites.' : 'Try another search, session, filter or muscle group.'} />}
+        {filteredExercises.length === 0 && <EmptyState title="No exercises found" subtitle={favoritesOnly ? 'Turn off Favorites' : 'Try another filter'} />}
         <div className="space-y-2 pr-0.5" data-testid="exercise-catalog-list">
           {filteredExercises.slice(0, visibleCount).map((ex) => {
             const favorite = settings.favoriteExerciseIds.includes(ex.id);
             return <div key={ex.id} data-exercise-id={ex.id} className="exercise-row">
               <button type="button" className="exercise-open" onClick={() => openExerciseSheet(ex)}>
-                <div className="min-w-0 pr-3"><div className="flex flex-wrap items-center gap-1.5"><h4 className="break-words font-heading text-xs font-semibold leading-snug text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[0.5625rem] font-semibold text-[#D8C39E]">{ex.targetAreas?.[0] || ex.muscleGroup}</span></div><p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{ex.equipment} · {ex.difficulty} · {ex.secondaryMuscles}</p></div>
+                <div className="min-w-0 pr-3"><div className="flex flex-wrap items-center gap-1.5"><h4 className="break-words font-heading text-xs font-semibold leading-snug text-[#F4F1EA]">{ex.name}</h4><span className="rounded-md bg-[#2B271F] border border-[#4A4232] px-1.5 py-0.5 text-[0.5625rem] font-semibold text-[#D8C39E]">{ex.targetAreas?.[0] || ex.muscleGroup}</span></div><p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{ex.equipment} · {ex.difficulty}</p></div>
                 <div className="flex shrink-0 items-center gap-2"><div className="exercise-stats text-right"><div className="font-heading text-xs font-bold text-[#F4F1EA]">{ex.difficulty}</div><div className="text-[0.625rem] font-semibold text-[#7BB38F]">+20 XP</div></div><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#528B67] text-[#F4F1EA]"><Plus className="h-4 w-4 stroke-[2.5]" /></div></div>
               </button>
               <button type="button" className="exercise-favorite" aria-label={`${favorite ? 'Remove' : 'Add'} ${ex.name} ${favorite ? 'from' : 'to'} favorites`} aria-pressed={favorite} onClick={() => toggleFavoriteExercise(ex.id)}><Heart size={19} fill={favorite ? 'currentColor' : 'none'} /></button>
             </div>;
           })}
         </div>
-        <p className="training-estimate-note">Some movements have no energy estimate; available estimates are rough, not measured.</p>
+        <p className="training-estimate-note">Energy estimates are rough, not measured.</p>
         <p className="catalog-count" aria-live="polite">Showing {Math.min(visibleCount, filteredExercises.length)} of {filteredExercises.length} exercises</p>
         {visibleCount < filteredExercises.length && (
           <button type="button" className="catalog-more" onClick={() => setVisibleCount((count) => count + CATALOG_PAGE_SIZE)}>
@@ -343,7 +340,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
         {todayWorkouts.length === 0 ? (
           <EmptyState
             title="No Workouts Logged Today"
-            subtitle="Select any exercise above to launch the Adaptive Workout Engine bottom sheet."
+            subtitle="Tap any exercise to log it."
           />
         ) : (
           <div className="space-y-2">
@@ -433,8 +430,8 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
             {/* Adaptive Engine Rationale & Form Tip */}
             <div className="mt-3 rounded-2xl border border-[#2F3A33] bg-[#1E2520] p-3 text-xs space-y-1.5">
               <p className="text-[#F4F1EA]">{prescription.goalRationale}</p>
-              <p className="text-[0.6875rem] text-[#D8C39E]">💡 Coach Cue: {selectedExercise.tip}</p>
-              {!selectedExercise.isBodyweight && <p className="text-[0.6875rem] text-[#B8B5AD]">Load starts at zero or your previous entry. Choose an amount that suits your ability; start light and adjust as needed.</p>}
+              <p className="text-[0.6875rem] text-[#D8C39E]">💡 {selectedExercise.tip}</p>
+              {!selectedExercise.isBodyweight && <p className="text-[0.6875rem] text-[#B8B5AD]">Start light. Choose a load that suits your ability.</p>}
               <p className="exercise-easier"><strong>Easier option:</strong> {easierOption(selectedExercise).note}</p>
               {easierOption(selectedExercise).exerciseId && <button type="button" className="exercise-alternative" onClick={() => { const alt=EXERCISE_CATALOG.find(e => e.id === easierOption(selectedExercise).exerciseId); if (alt) openExerciseSheet(alt); }}>View easier movement</button>}
             </div>

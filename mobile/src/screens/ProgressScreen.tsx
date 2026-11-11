@@ -100,9 +100,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Progress & Trends</h1>
-          <p className="text-xs text-[#84877F]">
-            Weight check-ins and 14 days of food logs
-          </p>
+          
         </div>
         <span className="rounded-full border border-[#3E634B] bg-[#213026] px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wider text-[#7BB38F]">
           {unit.toUpperCase()} Display
@@ -178,10 +176,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="progress-weekly-trend" aria-label="Weekly weight trend">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">7-Day Weight Trend Average</h2>
-            <p className="text-[0.6875rem] text-[#84877F]">
-              Never react to one day’s weight — the 7-day average smooths out water and sodium noise.
-            </p>
+            <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">7-Day Weight Trend</h2>
           </div>
           <span className="text-xs font-semibold text-[#7BB38F]">
             {weeklyWeightTrend.currentWeekDaysLogged}/7 logged
@@ -220,26 +215,13 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
           </div>
         )}
 
-        <p className="mt-2 text-xs leading-relaxed text-[#B8B5AD]">
-          <strong>{weeklyWeightTrend.coachingHeadline}.</strong> {weeklyWeightTrend.coachingBody}
-        </p>
-      </div>
+              </div>
 
       {profile.onboarded ? (
         <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="progress-bmi" aria-label="Body mass index">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Body Mass Index (BMI)</h2>
-              <p className="text-[0.6875rem] text-[#84877F]">
-                {bmiResult.healthyRangeKg ? (
-                  <>
-                    Adult BMI reference range for {profile.heightCm} cm:{' '}
-                    <strong className="text-[#D8C39E]">
-                      {formatWeight(bmiResult.healthyRangeKg[0], unit)} – {formatWeight(bmiResult.healthyRangeKg[1], unit)}
-                    </strong>
-                  </>
-                ) : 'BMI needs an age-appropriate assessment below age 20.'}
-              </p>
+              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">BMI</h2>
             </div>
             <div className="text-right">
               <div className="font-heading text-xl font-extrabold text-[#F4F1EA]">{bmiResult.bmi}</div>
@@ -276,13 +258,13 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
             </div>
           )}
 
-          <p className="mt-2.5 text-xs leading-relaxed text-[#B8B5AD]">{bmiResult.summary}</p>
+          
         </div>
       ) : (
         <section className="profile-needed profile-needed-card" data-guide-target="progress-bmi" aria-label="Body mass index">
           <div>
-            <strong>BMI is not available yet</strong>
-            <p>Add your own profile details if you want a BMI estimate. It is a screening measure, not a diagnosis.</p>
+            <strong>BMI not available yet</strong>
+            <p>Add profile details for BMI estimate.</p>
           </div>
           <button type="button" onClick={onEditProfile}>
             Add profile details
@@ -293,12 +275,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="progress-chart" aria-label="Weight trend chart">
         <div className="mb-2 flex items-center justify-between">
           <div>
-            <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Weight Trend (Last 14 Check-in Days)
-            </h2>
-            <p className="text-[0.6875rem] text-[#84877F]">
-              Dates are spaced by time. Open the table for every value.
-            </p>
+            <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Weight Trend (14 Days)</h2>
           </div>
           <span className="text-xs font-semibold text-[#7BB38F]">
             {weightChartData.length} pts
@@ -342,10 +319,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">14-Day Food Energy</h2>
-              <p className="text-[0.6875rem] text-[#84877F]">
-                {macroTargets ? 'Dashed line is your current target, for reference only; past targets may have differed. Unlogged days are gaps.' : 'Logged food energy. Unlogged days are gaps, not zero intake.'}
-              </p>
+              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Food Energy (14d)</h2>
             </div>
             {macroTargets && (
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D8C39E]">
@@ -392,10 +366,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">14-Day Protein</h2>
-              <p className="text-[0.6875rem] text-[#84877F]">
-                Unlogged meal days are gaps, not zero intake.
-              </p>
+              <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Protein (14d)</h2>
             </div>
             {macroTargets && (
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#7BB38F]">
@@ -421,7 +392,6 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="font-heading text-sm font-semibold text-[#F4F1EA]">Body Measurements</h2>
-            <p className="text-[0.6875rem] text-[#84877F]">Waist, hips, chest, neck, arm, thigh & body fat %</p>
           </div>
           <button
             type="button"
@@ -431,7 +401,7 @@ export const ProgressScreen: React.FC<{ onEditProfile: () => void }> = ({ onEdit
             <Plus className="h-3.5 w-3.5 stroke-[2.5]" /> Log measurement
           </button>
         </div>
-        <p className="text-xs text-[#B8B5AD]">Body measurement tracking coming soon — save waist, hip, chest, neck, arm, thigh circumferences and body fat % to see trend charts here.</p>
+        <p className="text-xs text-[#B8B5AD]">Coming soon: waist, hip, chest, neck, arm, thigh & body fat % trends.</p>
       </div>
     </div>
   );

@@ -39,11 +39,11 @@ interface SettingsScreenProps {
 }
 
 const WIDGET_ITEMS: { key: keyof DashboardWidgetsConfig; label: string }[] = [
-  { key: 'showMacros', label: '4 Macro Rings Card' },
-  { key: 'showHydration', label: 'Daily Hydration Tracker' },
-  { key: 'showMood', label: '11-State Mood Check-In' },
-  { key: 'showAiCoach', label: 'Daily guidance' },
-  { key: 'showActivityFeed', label: "Today's Activity Feed" },
+  { key: 'showMacros', label: 'Macro Rings' },
+  { key: 'showHydration', label: 'Hydration' },
+  { key: 'showMood', label: 'Mood Check-In' },
+  { key: 'showAiCoach', label: 'AI Coach' },
+  { key: 'showActivityFeed', label: 'Activity Feed' },
 ];
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReviewGuide }) => {
@@ -121,10 +121,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
               <Moon className="h-5 w-5 theme-visible-dark" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="font-heading text-sm font-bold text-[#F4F1EA]">
-                Appearance Mode
-              </h3>
-
+              <h3 className="font-heading text-sm font-bold text-[#F4F1EA]">Appearance</h3>
             </div>
           </div>
         </div>
@@ -142,7 +139,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
 
       {/* Compact, labelled, keyboard-accessible solid palette controls. */}
       <section className="palette-picker" aria-labelledby="palette-heading">
-        <div className="palette-picker-heading"><div><h3 id="palette-heading">Color palette</h3><p>{NATURAL_PALETTES[settings.paletteId].name}</p></div><Palette size={19} aria-hidden="true" /></div>
+        <div className="palette-picker-heading"><div><h3 id="palette-heading">Palette</h3></div><Palette size={19} aria-hidden="true" /></div>
         <div className="palette-swatches" role="group" aria-label="Color palette">
           {(Object.keys(NATURAL_PALETTES) as PaletteId[]).map((pid) => {
             const palette = NATURAL_PALETTES[pid];
@@ -162,9 +159,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Droplets className="h-4 w-4 text-[#7BB38F]" />
-            <span className="font-heading text-xs font-semibold text-[#F4F1EA]">
-              Daily Water Target
-            </span>
+            <span className="font-heading text-xs font-semibold text-[#F4F1EA]">Water Target</span>
           </div>
           <span className="text-xs font-bold text-[#7BB38F]">
             {(settings.waterGoalMl / 1000).toFixed(1)} Liters
@@ -185,7 +180,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         />
 
         <div className="pt-2 border-t border-[#2F3A33]">
-          <div className="mb-2 flex items-center justify-between"><span className="font-heading text-xs font-semibold text-[#F4F1EA]">Weekly workout goal</span><span className="text-xs font-bold text-[#7BB38F]">{settings.weeklyWorkoutGoal} days</span></div>
+          <div className="mb-2 flex items-center justify-between"><span className="font-heading text-xs font-semibold text-[#F4F1EA]">Weekly Goal</span><span className="text-xs font-bold text-[#7BB38F]">{settings.weeklyWorkoutGoal} days</span></div>
           <SegmentedSelector<string> size="sm" options={[1, 2, 3, 4, 5, 6, 7].map(day => ({ value: String(day), label: String(day) }))} selected={String(settings.weeklyWorkoutGoal)} onChange={(value) => setWeeklyWorkoutGoal(Number(value))} />
         </div>
 
@@ -193,9 +188,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <Timer className="h-4 w-4 text-[#D8C39E]" />
-              <span className="font-heading text-xs font-semibold text-[#F4F1EA]">
-                Default Set Rest Timer
-              </span>
+              <span className="font-heading text-xs font-semibold text-[#F4F1EA]">Rest Timer</span>
             </div>
             <span className="text-xs font-bold text-[#D8C39E]">
               {settings.defaultRestSeconds} sec
@@ -233,9 +226,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
             <Scale className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Weight Measurement Unit
-            </h3>
+            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">Weight Unit</h3>
             
           </div>
         </div>
@@ -255,9 +246,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
               <Vibrate className="h-4 w-4" />
             </div>
             <div>
-              <h4 className="font-heading text-xs font-semibold text-[#F4F1EA]">
-                Haptic Feedback
-              </h4>
+              <h4 className="font-heading text-xs font-semibold text-[#F4F1EA]">Haptics</h4>
               
             </div>
           </div>
@@ -287,9 +276,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
             <LayoutGrid className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
-              Dashboard Widgets
-            </h3>
+            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">Dashboard</h3>
             
           </div>
         </div>
@@ -342,7 +329,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
             <RefreshCw className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">App updates</h3>
+            <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">Updates</h3>
             
           </div>
         </div>
@@ -377,9 +364,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Cloud className="h-4 w-4 text-[#D8C39E]" />
-            <h3 className="font-heading text-xs font-semibold text-[#F4F1EA]">
-              Local data & activity
-            </h3>
+            <h3 className="font-heading text-xs font-semibold text-[#F4F1EA]">Data</h3>
           </div>
           <span className="text-[0.6875rem] text-[#84877F]">{profile.email}</span>
         </div>
@@ -405,10 +390,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onReview
 
         {pendingDataAction && (
           <div role="alert" className="rounded-2xl border border-[#6E4433] bg-[#33241E] p-3.5">
-            <p className="text-xs leading-relaxed text-[#F4F1EA]">
+            <p className="text-xs text-[#F4F1EA]">
               {pendingDataAction === 'clear'
-                ? 'Clear meals, workouts, mood and weight history across your synced devices? Your profile, steps, saved meals and weekly plan are kept. This cannot be undone.'
-                : 'Replace your profile and activity with the 14-day demo? Existing meals, workouts, mood and weight history will also be deleted from synced devices. This cannot be undone.'}
+                ? 'Clear meals, workouts, mood & weight history? Profile & saved meals kept. Cannot be undone.'
+                : 'Replace with 14-day demo? Meals, workouts, mood & weight will be deleted. Cannot be undone.'}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => setPendingDataAction(null)} className="min-h-[44px] rounded-xl border border-[#2F3A33] bg-[#1E2520] px-4 text-xs font-semibold text-[#F4F1EA]">Cancel</button>
