@@ -205,6 +205,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   waterGoalMl: 2500,
   guidesSeen: [],
   largeText: false,
+  habitReminders: DEFAULT_HABIT_REMINDERS,
   dashboardWidgets: {
     showMacros: true,
     showHydration: true,

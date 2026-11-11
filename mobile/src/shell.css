@@ -357,7 +357,7 @@ button, a, [role="button"] { touch-action: manipulation; }
   .mobile-bottom-nav.liquid-glass-nav {
     background: rgba(247, 245, 239, 0.45);
     border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 30px;
+    border-radius: 0;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
     -webkit-backdrop-filter: blur(24px) saturate(150%);
     backdrop-filter: blur(24px) saturate(150%);
@@ -368,6 +368,7 @@ button, a, [role="button"] { touch-action: manipulation; }
   [data-theme-mode="dark"] .mobile-bottom-nav.liquid-glass-nav {
     background: rgba(20, 28, 24, 0.45);
     border: 1px solid rgba(222, 239, 227, 0.18);
+    border-radius: 0;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
