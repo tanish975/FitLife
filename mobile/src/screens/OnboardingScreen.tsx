@@ -167,7 +167,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
           </div>
         </div>
 
-        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">Calorie and macro targets are estimates, not medical advice. Individual needs vary; the calculation floor is not a safety guarantee.</p>
+        <p className="mt-2 text-[0.6875rem] text-[#B8B5AD]">Targets are estimates, not medical advice.</p>
         <div className="mt-3.5 grid grid-cols-4 gap-2 pt-3 border-t border-[#344A3C] text-center">
           <div className="rounded-xl bg-[#151A17] p-2">
             <div className="text-[0.625rem] text-[#84877F]">Protein</div>
@@ -194,7 +194,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
             </div>
           </div>
         </div>
-      </div> : <section className="profile-needed profile-needed-card" data-guide-target="onboarding-preview" aria-label="Estimated targets preview"><div><strong>{isMinor ? "Adult targets are unavailable" : "Estimates will appear here"}</strong><p>{isMinor ? "Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance." : "Choose a sex, enter your own measurements, and pick a goal and activity level to preview them."}</p></div></section>}
+      </div> : <section className="profile-needed profile-needed-card" data-guide-target="onboarding-preview" aria-label="Estimated targets preview"><div><strong>{isMinor ? "Adult targets are unavailable" : "Estimates will appear here"}</strong><p>{isMinor ? "Adult targets not provided under 18." : "Choose sex, measurements, goal & activity to preview."}</p></div></section>}
 
       {/* Biometrics Card */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4 space-y-4" data-guide-target="onboarding-details" aria-label="Profile details">
@@ -298,7 +298,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
                       {cfg.calorieOffset > 0 ? `+${cfg.calorieOffset}` : cfg.calorieOffset} kcal
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{gKey === 'lose_weight' ? 'Fat loss (−500 kcal)' : gKey === 'gain_muscle' ? 'Lean bulk (+300 kcal)' : gKey === 'endurance' ? 'Endurance (+150 kcal)' : 'Maintenance'}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{gKey === 'lose_weight' ? 'Fat loss' : gKey === 'gain_muscle' ? 'Lean bulk' : gKey === 'endurance' ? 'Endurance' : 'Maintenance'}</p>
                 </div>
                 <div
                   className={`flex h-5 w-5 items-center justify-center rounded-full border ${
@@ -312,7 +312,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
               </PressScale>
             );
           })}
-        </div> : <p className="text-xs leading-relaxed text-[#B8B5AD]">{isMinor ? "Adult weight-loss and calorie goals are not offered under 18. Choose movement you enjoy and seek qualified guidance when needed." : "Enter your age to see the available goal choices."}</p>}
+        </div> : <p className="text-xs text-[#B8B5AD]">{isMinor ? "Adult goals not offered under 18." : "Enter your age to see goals."}</p>}
       </div>
 
       {/* Activity Level Selection */}
@@ -341,7 +341,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish, on
                       ×{item}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{aKey === 'sedentary' ? 'Little or no exercise' : aKey === 'light' ? 'Light exercise 1-3 days/week' : aKey === 'moderate' ? 'Moderate exercise 3-5 days/week' : aKey === 'active' ? 'Hard exercise 6-7 days/week' : 'Very hard exercise \& physical job'}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-[#84877F]">{aKey === 'sedentary' ? 'Little/no exercise' : aKey === 'light' ? 'Light 1-3 days/wk' : aKey === 'moderate' ? 'Moderate 3-5 days/wk' : aKey === 'active' ? 'Hard 6-7 days/wk' : 'Very hard + physical job'}</p>
                 </div>
                 <div
                   className={`flex h-5 w-5 items-center justify-center rounded-full border ${

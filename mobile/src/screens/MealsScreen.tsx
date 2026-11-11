@@ -285,7 +285,7 @@ export const MealsScreen: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Meals</h1>
-          <p className="text-xs text-[#84877F]">Indian & global nutrition, in one place.</p>
+          
         </div>
         <div className="rounded-2xl border border-[#3E634B] bg-[#213026] px-3 py-1.5 text-right">
           <div className="text-[0.625rem] font-medium text-[#7BB38F]">Today’s Intake</div>
@@ -346,9 +346,7 @@ export const MealsScreen: React.FC = () => {
           </PressScale>
         </form>
 
-        <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#B8B5AD]">
-          Supports katori, glass, tbsp, tsp, roti, and grams. Ambiguous raw-vs-cooked or preparation queries ask for review instead of guessing.
-        </p>
+        <p className="mt-2 text-[0.6875rem] text-[#B8B5AD]">Supports katori, glass, tbsp, roti, grams.</p>
 
         {/* Review every amount and nutrient before adding; unknown foods never get invented values. */}
         {parsedQuickDrafts.length > 0 && (
@@ -402,10 +400,7 @@ export const MealsScreen: React.FC = () => {
       </div>
 
       <div className="meal-add-row">
-        <div>
-          <strong>Add your own food or recipe</strong>
-          <span>Use a package label or build a multi-ingredient home recipe.</span>
-        </div>
+        <div><strong>Add food or recipe</strong></div>
         <div className="meal-add-buttons">
           <button type="button" onClick={() => setRecipeModal({ open: true })}>
             <ChefHat size={15} /> Recipe
@@ -471,7 +466,7 @@ export const MealsScreen: React.FC = () => {
         {todayMeals.length === 0 ? (
           <EmptyState
             title="No Meals Logged Today"
-            subtitle="Search curated & IFCT 2017 foods below or use Quick add."
+            subtitle="Search foods below or use Quick add."
           />
         ) : (
           <div className="space-y-2">
@@ -557,7 +552,7 @@ export const MealsScreen: React.FC = () => {
             aria-label="Search foods"
             value={searchQuery}
             onChange={(e) => updateSearch(e.target.value)}
-            placeholder={`Search ${FOOD_CATALOG.length} global & Indian foods, countries, or codes (rotli, ramen, jollof, acai, quinoa...)`}
+            placeholder="Search foods, countries, or codes"
             className="w-full rounded-2xl border border-[#2F3A33] bg-[#1E2520] py-2.5 pl-10 pr-11 text-xs text-[#F4F1EA] outline-none placeholder:text-[#636961] focus:border-[#6BA37E]"
           />
           {searchQuery && (
@@ -735,9 +730,7 @@ export const MealsScreen: React.FC = () => {
           />
         ) : (
           <div>
-            <p className="text-xs leading-relaxed text-[#B8B5AD]">
-              FitLife FoodDB unifies curated world & Indian dishes with ICMR-NIN IFCT 2017, USDA SR28, UNICAMP TACO, and ANSES CIQUAL per-100g laboratory references; tap the scale icon on any food for micronutrients, allergens, household portions, raw vs cooked yields, and cooking fat.
-            </p>
+            <p className="text-xs text-[#B8B5AD]">Sources: ICMR-NIN IFCT 2017, USDA SR28, UNICAMP TACO, ANSES CIQUAL. Tap scale for micronutrients & portions.</p>
             <div className="space-y-2 pr-0.5 mt-2" data-testid="food-catalog-list">
               {filteredCatalog.slice(0, visibleCount).map((item) => {
                 const isLab = isLaboratoryPer100gFood(item);
@@ -829,9 +822,9 @@ export const MealsScreen: React.FC = () => {
       </div>
 
       <details className="meal-about">
-        <summary>About FitLife FoodDB & global scientific sources</summary>
+        <summary>About FitLife FoodDB</summary>
         <p>
-          FitLife FoodDB covers {FOOD_CATALOG.length} foods across 17 world regions, 85+ countries, and 18 edible categories — combining FitLife’s World & Indian Culinary Atlas with four open laboratory tables: ICMR-NIN IFCT 2017 (India, MIT), USDA ARS SR28 (U.S. Public Domain), UNICAMP TACO 4th Ed. (Brazil, MIT), and ANSES CIQUAL (France/EU, Open Licence 2.0 / MIT). Tap the scale icon on any food to inspect micronutrients, dietary/allergen flags, raw-vs-cooked hydration yields, and added cooking fat.
+          {FOOD_CATALOG.length} foods across 17 world regions, 18 edible categories. Sources: ICMR-NIN IFCT 2017, USDA SR28, UNICAMP TACO, ANSES CIQUAL. Tap scale icon for micronutrients & portions.
         </p>
       </details>
 

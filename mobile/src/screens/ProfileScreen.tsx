@@ -59,9 +59,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Athlete Profile</h1>
-          <p className="text-xs text-[#84877F]">
-            Level progression, stats, targets & 9-badge vault
-          </p>
+          
         </div>
 
         <div className="flex items-center gap-2">
@@ -95,7 +93,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <div className="fitness-profile-bio">
           <h2>{profile.name}</h2>
           <p>Level {gamification.level} athlete{macroTargets ? ` · ${GOAL_CONFIG[profile.goal]?.label}` : !profile.onboarded ? ' · Set a goal when you’re ready' : ''}</p>
-          <span>A little stronger, every day.</span>
+          
         </div>
         <div className="fitness-profile-actions">
           <button onClick={onEditOnboarding}><Edit3 size={15} /> Edit profile</button>
@@ -185,8 +183,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <div className="flex items-center justify-between rounded-xl bg-[#141916] px-3 py-2 text-[0.6875rem] text-[#84877F]">
           <span>Activity: {ACTIVITY_MULTIPLIERS[profile.activityLevel]}</span>
           <span>BMR {macroTargets.bmr} · TDEE {macroTargets.tdee} kcal</span>
-        </div></> : <p className="text-xs leading-relaxed text-[#B8B5AD]">Adult calorie and macro targets are not provided under 18. Ask a qualified health professional for individual guidance.</p>}
-      </div> : <section className="profile-needed profile-needed-card" aria-label="Optional profile details"><div><strong>Profile details are optional</strong><p>Add your own measurements to see estimated targets and BMI. Nothing is filled in for you.</p></div><button type="button" onClick={onEditOnboarding}>Add profile details</button></section>}
+        </div></> : <p className="text-xs leading-relaxed text-[#B8B5AD]">Adult targets not provided under 18.</p>}
+      </div> : <section className="profile-needed profile-needed-card" aria-label="Optional profile details"><div><strong>Profile details are optional</strong><p>Add measurements for targets & BMI.</p></div><button type="button" onClick={onEditOnboarding}>Add profile details</button></section>}
 
       {/* 9-BADGE GAMIFICATION GRID */}
       <div className="rounded-[26px] border border-[#2F3A33] bg-[#1E2520] p-4" data-guide-target="profile-badges" aria-label="Achievement badges">
@@ -195,9 +193,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <h3 className="font-heading text-sm font-semibold text-[#F4F1EA]">
               Achievement Badges ({unlockedCount}/9)
             </h3>
-            <p className="text-[0.6875rem] text-[#84877F]">
-              Recomputed live from history · Tap any badge to celebrate
-            </p>
+            
           </div>
           <PressScale
             onClick={() => triggerManualCelebration(selectedBadge || undefined)}
