@@ -32,16 +32,14 @@ export const GlassBottomNav: React.FC<GlassBottomNavProps> = ({ activeTab, onSel
   const activeIndex = Math.max(0, NAV_ITEMS.findIndex((item) => item.id === activeTab));
   return (
     <nav className="mobile-bottom-nav liquid-glass-nav" data-nav-style="liquid-glass" aria-label="Main navigation" style={{ '--nav-index': activeIndex } as React.CSSProperties}>
-      {/* Liquid selection blob — wavy-morphs between tab positions */}
-      <svg className="liquid-selection" aria-hidden="true" preserveAspectRatio="none">
+      {/* Liquid selection blob — wavy-morphs between tab positions */ }
+      <svg className="liquid-selection" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 100 100">
         <path
           className="liquid-blob"
-          d={`
-            M ${activeIndex * 20 + 10},30
-            C ${activeIndex * 20 - 40},30 ${activeIndex * 20 + 60},50 ${activeIndex * 20 + 10},70
-            C ${activeIndex * 20 - 40},90 ${activeIndex * 20 + 60},90 ${activeIndex * 20 + 10},70
-            Z
-          `}
+          d={`M ${activeIndex * 20 + 5},30
+            C ${activeIndex * 20 - 35},30 ${activeIndex * 20 + 45},50 ${activeIndex * 20 + 5},70
+            C ${activeIndex * 20 - 35},90 ${activeIndex * 20 + 45},90 ${activeIndex * 20 + 5},70
+            Z`}
         />
       </svg>
 
