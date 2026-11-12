@@ -1,5 +1,7 @@
 # FitLife — fitness app for Android
 
+© 2026 Tanish (tanish975). **All rights reserved.** Proprietary source code — see [LICENSE](./LICENSE).
+
 [![Download latest Android APK](https://img.shields.io/badge/Download-Latest%20Android%20APK-347a55?style=for-the-badge)](https://github.com/tanish975/FitLife/releases/latest/download/FitLife.apk)
 [![Latest release](https://img.shields.io/github/v/release/tanish975/FitLife?label=Latest%20release&color=347a55)](https://github.com/tanish975/FitLife/releases/latest)
 
