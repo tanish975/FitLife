@@ -1,4 +1,8 @@
 
+## What’s included — v1.0.34
+
+- **Reduced text density across all screens** — replaced descriptive paragraphs with icons, visual badges, sparse labels, and compact typography throughout FitnessHomeScreen, DashboardScreen, WorkoutsScreen, MealsScreen, ProgressScreen, ProfileScreen, SettingsScreen, and OnboardingScreen. UI/UX-centric design, not a text-based readable manual.
+
 ## What’s included
 
 - **Exercise library:** 221 exercises, including 130 additions across major muscle groups, stabilizers and cardio, while retaining the original 91 exercise entries, logs and favorites. Filter by target and equipment, search, and log timed holds.
