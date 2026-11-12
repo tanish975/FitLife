@@ -1,3 +1,8 @@
+// FitLife — Fitness & Wellness App
+// Copyright (c) 2026 Tanish (tanish975). All rights reserved.
+// This source code is proprietary and confidential. Unauthorized copying,
+// modification, distribution, or use is strictly prohibited. See LICENSE.
+
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Flame, Sparkles } from 'lucide-react';
 import { useFitLife } from '../data/FitLifeStore';
