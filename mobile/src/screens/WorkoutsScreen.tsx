@@ -213,7 +213,7 @@ export const WorkoutsScreen: React.FC<{ initialGroup?: MuscleGroup }> = ({ initi
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Workouts</h1>
+          <h1 className="font-heading text-xl font-bold text-[#F4F1EA]">Workouts</h1><p className="text-xs text-[#84877F]">{EXERCISE_CATALOG.length} exercises · your pace</p>
           
         </div>
         <div className="rounded-2xl border border-[#6E4433] bg-[#33241E] px-3 py-1.5 text-right">
